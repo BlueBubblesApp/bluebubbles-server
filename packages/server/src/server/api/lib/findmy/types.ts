@@ -133,6 +133,8 @@ interface FindMyLocation {
 
 export type FindMyLocationItem = {
     handle: string | null;
+    /** Other accepted phone/email aliases for the same friend; removed before client emission. */
+    alternate_handles?: string[];
     coordinates: [number, number];
     long_address: string | null;
     short_address: string | null;

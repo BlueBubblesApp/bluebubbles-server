@@ -48,6 +48,27 @@ export class FindMyAddressLabeler {
     }
 
     /**
+     * Waits only long enough for the caller's response budget. If geocoding runs longer,
+     * returns cached/coordinate labels immediately and exposes the eventual result.
+     */
+    async labelWithin(
+        locations: FindMyLocationItem[],
+        deadlineMs: number
+    ): Promise<{ current: FindMyLocationItem[]; late: Promise<FindMyLocationItem[]> | null }> {
+        const labeling = this.label(locations);
+        let timer: NodeJS.Timeout;
+        const deadline = new Promise<null>(resolve => {
+            timer = setTimeout(() => resolve(null), deadlineMs);
+        });
+        const labeled = await Promise.race([labeling, deadline]);
+        clearTimeout(timer!);
+
+        return labeled
+            ? { current: labeled, late: null }
+            : { current: this.applyCached(locations), late: labeling };
+    }
+
+    /**
      * Geocodes every unknown cell in a single batch, then fills in addresses. Batches run
      * one at a time so overlapping refreshes reuse each other's results. Never rejects:
      * a failed lookup leaves the item as it was, to be retried on a later refresh.

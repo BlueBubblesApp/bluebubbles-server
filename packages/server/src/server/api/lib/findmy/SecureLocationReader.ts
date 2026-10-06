@@ -24,6 +24,13 @@ export type SecureLocationRecord = {
     secureLocation: SecureLocation;
 };
 
+/**
+ * Sonoma 14.4+ moved Find My friends to a different encrypted storage path.
+ * Keep this reader on the pre-Sonoma systems it was designed and tested for so
+ * it cannot shadow a newer backend with stale-but-decryptable cache records.
+ */
+export const supportsSecureLocationCacheReader = (isSonomaOrLater: boolean): boolean => !isSonomaOrLater;
+
 const parseSinglePlistObject = (data: Buffer): any => {
     const parsed = bplistParser.parseBuffer(data);
     if (parsed.length !== 1) throw new Error(`Expected one plist object, got ${parsed.length}`);
@@ -127,15 +134,16 @@ type FriendCacheData = {
  * Messages/FMFSessions path keys the shared cache by phone number or email. Emitting the
  * opaque id would add a second entry for the same person instead of updating theirs.
  */
-const buildHandleMap = (following: FriendFollowing[]): Record<string, string> => {
-    const handles: Record<string, string> = {};
+const buildHandleMap = (following: FriendFollowing[]): Record<string, string[]> => {
+    const handles: Record<string, string[]> = {};
     for (const friend of following) {
         if (!friend?.id) continue;
-        const handle =
-            friend.invitationAcceptedHandles?.find(value => typeof value === "string" && value.length > 0) ??
-            friend.invitationFromHandle ??
-            friend.invitationSentToHandle;
-        if (handle) handles[friend.id] = handle;
+        const accepted = (friend.invitationAcceptedHandles ?? [])
+            .filter((value): value is string => typeof value === "string" && value.length > 0);
+        const fallback = [friend.invitationFromHandle, friend.invitationSentToHandle]
+            .filter((value): value is string => typeof value === "string" && value.length > 0);
+        const all = [...new Set([...accepted, ...fallback])];
+        if (all.length > 0) handles[friend.id] = all;
     }
 
     return handles;
@@ -237,8 +245,9 @@ export const readFindMyFriendsFromSecureCache = (
             const contact = contacts[findMyId];
             // Without a verified phone/email the record cannot be matched to a chat handle;
             // publishing Apple's opaque id would create a phantom friend entry.
-            const handle = handles[findMyId];
-            if (!handle) continue;
+            const acceptedHandles = handles[findMyId];
+            if (!acceptedHandles?.length) continue;
+            const [handle, ...alternateHandles] = acceptedHandles;
 
             // A (0,0) reading means "no fix", not the Gulf of Guinea. FindMyFriendsCache
             // only blocks zero-coordinate clobbering when both sides are "legacy", so
@@ -251,6 +260,7 @@ export const readFindMyFriendsFromSecureCache = (
 
             output.push({
                 handle,
+                ...(alternateHandles.length > 0 ? { alternate_handles: alternateHandles } : {}),
                 coordinates: [location.latitude, location.longitude],
                 long_address: displayLabel,
                 short_address: displayLabel,

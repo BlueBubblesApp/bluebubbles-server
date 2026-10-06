@@ -11,7 +11,8 @@ import {
     assertFindMyLocationsFresh,
     assertFindMyLocationsUsable,
     loadBeaconStoreKey,
-    readFindMyFriendsFromSecureCache
+    readFindMyFriendsFromSecureCache,
+    supportsSecureLocationCacheReader
 } from "@server/api/lib/findmy/SecureLocationReader";
 import { startBackgroundFindMyRefresh } from "@server/api/lib/findmy/BackgroundFindMyRefresh";
 import { PrivateApiFindMyEventHandler } from "@server/api/privateApi/eventHandlers/PrivateApiFindMyEventHandler";
@@ -37,8 +38,15 @@ export class FindMyInterface {
      * helper. The cache drops a labelled copy whose coordinates have since been superseded.
      */
     private static async publishWithAddresses(locations: FindMyLocationItem[]): Promise<void> {
-        const labeled = (await this.getLabeler()?.label(locations)) ?? locations;
-        await new PrivateApiFindMyEventHandler().handleNewLocation(labeled);
+        const labeler = this.getLabeler();
+        const labeled = labeler
+            ? await labeler.labelWithin(locations, 3000)
+            : { current: locations, late: null };
+        const handler = new PrivateApiFindMyEventHandler();
+        await handler.handleNewLocation(labeled.current);
+        if (labeled.late) {
+            void labeled.late.then(late => handler.handleNewLocation(late)).catch(() => undefined);
+        }
     }
 
     static async getFriends() {
@@ -105,11 +113,15 @@ export class FindMyInterface {
     static async refreshFriends(openFindMyApp = true): Promise<FindMyLocationItem[]> {
         let refreshedFindMyApp = false;
 
-        // searchpartyd keeps current friend locations in its encrypted
-        // SecureLocationCache on every macOS version that ships it, so there is no
-        // version gate here. Prefer that direct source over the opportunistic
-        // Messages/FMFSessions event cache, which has no on-demand refresh.
-        if (fs.existsSync(FileSystem.findMySecureLocationsDir) && fs.existsSync(FileSystem.findMyFriendCachePath)) {
+        // Before Sonoma, searchpartyd keeps current friend locations in its encrypted
+        // SecureLocationCache. Prefer that direct source over the opportunistic
+        // Messages/FMFSessions event cache, which has no on-demand refresh. Sonoma 14.4+
+        // uses a different encrypted storage path and must be handled separately.
+        if (
+            supportsSecureLocationCacheReader(isMinSonoma) &&
+            fs.existsSync(FileSystem.findMySecureLocationsDir) &&
+            fs.existsSync(FileSystem.findMyFriendCachePath)
+        ) {
             const readDirectLocations = () =>
                 readFindMyFriendsFromSecureCache(
                     FileSystem.findMySecureLocationsDir,
@@ -147,11 +159,12 @@ export class FindMyInterface {
                 // Wait briefly for cities so the response carries them. Anything slower
                 // (e.g. a cold cache after restart) shows coordinates and follows over the socket.
                 const labeler = this.getLabeler();
-                const labeling = labeler?.label(directLocations);
-                const labeled = labeling && (await Promise.race([labeling, waitMs(3000).then(() => null)]));
-                Server().findMyCache.addAll(labeled ?? labeler?.applyCached(directLocations) ?? directLocations);
-                if (labeling && !labeled) {
-                    void labeling
+                const labeled = labeler
+                    ? await labeler.labelWithin(directLocations, 3000)
+                    : { current: directLocations, late: null };
+                Server().findMyCache.addAll(labeled.current);
+                if (labeled.late) {
+                    void labeled.late
                         .then(late => new PrivateApiFindMyEventHandler().handleNewLocation(late))
                         .catch(() => undefined);
                 }

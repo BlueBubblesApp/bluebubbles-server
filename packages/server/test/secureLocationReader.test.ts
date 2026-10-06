@@ -11,11 +11,17 @@ import {
     loadBeaconStoreKey,
     coordinateLabel,
     locationLabelForDisplay,
-    readFindMyFriendsFromSecureCache
+    readFindMyFriendsFromSecureCache,
+    supportsSecureLocationCacheReader
 } from "../src/server/api/lib/findmy/SecureLocationReader";
 
 const KEY = Buffer.from("11".repeat(32), "hex");
 const WRONG_KEY = Buffer.from("22".repeat(32), "hex");
+
+test("uses SecureLocationCache only before Sonoma", () => {
+    assert.equal(supportsSecureLocationCacheReader(false), true);
+    assert.equal(supportsSecureLocationCacheReader(true), false);
+});
 
 test("normalizes Apple's missing-label sentinel without discarding real labels", () => {
     assert.equal(locationLabelForDisplay("Home"), "Home");
@@ -285,6 +291,7 @@ test("keys locations by the friend's real handle so they merge with the Messages
     try {
         const [location] = readFindMyFriendsFromSecureCache(cacheDir, friendsPath, KEY);
         assert.equal(location.handle, "+155****0123");
+        assert.deepEqual(location.alternate_handles, ["synthetic@example.com"]);
         assert.equal(location.title, "Synthetic Friend");
         assert.equal(location.short_address, "Home");
         assert.equal(location.long_address, "Home");
