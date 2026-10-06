@@ -69,7 +69,9 @@ export class FindMyFriendsCache {
                 currentData?.status === locationData?.status &&
                 currentCoords[0] === updatedCoords[0] &&
                 currentCoords[1] === updatedCoords[1] &&
-                updateTimestamp === currentTimestamp
+                updateTimestamp === currentTimestamp &&
+                currentData?.short_address === locationData?.short_address &&
+                currentData?.long_address === locationData?.long_address
             ) || (
                 updateTimestamp < currentTimestamp
             )
