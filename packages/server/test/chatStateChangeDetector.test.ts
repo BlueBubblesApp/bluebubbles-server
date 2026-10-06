@@ -2,92 +2,124 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { ChatStateChangeDetector } from "../src/server/databases/imessage/pollers/ChatStateChangeDetector";
-import type { ChatSnapshotEntry } from "../src/server/databases/imessage/snapshot/ChatStateSnapshot";
+import type { ChatTransitionEntry } from "../src/server/databases/imessage/snapshot/ChatStateSnapshot";
 
-function entry(guid: string, overrides: Partial<ChatSnapshotEntry> = {}): ChatSnapshotEntry {
+function entry(guid: string, overrides: Partial<ChatTransitionEntry> = {}): ChatTransitionEntry {
     return {
         guid,
-        read: true,
-        isArchived: false,
         messageCount: 1,
         readPointer: "100",
+        sourceRowIds: [guid],
         ...overrides
     };
 }
 
-test("seed suppresses history", () => {
+test("seed suppresses history", async () => {
     const detector = new ChatStateChangeDetector();
     detector.seed([entry("a", { readPointer: "900719925474099301" })]);
-    assert.deepEqual(detector.observe([entry("a", { readPointer: "900719925474099301" })]), []);
+    assert.deepEqual(
+        await detector.observe([entry("a", { readPointer: "900719925474099301" })], async () => true),
+        []
+    );
 });
 
-test("pointer regression emits unread even when message rows remain read", () => {
+test("pointer regression emits unread without querying message rows", async () => {
     const detector = new ChatStateChangeDetector();
-    detector.seed([entry("a", { read: true, readPointer: "900719925474099399" })]);
-    assert.deepEqual(detector.observe([entry("a", { read: true, readPointer: "900719925474099301" })]), [
-        { guid: "a", read: false }
+    let readChecks = 0;
+    detector.seed([entry("a", { readPointer: "900719925474099399" })]);
+
+    assert.deepEqual(
+        await detector.observe([entry("a", { readPointer: "900719925474099301" })], async () => {
+            readChecks++;
+            return true;
+        }),
+        [{ guid: "a", read: false }]
+    );
+    assert.equal(readChecks, 0);
+});
+
+test("duplicate-row disappearance does not emit a false unread transition", async () => {
+    const detector = new ChatStateChangeDetector();
+    detector.seed([
+        entry("dup", { readPointer: "200", sourceRowIds: ["1", "2"] })
     ]);
+
+    assert.deepEqual(
+        await detector.observe(
+            [entry("dup", { readPointer: "100", sourceRowIds: ["1"] })],
+            async () => true
+        ),
+        []
+    );
 });
 
-test("row-derived read to unread transition emits unread", () => {
+test("pointer advance emits read only after the targeted unread query confirms it", async () => {
     const detector = new ChatStateChangeDetector();
-    detector.seed([entry("a", { read: true })]);
-    assert.deepEqual(detector.observe([entry("a", { read: false })]), [{ guid: "a", read: false }]);
+    const checked: string[] = [];
+    detector.seed([entry("a", { readPointer: "100" })]);
+
+    assert.deepEqual(
+        await detector.observe([entry("a", { readPointer: "101" })], async guid => {
+            checked.push(guid);
+            return true;
+        }),
+        [{ guid: "a", read: true }]
+    );
+    assert.deepEqual(checked, ["a"]);
 });
 
-test("pointer advance emits read only when rows say fully read", () => {
+test("pointer advance cannot clear a badge while unread messages remain", async () => {
     const detector = new ChatStateChangeDetector();
-    detector.seed([entry("a", { read: false, readPointer: "100" })]);
-    assert.deepEqual(detector.observe([entry("a", { read: true, readPointer: "101" })]), [
-        { guid: "a", read: true }
-    ]);
+    detector.seed([entry("a", { readPointer: "100" })]);
+
+    assert.deepEqual(
+        await detector.observe([entry("a", { readPointer: "101" })], async () => false),
+        []
+    );
 });
 
-test("pointer advance cannot clear a row-derived unread state", () => {
+test("unchanged chats do not query unread message rows", async () => {
     const detector = new ChatStateChangeDetector();
-    detector.seed([entry("a", { read: true, readPointer: "100" })]);
-    assert.deepEqual(detector.observe([entry("a", { read: false, readPointer: "101" })]), [
-        { guid: "a", read: false }
-    ]);
+    let readChecks = 0;
+    detector.seed([entry("a")]);
+
+    assert.deepEqual(
+        await detector.observe([entry("a")], async () => {
+            readChecks++;
+            return true;
+        }),
+        []
+    );
+    assert.equal(readChecks, 0);
 });
 
-test("row-derived unread to read transition emits read with unchanged pointer", () => {
+test("whole-chat deletion wins over read-pointer changes", async () => {
     const detector = new ChatStateChangeDetector();
-    detector.seed([entry("a", { read: false })]);
-    assert.deepEqual(detector.observe([entry("a", { read: true })]), [{ guid: "a", read: true }]);
+    detector.seed([entry("a", { messageCount: 2, readPointer: "100" })]);
+    assert.deepEqual(
+        await detector.observe([entry("a", { messageCount: 0, readPointer: "101" })], async () => true),
+        [{ guid: "a", deleted: true }]
+    );
 });
 
-test("whole-chat deletion wins over read changes", () => {
-    const detector = new ChatStateChangeDetector();
-    detector.seed([entry("a", { read: false, messageCount: 2 })]);
-    assert.deepEqual(detector.observe([entry("a", { read: true, messageCount: 0 })]), [
-        { guid: "a", deleted: true }
-    ]);
-});
-
-
-
-test("absent previously non-empty chat emits deletion once", () => {
+test("absent previously non-empty chat emits deletion once", async () => {
     const detector = new ChatStateChangeDetector();
     detector.seed([entry("a", { messageCount: 5 })]);
-    assert.deepEqual(detector.observe([]), [{ guid: "a", deleted: true }]);
-    assert.deepEqual(detector.observe([]), []);
+    assert.deepEqual(await detector.observe([], async () => true), [{ guid: "a", deleted: true }]);
+    assert.deepEqual(await detector.observe([], async () => true), []);
 });
 
-test("chat empty from seed never deletes or emits read state", () => {
+test("chat empty from seed never deletes", async () => {
     const detector = new ChatStateChangeDetector();
     detector.seed([entry("a", { messageCount: 0 })]);
-    assert.deepEqual(detector.observe([]), []);
+    assert.deepEqual(await detector.observe([], async () => true), []);
 });
 
-test("newly appearing chat seeds silently", () => {
+test("newly appearing chat seeds silently", async () => {
     const detector = new ChatStateChangeDetector();
     detector.seed([]);
-    assert.deepEqual(detector.observe([entry("new", { read: false, messageCount: 3, readPointer: "400" })]), []);
-});
-
-test("archive-only and unchanged snapshots emit nothing", () => {
-    const detector = new ChatStateChangeDetector();
-    detector.seed([entry("a", { isArchived: false })]);
-    assert.deepEqual(detector.observe([entry("a", { isArchived: true })]), []);
+    assert.deepEqual(
+        await detector.observe([entry("new", { messageCount: 3, readPointer: "400" })], async () => true),
+        []
+    );
 });

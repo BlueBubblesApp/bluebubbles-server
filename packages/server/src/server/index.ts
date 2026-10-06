@@ -38,7 +38,7 @@ import { runTerminalScript, openSystemPreferences, startMessages } from "@server
 
 import { ActionHandler } from "./api/apple/actions";
 import { insertChatParticipants, isEmpty, isNotEmpty, waitMs } from "./helpers/utils";
-import { isMinBigSur, isMinCatalina, isMinMojave, isMinMonterey, isMinSierra } from "./env";
+import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinMojave, isMinMonterey, isMinSierra } from "./env";
 import { Proxy } from "./services/proxyServices/proxy";
 import { PrivateApiService } from "./api/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
@@ -69,7 +69,6 @@ import { IMessageListener } from "./databases/imessage/listeners/IMessageListene
 import { IMessageCache } from "./databases/imessage/pollers";
 import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
 import { ChatUpdatePoller } from "./databases/imessage/pollers/ChatChangePoller";
-import { loadChatReadStates } from "./databases/imessage/pollers/IncomingReadEventDetector";
 import {
     loadChatStateSnapshot,
     type ChatStateSnapshotResult
@@ -1159,51 +1158,6 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     /**
-     * Re-syncs every chat's read state to match what Apple currently shows.
-     *
-     * The forward read detector seeds a baseline on startup and only emits when
-     * a read advances past it, so chats whose state changed before the detector
-     * deployed (or while the server was down) stay stale on the client. This
-     * one-shot emits each chat's actual current state -- read or unread -- so
-     * clients converge on Apple's view instead of drifting further.
-     *
-     * Emitting the real per-chat value matters: a backfill that only emits
-     * `read: true` marks genuinely unread chats as read, and one that blindly
-     * inverts invents unread badges. Both were observed here. Socket-only (no
-     * FCM) to avoid a push flood, and idempotent.
-     */
-    async backfillReadState(): Promise<{ total: number; read: number; unread: number }> {
-        if (!this.iMessageRepo?.db) {
-            throw new Error("iMessage repository is not initialized");
-        }
-
-        const rows = await loadChatReadStates(this.iMessageRepo.db);
-        let read = 0;
-        let unread = 0;
-        for (const [index, row] of rows.entries()) {
-            await this.emitMessage(
-                CHAT_READ_STATUS_CHANGED,
-                { chatGuid: row.guid, read: row.read },
-                "normal",
-                false,
-                true
-            );
-            if (row.read) {
-                read++;
-            } else {
-                unread++;
-            }
-
-            if (index < rows.length - 1) {
-                await waitMs(25);
-            }
-        }
-
-        this.logger.info(`Re-synced read state for ${rows.length} chats (${read} read, ${unread} unread)`);
-        return { total: rows.length, read, unread };
-    }
-
-    /**
      * Serves the complete Apple-side chat list with each chat's current read
      * state, for a client to reconcile against.
      *
@@ -1386,8 +1340,12 @@ class BlueBubblesServer extends EventEmitter {
 
         // Reads are detected by a dedicated poller. The message poller's query
         // is capped at 100 rows ordered by date created, so a message read now
-        // but created earlier never appears in its result set.
-        this.iMessageListener.addPoller(new ChatUpdatePoller(this.iMessageRepo, cache));
+        // but created earlier never appears in its result set. Preserve the
+        // existing OS gate because the snapshot query uses chat columns that
+        // are unavailable on earlier macOS versions.
+        if (isMinHighSierra) {
+            this.iMessageListener.addPoller(new ChatUpdatePoller(this.iMessageRepo, cache));
+        }
 
         this.iMessageListener.on(CHAT_READ_STATUS_CHANGED, async (item: { guid: string; read: boolean }) => {
             // Preserve the detector's transition decision verbatim. On Monterey,

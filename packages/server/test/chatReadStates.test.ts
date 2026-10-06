@@ -9,26 +9,26 @@ import {
 } from "../src/server/databases/imessage/pollers/IncomingReadEventDetector";
 
 test("treats a chat with no unread incoming messages as read", () => {
-    const states = parseChatReadStates([{ guid: "iMessage;-;+155****4567", unread_count: 0 }]);
-    assert.deepEqual(states, [{ guid: "iMessage;-;+155****4567", read: true }]);
+    const states = parseChatReadStates([{ guid: "iMessage;-;+15551234567", unread_count: 0 }]);
+    assert.deepEqual(states, [{ guid: "iMessage;-;+15551234567", read: true }]);
 });
 
 test("treats a chat with unread incoming messages as unread", () => {
-    const states = parseChatReadStates([{ guid: "iMessage;-;+155****4567", unread_count: 3 }]);
-    assert.deepEqual(states, [{ guid: "iMessage;-;+155****4567", read: false }]);
+    const states = parseChatReadStates([{ guid: "iMessage;-;+15551234567", unread_count: 3 }]);
+    assert.deepEqual(states, [{ guid: "iMessage;-;+15551234567", read: false }]);
 });
 
 test("treats a null unread tally as read rather than guessing unread", () => {
-    const states = parseChatReadStates([{ guid: "iMessage;-;+155****4567", unread_count: null }]);
-    assert.deepEqual(states, [{ guid: "iMessage;-;+155****4567", read: true }]);
+    const states = parseChatReadStates([{ guid: "iMessage;-;+15551234567", unread_count: null }]);
+    assert.deepEqual(states, [{ guid: "iMessage;-;+15551234567", read: true }]);
 });
 
 test("skips rows with no chat guid", () => {
     const states = parseChatReadStates([
         { guid: null as unknown as string, unread_count: 2 },
-        { guid: "iMessage;-;+155****4567", unread_count: 0 }
+        { guid: "iMessage;-;+15551234567", unread_count: 0 }
     ]);
-    assert.deepEqual(states, [{ guid: "iMessage;-;+155****4567", read: true }]);
+    assert.deepEqual(states, [{ guid: "iMessage;-;+15551234567", read: true }]);
 });
 
 test("emits a mix of read and unread instead of one blanket value", () => {
@@ -73,18 +73,21 @@ test("decides read state from the unread tally, not from a read timestamp", () =
  * the poller and the re-sync endpoint disagreed on what "read" means.
  */
 test("reports a chat as fully read when nothing is awaiting a read", async () => {
-    const db = { query: async () => [{ unread_count: 0 }] } as any;
+    const db = { query: async () => [{ chat_count: 1, unread_count: 0 }] } as any;
     assert.equal(await isChatFullyRead(db, "iMessage;-;+15551234567"), true);
 });
 
 test("reports a chat as not fully read while a message is awaiting a read", async () => {
-    const db = { query: async () => [{ unread_count: 2 }] } as any;
+    const db = { query: async () => [{ chat_count: 1, unread_count: 2 }] } as any;
     assert.equal(await isChatFullyRead(db, "iMessage;-;+15551234567"), false);
 });
 
-test("treats a null or missing unread tally as fully read", async () => {
-    assert.equal(await isChatFullyRead({ query: async () => [{ unread_count: null }] } as any, "chat"), true);
-    assert.equal(await isChatFullyRead({ query: async () => [] } as any, "chat"), true);
+test("does not report a deleted or missing chat as fully read", async () => {
+    assert.equal(
+        await isChatFullyRead({ query: async () => [{ chat_count: 0, unread_count: null }] } as any, "chat"),
+        false
+    );
+    assert.equal(await isChatFullyRead({ query: async () => [] } as any, "chat"), false);
 });
 
 test("scopes the unread count to the requested chat via a bound parameter", async () => {

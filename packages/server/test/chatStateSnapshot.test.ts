@@ -3,9 +3,38 @@ import assert from "node:assert/strict";
 
 import {
     buildChatSnapshotQuery,
+    buildChatTransitionQuery,
     compareDecimalStrings,
-    parseChatSnapshotRows
+    parseChatSnapshotRows,
+    parseChatTransitionRows
 } from "../src/server/databases/imessage/snapshot/ChatStateSnapshot";
+
+/** The live poll must not scan the message table or aggregate all joins every 500ms. */
+test("transition query short-circuits message existence without joining message rows", () => {
+    const sql = buildChatTransitionQuery();
+    assert.match(sql, /EXISTS\s*\(/i);
+    assert.match(sql, /FROM chat_message_join j/i);
+    assert.match(sql, /j\.chat_id\s*=\s*c\.ROWID/i);
+    assert.match(sql, /CAST\s*\(\s*c\.ROWID\s+AS TEXT\s*\)\s+AS row_id/i);
+    assert.doesNotMatch(sql, /JOIN\s+(?:chat_message_join|message)\b/i);
+    assert.doesNotMatch(sql, /COUNT\s*\(/i);
+    assert.doesNotMatch(sql, /unread_count/i);
+});
+
+test("transition rows merge duplicate GUIDs without losing a surviving message row", () => {
+    const entries = parseChatTransitionRows([
+        { guid: "duplicate", has_messages: 0, read_pointer: "100", row_id: "2" },
+        { guid: "duplicate", has_messages: 1, read_pointer: "900719925474099301", row_id: "1" }
+    ]);
+    assert.deepEqual(entries, [
+        {
+            guid: "duplicate",
+            messageCount: 1,
+            readPointer: "900719925474099301",
+            sourceRowIds: ["1", "2"]
+        }
+    ]);
+});
 
 /**
  * The snapshot drives DELETION on the client, so its chat set must be the

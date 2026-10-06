@@ -1,35 +1,24 @@
-import type { ChatSnapshotEntry } from "../snapshot/ChatStateSnapshot";
+import type { ChatTransitionEntry } from "../snapshot/ChatStateSnapshot";
 import { compareDecimalStrings } from "../snapshot/ChatStateSnapshot";
 
 export type ChatStateChange = { guid: string; read: boolean } | { guid: string; deleted: true };
 
-type TrackedState = {
-    read: boolean;
-    messageCount: number;
-    readPointer: string;
-};
-
-/** Diffs consecutive Apple-side snapshots without replaying historical state. */
+/** Diffs consecutive Apple-side states without replaying historical state. */
 export class ChatStateChangeDetector {
-    private readonly states = new Map<string, TrackedState>();
+    private readonly states = new Map<string, ChatTransitionEntry>();
 
-    private toTracked(entry: ChatSnapshotEntry): TrackedState {
-        return {
-            read: entry.read,
-            messageCount: entry.messageCount,
-            readPointer: entry.readPointer
-        };
-    }
-
-    seed(entries: ChatSnapshotEntry[]): void {
+    seed(entries: ChatTransitionEntry[]): void {
         this.states.clear();
-        for (const entry of entries) this.states.set(entry.guid, this.toTracked(entry));
+        for (const entry of entries) this.states.set(entry.guid, entry);
     }
 
-    observe(entries: ChatSnapshotEntry[]): ChatStateChange[] {
+    async observe(
+        entries: ChatTransitionEntry[],
+        isChatFullyRead: (guid: string) => Promise<boolean>
+    ): Promise<ChatStateChange[]> {
         const changes: ChatStateChange[] = [];
-        const current = new Map<string, TrackedState>();
-        for (const entry of entries) current.set(entry.guid, this.toTracked(entry));
+        const current = new Map<string, ChatTransitionEntry>();
+        for (const entry of entries) current.set(entry.guid, entry);
 
         for (const [guid, previous] of this.states) {
             if (previous.messageCount <= 0) continue;
@@ -40,16 +29,21 @@ export class ChatStateChangeDetector {
                 continue;
             }
 
+            const sameSourceRows =
+                previous.sourceRowIds.length === next.sourceRowIds.length &&
+                previous.sourceRowIds.every((rowId, index) => rowId === next.sourceRowIds[index]);
+            if (!sameSourceRows) continue;
+
             const pointerChange = compareDecimalStrings(next.readPointer, previous.readPointer);
-            if (pointerChange < 0 || (previous.read && !next.read)) {
+            if (pointerChange < 0) {
                 changes.push({ guid, read: false });
-                continue;
-            }
-            if ((pointerChange > 0 && next.read) || (!previous.read && next.read)) {
+            } else if (pointerChange > 0 && (await isChatFullyRead(guid))) {
                 changes.push({ guid, read: true });
             }
         }
 
+        // Commit the new baseline only after every targeted read check succeeds.
+        // A query failure therefore retries the complete transition next poll.
         this.states.clear();
         for (const [guid, state] of current) this.states.set(guid, state);
         return changes;
