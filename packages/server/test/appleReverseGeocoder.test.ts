@@ -94,6 +94,23 @@ test("a failed or partial batch leaves items unlabelled and retries them later",
     assert.equal(retried.short_address, "Plano, TX");
 });
 
+test("returns coordinate fallbacks at the deadline and exposes late labels", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => (release = resolve));
+    const labeler = new FindMyAddressLabeler(async coordinates => {
+        await gate;
+        return coordinates.map(() => plano);
+    });
+
+    const result = await labeler.labelWithin([location()], 0);
+    assert.equal(result.current[0].short_address, "33.020° N, 96.699° W");
+    assert.ok(result.late);
+
+    release();
+    const late = await result.late;
+    assert.equal(late?.[0].short_address, "Plano, TX");
+});
+
 test("overlapping refreshes run one batch at a time and share results", async () => {
     let release!: () => void;
     const gate = new Promise<void>(resolve => (release = resolve));

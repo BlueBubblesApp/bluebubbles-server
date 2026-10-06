@@ -1,9 +1,12 @@
-import { isEmpty } from "@server/helpers/utils";
 import { FindMyLocationItem } from "./types";
-import { Server } from "@server";
 
 export class FindMyFriendsCache {
     cache: Record<string, FindMyLocationItem> = {};
+    private readonly aliasToHandle: Record<string, string> = {};
+
+    private static normalizeHandle(handle: string): string {
+        return handle.trim().toLowerCase();
+    }
 
     /**
      * Adds a list of location data to the cache.
@@ -16,8 +19,8 @@ export class FindMyFriendsCache {
         const output: FindMyLocationItem[] = [];
         for (const i of locationData) {
             const success = this.add(i);
-            if (success) {
-                output.push(i);
+            if (success && i.handle) {
+                output.push(this.get(i.handle) ?? i);
             }
         }
 
@@ -31,11 +34,25 @@ export class FindMyFriendsCache {
      * @returns Whether the location data updated the cache at all
      */
     add(locationData: FindMyLocationItem): boolean {
-        const handle = locationData?.handle;
-        if (isEmpty(handle)) return false;
+        const suppliedHandle = locationData?.handle;
+        if (!suppliedHandle) return false;
+
+        const handles = [...new Set([suppliedHandle, ...(locationData.alternate_handles ?? [])].filter(Boolean))];
+        const existingHandle = handles.find(handle => this.cache[handle]);
+        const mappedHandle = handles
+            .map(handle => this.aliasToHandle[FindMyFriendsCache.normalizeHandle(handle)])
+            .find(handle => handle && this.cache[handle]);
+        const handle = existingHandle ?? mappedHandle ?? suppliedHandle;
+        for (const alias of handles) {
+            this.aliasToHandle[FindMyFriendsCache.normalizeHandle(alias)] = handle;
+        }
+
+        // Alias metadata is internal to cache reconciliation and must not reach clients.
+        const { alternate_handles: _, ...publicLocation } = locationData;
+        const normalizedLocation: FindMyLocationItem = { ...publicLocation, handle };
 
         const updateCache = (): boolean => {
-            this.cache[handle] = locationData;
+            this.cache[handle] = normalizedLocation;
             return true;
         };
 
@@ -83,7 +100,8 @@ export class FindMyFriendsCache {
     }
 
     get(handle: string): FindMyLocationItem | null {
-        return this.cache[handle] ?? null;
+        const canonical = this.aliasToHandle[FindMyFriendsCache.normalizeHandle(handle)] ?? handle;
+        return this.cache[canonical] ?? null;
     }
 
     getAll(): FindMyLocationItem[] {

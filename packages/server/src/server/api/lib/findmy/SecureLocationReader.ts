@@ -127,15 +127,16 @@ type FriendCacheData = {
  * Messages/FMFSessions path keys the shared cache by phone number or email. Emitting the
  * opaque id would add a second entry for the same person instead of updating theirs.
  */
-const buildHandleMap = (following: FriendFollowing[]): Record<string, string> => {
-    const handles: Record<string, string> = {};
+const buildHandleMap = (following: FriendFollowing[]): Record<string, string[]> => {
+    const handles: Record<string, string[]> = {};
     for (const friend of following) {
         if (!friend?.id) continue;
-        const handle =
-            friend.invitationAcceptedHandles?.find(value => typeof value === "string" && value.length > 0) ??
-            friend.invitationFromHandle ??
-            friend.invitationSentToHandle;
-        if (handle) handles[friend.id] = handle;
+        const accepted = (friend.invitationAcceptedHandles ?? [])
+            .filter((value): value is string => typeof value === "string" && value.length > 0);
+        const fallback = [friend.invitationFromHandle, friend.invitationSentToHandle]
+            .filter((value): value is string => typeof value === "string" && value.length > 0);
+        const all = [...new Set([...accepted, ...fallback])];
+        if (all.length > 0) handles[friend.id] = all;
     }
 
     return handles;
@@ -237,8 +238,9 @@ export const readFindMyFriendsFromSecureCache = (
             const contact = contacts[findMyId];
             // Without a verified phone/email the record cannot be matched to a chat handle;
             // publishing Apple's opaque id would create a phantom friend entry.
-            const handle = handles[findMyId];
-            if (!handle) continue;
+            const acceptedHandles = handles[findMyId];
+            if (!acceptedHandles?.length) continue;
+            const [handle, ...alternateHandles] = acceptedHandles;
 
             // A (0,0) reading means "no fix", not the Gulf of Guinea. FindMyFriendsCache
             // only blocks zero-coordinate clobbering when both sides are "legacy", so
@@ -251,6 +253,7 @@ export const readFindMyFriendsFromSecureCache = (
 
             output.push({
                 handle,
+                ...(alternateHandles.length > 0 ? { alternate_handles: alternateHandles } : {}),
                 coordinates: [location.latitude, location.longitude],
                 long_address: displayLabel,
                 short_address: displayLabel,
