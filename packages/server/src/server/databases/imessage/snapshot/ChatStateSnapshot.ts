@@ -25,6 +25,7 @@ export type ChatSnapshotRow = {
 
 export type ChatTransitionEntry = {
     guid: string;
+    read: boolean;
     messageCount: number;
     readPointer: string;
     sourceRowIds: string[];
@@ -32,10 +33,14 @@ export type ChatTransitionEntry = {
 
 export type ChatTransitionRow = {
     guid: string;
+    is_read: number | null;
     has_messages: number | null;
     read_pointer: string | null;
     row_id: string | null;
 };
+
+/** Chat-state queries require chat.last_read_message_timestamp (macOS High Sierra+). */
+export const supportsChatStateSnapshot = (isHighSierraOrLater: boolean): boolean => isHighSierraOrLater;
 
 /** Compare non-negative decimal integers without converting them to JS Number. */
 export function compareDecimalStrings(a: string, b: string): number {
@@ -45,12 +50,22 @@ export function compareDecimalStrings(a: string, b: string): number {
 }
 
 /**
- * Lightweight state used by the live poller. It deliberately avoids joining
- * the message table; the listener can run every 500ms, so unread rows are
- * queried only for chats whose read pointer actually advanced.
+ * Lightweight state used by the live poller. Message work is restricted to
+ * Apple's indexed unread candidates; this avoids aggregating the message table
+ * while still detecting reads that do not move the chat-level pointer.
  */
 export function buildChatTransitionQuery(): string {
     return `
+        WITH unread_chat_ids AS (
+            SELECT DISTINCT j.chat_id
+            FROM message m
+            JOIN chat_message_join j ON j.message_id = m.ROWID
+            WHERE m.is_read = 0
+                AND m.is_from_me = 0
+                AND m.date_read = 0
+                AND m.item_type = 0
+                AND COALESCE(m.associated_message_type, 0) = 0
+        )
         SELECT
             c.guid AS guid,
             CAST(c.ROWID AS TEXT) AS row_id,
@@ -60,8 +75,10 @@ export function buildChatTransitionQuery(): string {
                 WHERE j.chat_id = c.ROWID
                 LIMIT 1
             ) AS has_messages,
-            CAST(COALESCE(c.last_read_message_timestamp, 0) AS TEXT) AS read_pointer
+            CAST(COALESCE(c.last_read_message_timestamp, 0) AS TEXT) AS read_pointer,
+            CASE WHEN unread.chat_id IS NULL THEN 1 ELSE 0 END AS is_read
         FROM chat c
+        LEFT JOIN unread_chat_ids unread ON unread.chat_id = c.ROWID
     `;
 }
 
@@ -77,6 +94,11 @@ export function parseChatTransitionRows(rows: ChatTransitionRow[]): ChatTransiti
         if (hasMessages !== 0 && hasMessages !== 1) {
             throw new Error(`Invalid message-existence flag for chat ${row.guid}`);
         }
+        const readFlag = Number(row.is_read ?? 0);
+        if (readFlag !== 0 && readFlag !== 1) {
+            throw new Error(`Invalid read-state flag for chat ${row.guid}`);
+        }
+        const read = readFlag === 1;
 
         const rowId = row.row_id ?? "";
         if (!/^\d+$/.test(rowId)) {
@@ -84,6 +106,7 @@ export function parseChatTransitionRows(rows: ChatTransitionRow[]): ChatTransiti
         }
         const existing = byGuid.get(row.guid);
         if (existing) {
+            existing.read = existing.read && read;
             existing.messageCount = Math.max(existing.messageCount, hasMessages);
             if (compareDecimalStrings(readPointer, existing.readPointer) > 0) {
                 existing.readPointer = readPointer;
@@ -93,6 +116,7 @@ export function parseChatTransitionRows(rows: ChatTransitionRow[]): ChatTransiti
         } else {
             byGuid.set(row.guid, {
                 guid: row.guid,
+                read,
                 messageCount: hasMessages,
                 readPointer,
                 sourceRowIds: [rowId]
