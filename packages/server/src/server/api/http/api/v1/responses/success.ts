@@ -7,6 +7,39 @@ type ResponseClasses = ResponseParams | string | fs.ReadStream;
 
 type ResponseTypes = "json" | "html" | "file";
 
+function normalizeMalformedSurrogates(value: string): string {
+    let normalized = "";
+    for (let i = 0; i < value.length; i += 1) {
+        const code = value.charCodeAt(i);
+        if (code >= 0xd800 && code <= 0xdbff) {
+            const next = value.charCodeAt(i + 1);
+            if (next >= 0xdc00 && next <= 0xdfff) {
+                normalized += value[i] + value[i + 1];
+                i += 1;
+            } else {
+                normalized += "\ufffd";
+            }
+        } else if (code >= 0xdc00 && code <= 0xdfff) {
+            normalized += "\ufffd";
+        } else {
+            normalized += value[i];
+        }
+    }
+    return normalized;
+}
+
+export function attachmentContentDisposition(filename: string): string {
+    const normalized = normalizeMalformedSurrogates(filename);
+    const fallback = normalized.replace(/[^\x20-\x7e]|["\\]/gu, "_");
+    const disposition = `attachment; filename="${fallback}"`;
+    if (fallback === filename) return disposition;
+
+    const encoded = encodeURIComponent(normalized).replace(/[!'()*]/g, char =>
+        `%${char.charCodeAt(0).toString(16).toUpperCase()}`
+    );
+    return `${disposition}; filename*=UTF-8''${encoded}`;
+}
+
 export class HTTPResponse {
     ctx: RouterContext;
 
@@ -90,7 +123,7 @@ export class FileStream extends HTTPResponse {
         // Set the content-length header so that clients can show download progress
         const stats = fs.statSync(path);
         ctx.response.set("Content-Length", stats.size.toString());
-        ctx.response.set("Content-Disposition", `attachment; filename="${path.split("/").pop()}"`);
+        ctx.response.set("Content-Disposition", attachmentContentDisposition(path.split("/").pop() ?? "attachment"));
 
         super(ctx, 200, src, "file");
     }
