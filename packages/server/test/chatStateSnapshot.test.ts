@@ -24,7 +24,8 @@ test("transition query derives read state from unread-only message candidates", 
     assert.match(sql, /FROM message m/i);
     assert.match(sql, /m\.is_read = 0/i);
     assert.match(sql, /m\.is_from_me = 0/i);
-    assert.match(sql, /m\.date_read = 0/i);
+    // Ventura preserves date_read when a user manually marks a previously read chat unread.
+    assert.doesNotMatch(sql, /m\.date_read = 0/i);
     assert.match(sql, /m\.item_type = 0/i);
     assert.match(sql, /COALESCE\(m\.associated_message_type, 0\) = 0/i);
     assert.match(sql, /CAST\s*\(\s*c\.ROWID\s+AS TEXT\s*\)\s+AS row_id/i);
@@ -76,6 +77,8 @@ test("snapshot query excludes system events and tapbacks from the unread tally",
     assert.match(sql, /item_type = 0/i);
     assert.match(sql, /associated_message_type/i);
     assert.match(sql, /is_from_me = 0/i);
+    // A manually restored unread badge must count even when Apple retains the old read date.
+    assert.doesNotMatch(sql, /date_read = 0/i);
 });
 
 /** The pointer must stay TEXT; Apple timestamps exceed exact Number range. */
