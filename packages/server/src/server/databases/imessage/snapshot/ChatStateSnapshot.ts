@@ -63,7 +63,22 @@ export function buildChatTransitionQuery(): string {
             WHERE m.is_read = 0
                 AND m.is_from_me = 0
                 AND m.item_type = 0
-                AND COALESCE(m.associated_message_type, 0) = 0
+                AND (
+                    COALESCE(m.associated_message_type, 0) = 0
+                    OR (
+                        COALESCE(m.associated_message_type, 0) != 0
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM chat_message_join newer_j
+                            JOIN message newer_m ON newer_m.ROWID = newer_j.message_id
+                            WHERE newer_j.chat_id = j.chat_id
+                                AND (
+                                    newer_m.date > m.date
+                                    OR (newer_m.date = m.date AND newer_m.ROWID > m.ROWID)
+                                )
+                        )
+                    )
+                )
         )
         SELECT
             c.guid AS guid,
@@ -156,8 +171,23 @@ export function buildChatSnapshotQuery(): string {
                 CASE
                     WHEN m.is_read = 0
                         AND m.item_type = 0
-                        AND COALESCE(m.associated_message_type, 0) = 0
                         AND m.is_from_me = 0
+                        AND (
+                            COALESCE(m.associated_message_type, 0) = 0
+                            OR (
+                                COALESCE(m.associated_message_type, 0) != 0
+                                AND NOT EXISTS (
+                                    SELECT 1
+                                    FROM chat_message_join newer_j
+                                    JOIN message newer_m ON newer_m.ROWID = newer_j.message_id
+                                    WHERE newer_j.chat_id = j.chat_id
+                                        AND (
+                                            newer_m.date > m.date
+                                            OR (newer_m.date = m.date AND newer_m.ROWID > m.ROWID)
+                                        )
+                                )
+                            )
+                        )
                     THEN 1
                     ELSE 0
                 END
