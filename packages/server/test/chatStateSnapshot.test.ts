@@ -6,29 +6,47 @@ import {
     buildChatTransitionQuery,
     compareDecimalStrings,
     parseChatSnapshotRows,
-    parseChatTransitionRows
+    parseChatTransitionRows,
+    supportsChatStateSnapshot
 } from "../src/server/databases/imessage/snapshot/ChatStateSnapshot";
 
-/** The live poll must not scan the message table or aggregate all joins every 500ms. */
-test("transition query short-circuits message existence without joining message rows", () => {
-    const sql = buildChatTransitionQuery();
-    assert.match(sql, /EXISTS\s*\(/i);
-    assert.match(sql, /FROM chat_message_join j/i);
-    assert.match(sql, /j\.chat_id\s*=\s*c\.ROWID/i);
-    assert.match(sql, /CAST\s*\(\s*c\.ROWID\s+AS TEXT\s*\)\s+AS row_id/i);
-    assert.doesNotMatch(sql, /JOIN\s+(?:chat_message_join|message)\b/i);
-    assert.doesNotMatch(sql, /COUNT\s*\(/i);
-    assert.doesNotMatch(sql, /unread_count/i);
+/** Snapshot queries require chat.last_read_message_timestamp (High Sierra+). */
+test("supports chat-state snapshots only on High Sierra or later", () => {
+    assert.equal(supportsChatStateSnapshot(false), false);
+    assert.equal(supportsChatStateSnapshot(true), true);
 });
 
-test("transition rows merge duplicate GUIDs without losing a surviving message row", () => {
+/** The live poll may inspect only Apple's indexed unread-message candidates. */
+test("transition query derives read state from unread-only message candidates", () => {
+    const sql = buildChatTransitionQuery().replace(/\s+/g, " ");
+
+    assert.match(sql, /WITH unread_chat_ids AS/i);
+    assert.match(sql, /FROM message m/i);
+    assert.match(sql, /m\.is_read = 0/i);
+    assert.match(sql, /m\.is_from_me = 0/i);
+    assert.match(sql, /m\.date_read = 0/i);
+    assert.match(sql, /m\.item_type = 0/i);
+    assert.match(sql, /COALESCE\(m\.associated_message_type, 0\) = 0/i);
+    assert.match(sql, /CAST\s*\(\s*c\.ROWID\s+AS TEXT\s*\)\s+AS row_id/i);
+    assert.doesNotMatch(sql, /COUNT\s*\(/i);
+    assert.doesNotMatch(sql, /GROUP BY/i);
+});
+
+test("transition rows merge duplicate GUIDs with unread winning", () => {
     const entries = parseChatTransitionRows([
-        { guid: "duplicate", has_messages: 0, read_pointer: "100", row_id: "2" },
-        { guid: "duplicate", has_messages: 1, read_pointer: "900719925474099301", row_id: "1" }
+        { guid: "duplicate", is_read: 1, has_messages: 0, read_pointer: "100", row_id: "2" },
+        {
+            guid: "duplicate",
+            is_read: 0,
+            has_messages: 1,
+            read_pointer: "900719925474099301",
+            row_id: "1"
+        }
     ]);
     assert.deepEqual(entries, [
         {
             guid: "duplicate",
+            read: false,
             messageCount: 1,
             readPointer: "900719925474099301",
             sourceRowIds: ["1", "2"]

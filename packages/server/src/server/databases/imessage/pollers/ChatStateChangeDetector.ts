@@ -35,9 +35,11 @@ export class ChatStateChangeDetector {
             if (!sameSourceRows) continue;
 
             const pointerChange = compareDecimalStrings(next.readPointer, previous.readPointer);
-            if (pointerChange < 0) {
+            if (pointerChange < 0 || (previous.read && !next.read)) {
                 changes.push({ guid, read: false });
-            } else if (pointerChange > 0 && (await isChatFullyRead(guid))) {
+            } else if (!previous.read && next.read) {
+                changes.push({ guid, read: true });
+            } else if (pointerChange > 0 && next.read && (await isChatFullyRead(guid))) {
                 changes.push({ guid, read: true });
             }
         }

@@ -71,6 +71,7 @@ import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
 import { ChatUpdatePoller } from "./databases/imessage/pollers/ChatChangePoller";
 import {
     loadChatStateSnapshot,
+    supportsChatStateSnapshot,
     type ChatStateSnapshotResult
 } from "./databases/imessage/snapshot/ChatStateSnapshot";
 import { obfuscatedHandle } from "./utils/StringUtils";
@@ -1343,7 +1344,7 @@ class BlueBubblesServer extends EventEmitter {
         // but created earlier never appears in its result set. Preserve the
         // existing OS gate because the snapshot query uses chat columns that
         // are unavailable on earlier macOS versions.
-        if (isMinHighSierra) {
+        if (supportsChatStateSnapshot(isMinHighSierra)) {
             this.iMessageListener.addPoller(new ChatUpdatePoller(this.iMessageRepo, cache));
         }
 
