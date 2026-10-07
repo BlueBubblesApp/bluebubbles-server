@@ -62,7 +62,6 @@ export function buildChatTransitionQuery(): string {
             JOIN chat_message_join j ON j.message_id = m.ROWID
             WHERE m.is_read = 0
                 AND m.is_from_me = 0
-                AND m.date_read = 0
                 AND m.item_type = 0
                 AND COALESCE(m.associated_message_type, 0) = 0
         )
@@ -156,7 +155,6 @@ export function buildChatSnapshotQuery(): string {
             SUM(
                 CASE
                     WHEN m.is_read = 0
-                        AND m.date_read = 0
                         AND m.item_type = 0
                         AND COALESCE(m.associated_message_type, 0) = 0
                         AND m.is_from_me = 0
