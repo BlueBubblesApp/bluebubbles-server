@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { FindMyFriendsCache } from "../src/server/api/lib/findmy/FindMyFriendsCache";
 import { FindMyLocationItem } from "../src/server/api/lib/findmy/types";
+import { buildFindMyRoster, FindMyRoster } from "../src/server/api/lib/findmy/FindMyFriendRoster";
 
 const location = (handle: string, overrides: Partial<FindMyLocationItem> = {}): FindMyLocationItem => ({
     handle,
@@ -49,4 +50,61 @@ test("accepted phone and email aliases resolve to one cached friend", () => {
     assert.equal(updated.length, 1);
     assert.equal(updated[0].handle, phone);
     assert.equal(updated[0].alternate_handles, undefined);
+});
+
+
+const rosterFor = (ids: string[]): FindMyRoster =>
+    buildFindMyRoster({
+        myInfo: { emails: ["owner@example.com"] },
+        contacts: Object.fromEntries(ids.map(id => [id, { displayName: id === "friend-1" ? "Current Name" : id }])),
+        following: ids.map(id => ({
+            id,
+            invitationAcceptedHandles: [id === "friend-1" ? "current@example.com" : `${id}@example.com`],
+            invitationFromHandles: ["owner@example.com"]
+        })),
+        followers: ids.map(id => ({
+            id,
+            invitationAcceptedHandles: ["owner@example.com"],
+            invitationFromHandles: [id === "friend-1" ? "old@example.edu" : `${id}@example.com`]
+        })),
+        preferences: { favorites: [{ id: "friend-1", order: 0 }] }
+    })!;
+
+test("authoritative roster collapses old and current handles to one friend", () => {
+    const cache = new FindMyFriendsCache(() => rosterFor(["friend-1"]));
+    cache.refreshRoster(true);
+
+    cache.add(location("old@example.edu", { title: "Old label", last_updated: 1, status: "legacy" }));
+    cache.add(location("current@example.com", { title: "Incoming label", last_updated: 2 }));
+
+    assert.deepEqual(cache.getAll(), [
+        {
+            ...location("current@example.com", { title: "Current Name", last_updated: 2 }),
+            favorite_order: 0
+        }
+    ]);
+    assert.equal(cache.get("old@example.edu")?.handle, "current@example.com");
+});
+
+test("authoritative roster rejects updates for people Apple no longer lists", () => {
+    const cache = new FindMyFriendsCache(() => rosterFor(["friend-1"]));
+    cache.refreshRoster(true);
+
+    assert.deepEqual(cache.addAll([location("removed@example.com")]), []);
+    assert.equal(cache.getAll().length, 0);
+});
+
+test("refreshing the authoritative roster removes people who stopped sharing", () => {
+    let roster = rosterFor(["friend-1", "friend-2"]);
+    const cache = new FindMyFriendsCache(() => roster);
+    cache.refreshRoster(true);
+    cache.add(location("current@example.com"));
+    cache.add(location("friend-2@example.com"));
+    assert.equal(cache.getAll().length, 2);
+
+    roster = rosterFor(["friend-1"]);
+    cache.refreshRoster(true);
+
+    assert.equal(cache.getAll().length, 1);
+    assert.equal(cache.getAll()[0].handle, "current@example.com");
 });

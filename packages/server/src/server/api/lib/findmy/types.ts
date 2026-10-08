@@ -143,6 +143,8 @@ export type FindMyLocationItem = {
     last_updated: number;
     is_locating_in_progress?: boolean;
     status: "legacy" | "live" | "shallow";
+    /** Position among the user's Find My favorites (lower first); absent when not a favorite. */
+    favorite_order?: number;
 };
 
 export type FindMySafeLocation = {
