@@ -26,6 +26,24 @@ export class FindMyFriendsCache {
         this.roster = roster;
         this.cache = {};
         for (const item of previous) this.add(item, false);
+
+        // Apple's roster includes friends even when no SecureLocationCache record exists.
+        // Keep those people visible under "Friends without locations" instead of silently
+        // reducing the roster to only friends who currently have coordinates.
+        for (const [id, handle] of roster.primaryHandles) {
+            if (this.cache[id]) continue;
+            this.cache[id] = {
+                handle,
+                coordinates: [0, 0],
+                long_address: null,
+                short_address: null,
+                subtitle: null,
+                title: roster.names.get(id) ?? handle,
+                last_updated: 0,
+                is_locating_in_progress: false,
+                status: "legacy"
+            };
+        }
     }
 
     private rosterIdFor(handles: string[]): string | undefined {

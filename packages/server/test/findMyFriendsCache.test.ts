@@ -91,7 +91,8 @@ test("authoritative roster rejects updates for people Apple no longer lists", ()
     cache.refreshRoster(true);
 
     assert.deepEqual(cache.addAll([location("removed@example.com")]), []);
-    assert.equal(cache.getAll().length, 0);
+    assert.equal(cache.get("removed@example.com"), null);
+    assert.deepEqual(cache.getAll().map(item => item.handle), ["current@example.com"]);
 });
 
 test("refreshing the authoritative roster removes people who stopped sharing", () => {
@@ -107,4 +108,17 @@ test("refreshing the authoritative roster removes people who stopped sharing", (
 
     assert.equal(cache.getAll().length, 1);
     assert.equal(cache.getAll()[0].handle, "current@example.com");
+});
+
+
+test("authoritative roster keeps friends who currently have no location", () => {
+    const cache = new FindMyFriendsCache(() => rosterFor(["friend-1", "friend-2"]));
+    cache.refreshRoster(true);
+    cache.add(location("current@example.com", { last_updated: 2 }));
+
+    const missing = cache.getAll().find(item => item.handle === "friend-2@example.com");
+    assert.equal(cache.getAll().length, 2);
+    assert.deepEqual(missing?.coordinates, [0, 0]);
+    assert.equal(missing?.status, "legacy");
+    assert.equal(missing?.title, "friend-2");
 });
