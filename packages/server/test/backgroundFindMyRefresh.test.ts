@@ -37,6 +37,33 @@ test("returns immediately while Find My refresh continues and publishes afterwar
     assert.deepEqual(calls, ["refresh-started", "refresh-finished", "read", "publish:fresh-location"]);
 });
 
+test("cleans up Find My only after refreshed locations are published", async () => {
+    const calls: string[] = [];
+
+    startBackgroundFindMyRefresh(
+        async () => {
+            calls.push("refresh");
+        },
+        () => {
+            calls.push("read");
+            return ["fresh-location"];
+        },
+        async () => {
+            calls.push("publish");
+        },
+        error => {
+            throw error;
+        },
+        async () => {
+            calls.push("cleanup");
+        }
+    );
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.deepEqual(calls, ["refresh", "read", "publish", "cleanup"]);
+});
+
 test("coalesces overlapping Find My refresh requests", async () => {
     let releaseRefresh!: () => void;
     const refreshBlocked = new Promise<void>(resolve => {

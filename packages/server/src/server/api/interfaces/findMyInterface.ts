@@ -150,6 +150,9 @@ export class FindMyInterface {
                     error => {
                         Server().logger.debug("Failed to refresh Find My friends from SecureLocationCache.");
                         Server().logger.debug(String(error));
+                    },
+                    async () => {
+                        await FileSystem.executeAppleScript(quitFindMyFriends());
                     }
                 );
                 refreshedFindMyApp = true;
