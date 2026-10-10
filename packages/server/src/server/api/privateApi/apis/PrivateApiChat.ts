@@ -5,6 +5,7 @@ import {
     TransactionType
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
+import { recoverableChatDeleteRequest } from "../protocol/RecoverableChatDeleteRequest";
 
 export class PrivateApiChat extends PrivateApiAction {
     tag = "PrivateApiChat";
@@ -127,6 +128,13 @@ export class PrivateApiChat extends PrivateApiAction {
         this.throwForNoMissingFields(action, [chatGuid]);
         const request = new TransactionPromise(TransactionType.CHAT);
         return this.sendApiMessage(action, { chatGuid }, request);
+    }
+
+    async recoverableDelete(guid: string): Promise<TransactionResult> {
+        const { action, data } = recoverableChatDeleteRequest(guid);
+        this.throwForNoMissingFields(action, [guid]);
+        const request = new TransactionPromise(TransactionType.CHAT);
+        return this.sendApiMessage(action, data, request);
     }
 
     async delete(guid: string): Promise<TransactionResult> {

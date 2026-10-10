@@ -366,6 +366,15 @@ export class ChatInterface {
         return retChat;
     }
 
+    static async recoverableDelete(guid: string): Promise<void> {
+        checkPrivateApiStatus();
+        if (!isMinVentura) {
+            throw new Error("Recoverable chat deletion is only supported on macOS Ventura or newer!");
+        }
+
+        await Server().privateApi.chat.recoverableDelete(guid);
+    }
+
     static async delete({ chat, guid }: { chat?: Chat; guid?: string } = {}): Promise<void> {
         checkPrivateApiStatus();
 

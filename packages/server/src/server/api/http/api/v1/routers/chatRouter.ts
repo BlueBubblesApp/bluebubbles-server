@@ -309,6 +309,12 @@ export class ChatRouter {
         return new Success(ctx, { message: "Successfully removed group chat icon!" }).send();
     }
 
+    static async recoverableDeleteChat(ctx: RouterContext, _: Next): Promise<void> {
+        const { guid } = ctx.params;
+        await ChatInterface.recoverableDelete(guid);
+        return new Success(ctx, { message: `Successfully recoverably deleted chat!` }).send();
+    }
+
     static async deleteChat(ctx: RouterContext, _: Next): Promise<void> {
         const { guid } = ctx.params;
         await ChatInterface.delete({ guid });
