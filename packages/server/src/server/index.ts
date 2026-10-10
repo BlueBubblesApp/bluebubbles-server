@@ -62,6 +62,7 @@ import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
 import { getStartDelay } from "./utils/ConfigUtils";
 import { FindMyFriendsCache } from "./api/lib/findmy/FindMyFriendsCache";
+import { readFindMyRoster } from "./api/lib/findmy/FindMyFriendRoster";
 import { ScheduledService } from "./lib/ScheduledService";
 import { getLogger } from "./lib/logging/Loggable";
 import { IMessageListener } from "./databases/imessage/listeners/IMessageListener";
@@ -709,7 +710,8 @@ class BlueBubblesServer extends EventEmitter {
         this.eventCache = new EventCache();
 
         this.logger.info("Initializing FindMy Location cache...");
-        this.findMyCache = new FindMyFriendsCache();
+        this.findMyCache = new FindMyFriendsCache(() => readFindMyRoster(FileSystem.findMyFriendCachePath));
+        this.findMyCache.refreshRoster(true);
 
         try {
             this.logger.info("Initializing caffeinate service...");

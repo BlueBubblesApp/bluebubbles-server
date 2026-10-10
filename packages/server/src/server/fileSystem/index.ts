@@ -89,6 +89,8 @@ export class FileSystem {
 
     public static resources = path.join(appPath, "appResources");
 
+    public static findMyReverseGeocoder = path.join(FileSystem.resources, "macos", "tools", "findmy-geocoder");
+
     public static addressBookFile = `${FileSystem.contactsDir}/AddressBook.vcf`;
 
     public static contactsFile = `${FileSystem.contactsDir}/contacts.vcf`;
@@ -111,6 +113,21 @@ export class FileSystem {
     public static findMyDir = path.join(userHomeDir(), "Library", "Caches", "com.apple.findmy.fmipcore");
 
     public static findMyFriendsDir = path.join(userHomeDir(), "Library", "Caches", "com.apple.icloud.fmfd");
+
+    public static findMySecureLocationsDir = path.join(
+        userHomeDir(),
+        "Library",
+        "com.apple.icloud.searchpartyd",
+        "SecureLocationCache"
+    );
+
+    public static findMyFriendCachePath = path.join(
+        userHomeDir(),
+        "Library",
+        "Caches",
+        "com.apple.findmy.fmfcore",
+        "FriendCacheData.data"
+    );
 
     public static get usingCustomFcm(): boolean {
         const fcmClient = Server().args["fcm-client"];
@@ -693,7 +710,7 @@ export class FileSystem {
             }
         } catch (ex) {
             Server().log("Failed to sync time with time servers!", "debug");
-            Server().log(ex, 'debug');
+            Server().log(ex, "debug");
         }
 
         return null;

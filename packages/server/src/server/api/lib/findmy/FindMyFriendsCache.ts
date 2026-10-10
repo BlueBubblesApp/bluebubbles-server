@@ -1,90 +1,149 @@
-import { isEmpty } from "@server/helpers/utils";
+import { FindMyRoster, normalizeFindMyHandle } from "./FindMyFriendRoster";
 import { FindMyLocationItem } from "./types";
-import { Server } from "@server";
+
+const ROSTER_RELOAD_MS = 30 * 1000;
 
 export class FindMyFriendsCache {
     cache: Record<string, FindMyLocationItem> = {};
+    private readonly aliasToHandle: Record<string, string> = {};
+    private roster: FindMyRoster | null = null;
+    private rosterLoadedAt = Number.NEGATIVE_INFINITY;
 
-    /**
-     * Adds a list of location data to the cache.
-     * Location data may be dropped if it doesn't update/change the cache at all.
-     *
-     * @param locationData
-     * @returns The location data that was updated in the cache
-     */
+    constructor(private readonly loadRoster: () => FindMyRoster | null = () => null) {}
+
+    private static normalizeHandle(handle: string): string {
+        return handle.trim().toLowerCase();
+    }
+
+    /** Re-reads Apple's friend list and removes cached rows Apple no longer lists. */
+    refreshRoster(force = false, now = Date.now()): void {
+        if (!force && now - this.rosterLoadedAt < ROSTER_RELOAD_MS) return;
+        this.rosterLoadedAt = now;
+        const roster = this.loadRoster();
+        if (!roster) return;
+
+        const previous = Object.values(this.cache);
+        this.roster = roster;
+        this.cache = {};
+        for (const item of previous) this.add(item, false);
+
+        // Apple's roster includes friends even when no SecureLocationCache record exists.
+        // Keep those people visible under "Friends without locations" instead of silently
+        // reducing the roster to only friends who currently have coordinates.
+        for (const [id, handle] of roster.primaryHandles) {
+            if (this.cache[id]) continue;
+            this.cache[id] = {
+                handle,
+                coordinates: [0, 0],
+                long_address: null,
+                short_address: null,
+                subtitle: null,
+                title: roster.names.get(id) ?? handle,
+                last_updated: 0,
+                is_locating_in_progress: false,
+                status: "legacy"
+            };
+        }
+    }
+
+    private rosterIdFor(handles: string[]): string | undefined {
+        if (!this.roster) return undefined;
+        for (const handle of handles) {
+            const id = this.roster.aliases.get(normalizeFindMyHandle(handle));
+            if (id) return id;
+        }
+        return undefined;
+    }
+
+    private publicItem(key: string, item: FindMyLocationItem): FindMyLocationItem {
+        const favoriteOrder = this.roster?.favorites.get(key);
+        return favoriteOrder === undefined ? item : { ...item, favorite_order: favoriteOrder };
+    }
+
     addAll(locationData: FindMyLocationItem[]): FindMyLocationItem[] {
         const output: FindMyLocationItem[] = [];
-        for (const i of locationData) {
-            const success = this.add(i);
-            if (success) {
-                output.push(i);
-            }
+        for (const item of locationData) {
+            const success = this.add(item);
+            if (success && item.handle) output.push(this.get(item.handle) ?? item);
         }
-
         return output;
     }
 
-    /**
-     * Adds a single location data to the cache
-     *
-     * @param locationData
-     * @returns Whether the location data updated the cache at all
-     */
-    add(locationData: FindMyLocationItem): boolean {
-        const handle = locationData?.handle;
-        if (isEmpty(handle)) return false;
+    add(locationData: FindMyLocationItem, reloadRoster = true): boolean {
+        const suppliedHandle = locationData?.handle;
+        if (!suppliedHandle) return false;
+        const handles = [...new Set([suppliedHandle, ...(locationData.alternate_handles ?? [])].filter(Boolean))];
 
-        const updateCache = (): boolean => {
-            this.cache[handle] = locationData;
-            return true;
-        };
+        if (this.roster) {
+            let rosterId = this.rosterIdFor(handles);
+            if (!rosterId && reloadRoster) {
+                this.refreshRoster();
+                rosterId = this.rosterIdFor(handles);
+            }
+            // Find My no longer lists this person, so do not resurrect a stale helper row.
+            if (!rosterId) return false;
 
-        // If we don't have a cache item, add it to the cache as-is
-        const currentData = this.cache[handle];
-        if (!currentData) {
-            return updateCache();
+            const { alternate_handles: _, favorite_order: __, ...publicLocation } = locationData;
+            return this.store(rosterId, {
+                ...publicLocation,
+                handle: this.roster.primaryHandles.get(rosterId) ?? suppliedHandle,
+                title: this.roster.names.get(rosterId) ?? locationData.title
+            });
         }
 
-        // If the update is a "legacy" update, and the current location isn't, ignore it.
-        // We don't want to override a live/shallow location with a legacy one
-        if (locationData?.status === "legacy" && currentData?.status !== "legacy") return false;
+        // Compatibility fallback when Apple's roster file is unavailable.
+        const existingHandle = handles.find(handle => this.cache[handle]);
+        const mappedHandle = handles
+            .map(handle => this.aliasToHandle[FindMyFriendsCache.normalizeHandle(handle)])
+            .find(handle => handle && this.cache[handle]);
+        const handle = existingHandle ?? mappedHandle ?? suppliedHandle;
+        for (const alias of handles) this.aliasToHandle[FindMyFriendsCache.normalizeHandle(alias)] = handle;
+        const { alternate_handles: _, ...publicLocation } = locationData;
+        return this.store(handle, { ...publicLocation, handle });
+    }
 
-        // We don't want to overwrite a non [0, 0] location with a [0, 0] one.
-        // We also don't need to update the cache if the metadata is the same.
-        // Lastly, if the update timestamp is older than the current one, ignore it.
-        const currentCoords = currentData?.coordinates ?? [0, 0];
-        const updatedCoords = locationData?.coordinates ?? [0, 0];
-        const noLocationType = currentData?.status === "legacy" && locationData?.status === "legacy";
-        const updateTimestamp = locationData?.last_updated ?? 0;
-        const currentTimestamp = currentData?.last_updated ?? 0;
+    private store(key: string, locationData: FindMyLocationItem): boolean {
+        const currentData = this.cache[key];
+        const updateCache = (): boolean => {
+            this.cache[key] = locationData;
+            return true;
+        };
+        if (!currentData) return updateCache();
+
+        if (locationData.status === "legacy" && currentData.status !== "legacy") return false;
+
+        const currentCoords = currentData.coordinates ?? [0, 0];
+        const updatedCoords = locationData.coordinates ?? [0, 0];
+        const noLocationType = currentData.status === "legacy" && locationData.status === "legacy";
+        const updateTimestamp = locationData.last_updated ?? 0;
+        const currentTimestamp = currentData.last_updated ?? 0;
         if (
-            (
-                noLocationType &&
+            (noLocationType &&
                 currentCoords[0] !== 0 &&
                 currentCoords[1] !== 0 &&
                 updatedCoords[0] === 0 &&
-                updatedCoords[1] === 0
-            ) ||
-            (
-                currentData?.status === locationData?.status &&
+                updatedCoords[1] === 0) ||
+            (currentData.status === locationData.status &&
                 currentCoords[0] === updatedCoords[0] &&
                 currentCoords[1] === updatedCoords[1] &&
-                updateTimestamp === currentTimestamp
-            ) || (
-                updateTimestamp < currentTimestamp
-            )
+                updateTimestamp === currentTimestamp &&
+                currentData.short_address === locationData.short_address &&
+                currentData.long_address === locationData.long_address) ||
+            updateTimestamp < currentTimestamp
         ) {
             return false;
         }
-
         return updateCache();
     }
 
     get(handle: string): FindMyLocationItem | null {
-        return this.cache[handle] ?? null;
+        const rosterId = this.rosterIdFor([handle]);
+        const key = rosterId ?? this.aliasToHandle[FindMyFriendsCache.normalizeHandle(handle)] ?? handle;
+        const item = this.cache[key];
+        return item ? this.publicItem(key, item) : null;
     }
 
     getAll(): FindMyLocationItem[] {
-        return Object.values(this.cache);
+        return Object.entries(this.cache).map(([key, item]) => this.publicItem(key, item));
     }
 }

@@ -7,8 +7,48 @@ import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
 import { FindMyDevice, FindMyItem, FindMyLocationItem } from "@server/api/lib/findmy/types";
 import { transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
+import {
+    assertFindMyLocationsFresh,
+    assertFindMyLocationsUsable,
+    loadBeaconStoreKey,
+    readFindMyFriendsFromSecureCache,
+    supportsSecureLocationCacheReader
+} from "@server/api/lib/findmy/SecureLocationReader";
+import { startBackgroundFindMyRefresh } from "@server/api/lib/findmy/BackgroundFindMyRefresh";
+import { PrivateApiFindMyEventHandler } from "@server/api/privateApi/eventHandlers/PrivateApiFindMyEventHandler";
+import { FindMyAddressLabeler, createAppleGeocodeBatch } from "@server/api/lib/findmy/AppleReverseGeocoder";
 
 export class FindMyInterface {
+    // Shared so the coordinate-cell cache survives between refreshes. Created lazily because
+    // `FileSystem.resources` depends on the app path, which is only known after Electron starts.
+    private static labeler: FindMyAddressLabeler | null = null;
+
+    private static getLabeler(): FindMyAddressLabeler | null {
+        if (!this.labeler && fs.existsSync(FileSystem.findMyReverseGeocoder)) {
+            this.labeler = new FindMyAddressLabeler(createAppleGeocodeBatch(FileSystem.findMyReverseGeocoder));
+        }
+
+        return this.labeler;
+    }
+
+    /**
+     * Publishes locations with a "City, ST" address in place of Apple's missing label.
+     * Locations the geocoder could not place keep their coordinates as the address.
+     * Coordinates are geocoded only through Apple's on-device CLGeocoder via the packaged
+     * helper. The cache drops a labelled copy whose coordinates have since been superseded.
+     */
+    private static async publishWithAddresses(locations: FindMyLocationItem[]): Promise<void> {
+        const labeler = this.getLabeler();
+        const labeled = labeler
+            ? await labeler.labelWithin(locations, 3000)
+            : { current: locations, late: null };
+        const handler = new PrivateApiFindMyEventHandler();
+        await handler.handleNewLocation(labeled.current);
+        if (labeled.late) {
+            void labeled.late.then(late => handler.handleNewLocation(late)).catch(() => undefined);
+        }
+    }
+
     static async getFriends() {
         return Server().findMyCache.getAll();
     }
@@ -58,7 +98,7 @@ export class FindMyInterface {
 
             return [...(devices ?? []), ...transformedItems];
         } catch (ex: any) {
-            Server().logger.debug('An error occurred while reading FindMy Device cache files.');
+            Server().logger.debug("An error occurred while reading FindMy Device cache files.");
             Server().logger.debug(String(ex));
             return null;
         }
@@ -71,6 +111,79 @@ export class FindMyInterface {
     }
 
     static async refreshFriends(openFindMyApp = true): Promise<FindMyLocationItem[]> {
+        let refreshedFindMyApp = false;
+        // Find My's roster is authoritative for identity, favorites, and removals.
+        Server().findMyCache.refreshRoster(true);
+
+        // Before Sonoma, searchpartyd keeps current friend locations in its encrypted
+        // SecureLocationCache. Prefer that direct source over the opportunistic
+        // Messages/FMFSessions event cache, which has no on-demand refresh. Sonoma 14.4+
+        // uses a different encrypted storage path and must be handled separately.
+        if (
+            supportsSecureLocationCacheReader(isMinSonoma) &&
+            fs.existsSync(FileSystem.findMySecureLocationsDir) &&
+            fs.existsSync(FileSystem.findMyFriendCachePath)
+        ) {
+            const readDirectLocations = () =>
+                readFindMyFriendsFromSecureCache(
+                    FileSystem.findMySecureLocationsDir,
+                    FileSystem.findMyFriendCachePath,
+                    loadBeaconStoreKey(),
+                    (name, error) => {
+                        Server().logger.debug(`Failed to decrypt SecureLocationCache record ${name}.`);
+                        Server().logger.debug(String(error));
+                    }
+                );
+
+            // The AppleScript bounce takes about 25 seconds, while the Android friends
+            // endpoint uses the normal API timeout. Return the best current snapshot
+            // immediately, refresh in the background, then publish changed locations
+            // over the socket path the client already listens to.
+            if (openFindMyApp) {
+                startBackgroundFindMyRefresh(
+                    () => this.refreshLocationsAccessibility(),
+                    readDirectLocations,
+                    async locations => {
+                        assertFindMyLocationsFresh(locations);
+                        await this.publishWithAddresses(locations);
+                    },
+                    error => {
+                        Server().logger.debug("Failed to refresh Find My friends from SecureLocationCache.");
+                        Server().logger.debug(String(error));
+                    },
+                    async () => {
+                        await FileSystem.executeAppleScript(quitFindMyFriends());
+                    }
+                );
+                refreshedFindMyApp = true;
+            }
+
+            try {
+                const directLocations = readDirectLocations();
+                assertFindMyLocationsUsable(directLocations);
+                // Wait briefly for cities so the response carries them. Anything slower
+                // (e.g. a cold cache after restart) shows coordinates and follows over the socket.
+                const labeler = this.getLabeler();
+                const labeled = labeler
+                    ? await labeler.labelWithin(directLocations, 3000)
+                    : { current: directLocations, late: null };
+                Server().findMyCache.addAll(labeled.current);
+                if (labeled.late) {
+                    void labeled.late
+                        .then(late => new PrivateApiFindMyEventHandler().handleNewLocation(late))
+                        .catch(() => undefined);
+                }
+
+                return Server().findMyCache.getAll();
+            } catch (ex: any) {
+                // Fall through to the Messages/FMFSessions path below. On Monterey that path
+                // has no on-demand refresh and usually returns stale data, but returning
+                // whatever it holds beats failing the request outright.
+                Server().logger.debug("Failed to read Find My friends from SecureLocationCache.");
+                Server().logger.debug(String(ex));
+            }
+        }
+
         const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
         if (papiEnabled && isMinBigSur && !isMinSonoma) {
             checkPrivateApiStatus();
@@ -85,7 +198,7 @@ export class FindMyInterface {
         // No matter what, open the Find My app.
         // Don't await because it should update in the background.
         // Location updates get emitted as an event as they come in.
-        if (openFindMyApp) {
+        if (openFindMyApp && !refreshedFindMyApp) {
             this.refreshLocationsAccessibility();
         }
 
