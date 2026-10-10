@@ -147,6 +147,11 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.GET,
+                        path: "chat-state/snapshot",
+                        controller: ServerRouter.getChatStateSnapshot
+                    },
+                    {
+                        method: HttpMethod.GET,
                         path: "logs",
                         controller: ServerRouter.getLogs
                     },
@@ -412,6 +417,12 @@ export class HttpRoutes {
                         method: HttpMethod.GET,
                         path: ":guid",
                         controller: ChatRouter.find
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: ":guid/delete/recoverable",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.recoverableDeleteChat
                     },
                     {
                         method: HttpMethod.DELETE,
