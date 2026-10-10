@@ -38,6 +38,15 @@ test("chat interface guards recoverable deletion by private API and macOS versio
     assert.doesNotMatch(method, /privateApi\.chat\.delete\(/);
 });
 
+test("chat interface fails when the helper never received the recoverable delete", () => {
+    const code = source("../src/server/api/interfaces/chatInterface.ts");
+    const method = code.match(/static async recoverableDelete[\s\S]*?\n    \}/u)?.[0] ?? "";
+
+    // sendApiMessage returns null instead of throwing on socket write failure
+    assert.match(method, /const result = await Server\(\)\.privateApi\.chat\.recoverableDelete\(guid\)/);
+    assert.match(method, /if \(!result\) \{\s*throw new Error\(/u);
+});
+
 test("controller propagates recoverable deletion through its dedicated interface method", () => {
     const code = source("../src/server/api/http/api/v1/routers/chatRouter.ts");
     const method = code.match(/static async recoverableDeleteChat[\s\S]*?\n    \}/u)?.[0] ?? "";
