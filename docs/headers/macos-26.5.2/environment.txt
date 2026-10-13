@@ -1,0 +1,21 @@
+# Collected by Tools/private-api/collect.sh
+
+macos_version   26.5.2
+macos_build     25F84
+architecture    arm64
+hardware        Apple M3 Max
+xcode           Xcode 26.6
+clang           Apple clang version 21.0.0 (clang-2100.1.1.101)
+sdk             /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+
+# Host apps. 'platform' is what decides which copy of a shared framework the
+# dumper sees, so it is the single most useful line in this file.
+# bundle-id            installed  platform   version
+app com.apple.MobileSMS    yes        catalyst   26.0
+app com.apple.FaceTime     yes        catalyst   36
+app com.apple.findmy       yes        catalyst   4.0
+app com.apple.Notes        yes        macos      4.13
+
+# Classes reported NOT PRESENT on this release. This list is the point of the
+# whole exercise: it is what this macOS does not have that ours does.
+missing _STKStickerObjCFacade

@@ -1,0 +1,38 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/chat/any;+;b070791abb7e9ea04a21756bd0b7325e/filter?password=__REDACTED__",
+    "headers": {
+      "host": "127.0.0.1:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "vary": "Accept-Encoding",
+      "access-control-allow-origin": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "message": "Success",
+        "data": {
+          "is_filtered": 0,
+          "can_report_junk": false,
+          "is_known_sender": true,
+          "is_in_unknown_senders_filter": false,
+          "was_detected_as_sms_spam": false
+        },
+        "status": 200
+      }
+    }
+  },
+  "recordedAt": "2026-10-12T00:38:19.515Z"
+}

@@ -1,0 +1,53 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/message/poll/10C9DBB0-61B4-41E1-82D9-35139FE060AD?password=__REDACTED__",
+    "headers": {
+      "host": "127.0.0.1:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "data": {
+          "latest_state_guid": "10C9DBB0-61B4-41E1-82D9-35139FE060AD",
+          "votes": [],
+          "guid": "10C9DBB0-61B4-41E1-82D9-35139FE060AD",
+          "title": "",
+          "creator_handle": "tester",
+          "session_id": "0AEEC8D0-FB9F-4954-8E91-C5A058DE6B9D",
+          "options": [
+            {
+              "id": "OPT-1",
+              "text": "REDACTED",
+              "can_be_edited": false,
+              "creator_handle": "tester"
+            },
+            {
+              "creator_handle": "tester",
+              "id": "OPT-2",
+              "text": "REDACTED",
+              "can_be_edited": false
+            }
+          ]
+        },
+        "message": "Successfully fetched poll!"
+      }
+    }
+  },
+  "recordedAt": "2026-09-04T15:12:39.982Z"
+}

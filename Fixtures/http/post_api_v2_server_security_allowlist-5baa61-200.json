@@ -1,0 +1,40 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v2/server/security/allowlist?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "address": "REDACTED"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "data": {
+          "id": "349DA4BB-E483-4F77-80F1-37C01B33E5F8",
+          "cidr": "+15555550100",
+          "created_at": 1788201139363
+        },
+        "message": "Success",
+        "status": 200
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T18:32:19.363Z"
+}

@@ -1,0 +1,48 @@
+{
+  "request": {
+    "method": "PUT",
+    "path": "/api/v2/webhook/3?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "url": "https://example.com/v2-fixture-updated",
+        "events": [
+          "new-message",
+          "updated-message"
+        ]
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Successfully updated webhook!",
+        "data": {
+          "id": 3,
+          "url": "https://example.com/v2-fixture-updated",
+          "events": [
+            "new-message",
+            "updated-message"
+          ],
+          "created": 1788200054808
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T18:14:14.917Z"
+}

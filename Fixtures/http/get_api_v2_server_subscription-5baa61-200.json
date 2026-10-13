@@ -1,0 +1,45 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/server/subscription?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "vary": "Accept-Encoding",
+      "access-control-allow-origin": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": {
+          "is_perpetual": false,
+          "available_tiers": [
+            {
+              "purchase_url": "https://bluebubbles.app/pricing",
+              "id": "pro",
+              "name": "Pro",
+              "rank": 1
+            }
+          ],
+          "features": [],
+          "tier": null,
+          "status": "none"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-09-17T00:01:56.922Z"
+}

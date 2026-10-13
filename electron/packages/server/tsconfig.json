@@ -1,0 +1,19 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "ignoreDeprecations": "6.0",
+        "baseUrl": "./src",
+        "paths": {
+            "@server": ["server/index"],
+            "@server/*": ["server/*"],
+            "@windows/*": ["windows/*"],
+            "@trays/*": ["trays/*"],
+        },
+        "outDir": "./dist",
+        "strictNullChecks": false,
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true
+    },
+    "include": ["src"],
+    "exclude": ["dist", "node_modules", "*.js", "tsconfig.json"]
+}

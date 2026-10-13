@@ -1,0 +1,91 @@
+//  ToolUpdateService
+//  Asking, on a schedule, whether the programs this server runs have newer versions.
+//
+//  It only ever ASKS. Nothing here installs anything, and the reason is worth restating where
+//  the timer lives rather than only where the installer does: the program most likely to be
+//  updated is the tunnel, the tunnel is the only route to this Mac, and an automatic update
+//  that breaks it breaks the connection its owner would need in order to notice. They are not
+//  at the machine; being away from the machine is what the tunnel is for.
+//
+//  So this service produces one thing: a notice with a version number on it. What happens next
+//  is a person's decision, made while they are sitting in front of the Mac, with the previous
+//  version still on disk and one click away.
+//
+//  See `.claude/docs/imessage.md`.
+
+import BBBuiltIns
+import BBCore
+import BBDiagnostics
+import BBInterfaces
+import BBServiceKit
+import BBSettings
+import BBTooling
+import Foundation
+
+actor ToolUpdateService: Service, GatedService, ConfigurableService {
+
+  static let manifest = BuiltInManifests.toolUpdates
+  /// A failed check is a network failure, and the timer will come round again. Restarting
+  /// the service would just make the same request sooner.
+  static let restartPolicy = RestartPolicy.never
+
+  /// Once a day. These vendors publish every few weeks; anything more frequent is traffic
+  /// nobody asked for, in exchange for hearing about a release some hours earlier.
+  private static let interval = Duration.seconds(24 * 60 * 60)
+  /// Long enough after launch that the check is never competing with the server coming up,
+  /// and long enough that a machine rebooting repeatedly does not check on every boot.
+  private static let initialDelay = Duration.seconds(120)
+
+  /// What this service touches, rather than the container that holds it.
+  typealias Host = any ScopedSettingsProviding & ToolProviding
+
+  private let scoped: ScopedSettings
+  private let tools: ToolManager
+  private let checks = OwnedTask()
+
+  init(host: Host) {
+    self.scoped = host.scopedSettings(for: Self.manifest)
+    self.tools = host.tools
+  }
+
+  /// Gated on the same setting as the app's own update check.
+  ///
+  /// It defaults to OFF, so nothing here reaches the network until someone asks for it,
+  /// and the Check button on an integration's page works regardless, because that is a
+  /// person asking directly rather than a schedule deciding for them.
+  func canRun() async -> Bool {
+    await scoped.valueOrDefault(Settings.checkForUpdates)
+  }
+
+  func start() async throws {
+    let tools = self.tools
+    checks.runPeriodically(every: Self.interval, after: Self.initialDelay) {
+      // Local first, and it reaches nothing: a fingerprint comparison per tool, with a
+      // version probe only where a binary has been REPLACED since it was last looked at.
+      // That is what catches a `brew upgrade` landing under a running server — zrok 2
+      // being the case that matters, since it removes the subcommand a reserved share is
+      // opened with and the failure would otherwise appear hours later on a machine
+      // nobody is sitting at.
+      //
+      // Note this only runs while update checks are switched on, because that is what
+      // gates the whole service. A server with them off still scans at every launch
+      // (`ServerComposition`) and on the Check Again button; what it gives up is noticing
+      // a change DURING a long run.
+      await tools.scanForExistingCopies()
+      await tools.checkAllForUpdates()
+    }
+  }
+
+  func stop() async {
+    await checks.stop()
+  }
+
+  func apply(_ change: SettingsChange) async throws -> ReloadAction { .restart }
+
+  var health: ServiceHealth {
+    get async { checks.isRunning ? .running : .stopped }
+  }
+
+  /// The schedule is the service: without it nothing is checked again until a restart.
+  var isAlive: Bool { get async { checks.isRunning } }
+}

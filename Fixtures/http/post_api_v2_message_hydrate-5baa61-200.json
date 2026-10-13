@@ -1,0 +1,224 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v2/message/hydrate?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "guids": [
+          "E520E0DF-3146-44D0-A101-47DB72A18AF0",
+          "88519B76-D6B4-4E0C-B21D-D927F47CC933",
+          "8E1B546A-76BA-483D-9F8A-1D2A61F321DC"
+        ]
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "message": "Success",
+        "metadata": {
+          "returned": 3,
+          "requested": 3
+        },
+        "data": [
+          {
+            "hasPayloadData": false,
+            "dateRead": 1788207969228,
+            "isForward": false,
+            "shareStatus": 0,
+            "isArchived": false,
+            "originalROWID": 418354,
+            "wasDeliveredQuietly": false,
+            "partCount": 1,
+            "threadOriginatorGuid": null,
+            "isCorrupt": false,
+            "threadOriginatorPart": null,
+            "isFromMe": false,
+            "hasDdResults": false,
+            "isSpam": false,
+            "groupActionType": 0,
+            "country": null,
+            "dateEdited": null,
+            "groupTitle": null,
+            "attachments": [],
+            "isAudioMessage": false,
+            "dateRetracted": null,
+            "otherHandle": 0,
+            "guid": "E520E0DF-3146-44D0-A101-47DB72A18AF0",
+            "isSystemMessage": false,
+            "dateCreated": 1788206915927,
+            "balloonBundleId": null,
+            "payloadData": null,
+            "handle": null,
+            "replyToGuid": "1BBCF+15555550100C0D-AF49-6124CEB20A6F",
+            "expressiveSendStyleId": null,
+            "dateDelivered": null,
+            "shareDirection": 0,
+            "didNotifyRecipient": false,
+            "associatedMessageGuid": null,
+            "isDelivered": true,
+            "associatedMessageType": null,
+            "text": "REDACTED",
+            "itemType": 0,
+            "messageSummaryInfo": [
+              {
+                "ust": true,
+                "amc": 0
+              }
+            ],
+            "attributedBody": [
+              {
+                "runs": [
+                  {
+                    "range": [
+                      0,
+                      10
+                    ],
+                    "attributes": {
+                      "__kIMMessagePartAttributeName": 0
+                    }
+                  }
+                ],
+                "string": "Im HIUNGRY"
+              }
+            ],
+            "timeExpressiveSendPlayed": null,
+            "cacheRoomnames": null,
+            "chats": [],
+            "isDelayed": false,
+            "isExpired": false,
+            "error": 0,
+            "subject": null,
+            "isAutoReply": false,
+            "isServiceMessage": false,
+            "datePlayed": null,
+            "handleId": 19
+          },
+          {
+            "cacheRoomnames": "bcb9a1843dfc4b65bb47ce50afec8d32",
+            "partCount": 0,
+            "isFromMe": false,
+            "dateRead": null,
+            "otherHandle": 0,
+            "associatedMessageGuid": null,
+            "isAutoReply": false,
+            "isCorrupt": false,
+            "isDelivered": false,
+            "isDelayed": false,
+            "isAudioMessage": false,
+            "subject": null,
+            "text": null,
+            "isSpam": false,
+            "threadOriginatorPart": null,
+            "groupActionType": 2,
+            "dateCreated": 1788204923737,
+            "dateEdited": null,
+            "messageSummaryInfo": null,
+            "dateRetracted": null,
+            "attachments": [],
+            "dateDelivered": null,
+            "isArchived": false,
+            "replyToGuid": null,
+            "hasPayloadData": false,
+            "didNotifyRecipient": false,
+            "error": 0,
+            "isForward": false,
+            "expressiveSendStyleId": null,
+            "isExpired": false,
+            "hasDdResults": false,
+            "shareDirection": 0,
+            "balloonBundleId": null,
+            "originalROWID": 418352,
+            "shareStatus": 0,
+            "country": null,
+            "threadOriginatorGuid": null,
+            "isServiceMessage": false,
+            "groupTitle": null,
+            "isSystemMessage": false,
+            "payloadData": null,
+            "itemType": 3,
+            "chats": [],
+            "wasDeliveredQuietly": false,
+            "datePlayed": null,
+            "associatedMessageType": null,
+            "timeExpressiveSendPlayed": null,
+            "attributedBody": null,
+            "handle": null,
+            "handleId": 0,
+            "guid": "88519B76-D6B4-4E0C-B21D-D927F47CC933"
+          },
+          {
+            "attachments": [],
+            "dateRetracted": null,
+            "replyToGuid": null,
+            "shareStatus": 0,
+            "timeExpressiveSendPlayed": null,
+            "isAudioMessage": false,
+            "dateEdited": null,
+            "associatedMessageGuid": null,
+            "didNotifyRecipient": false,
+            "dateRead": null,
+            "chats": [],
+            "dateDelivered": null,
+            "originalROWID": 418351,
+            "isSpam": false,
+            "isForward": false,
+            "guid": "8E1B546A-76BA-483D-9F8A-1D2A61F321DC",
+            "isDelivered": false,
+            "otherHandle": 0,
+            "isDelayed": false,
+            "isServiceMessage": false,
+            "associatedMessageType": null,
+            "isAutoReply": false,
+            "itemType": 3,
+            "text": null,
+            "datePlayed": null,
+            "isFromMe": false,
+            "dateCreated": 1788204923631,
+            "cacheRoomnames": "bcb9a1843dfc4b65bb47ce50afec8d32",
+            "groupTitle": null,
+            "groupActionType": 1,
+            "isSystemMessage": false,
+            "error": 0,
+            "isExpired": false,
+            "shareDirection": 0,
+            "messageSummaryInfo": null,
+            "partCount": 0,
+            "hasPayloadData": false,
+            "isArchived": false,
+            "subject": null,
+            "country": null,
+            "isCorrupt": false,
+            "handleId": 0,
+            "threadOriginatorPart": null,
+            "expressiveSendStyleId": null,
+            "balloonBundleId": null,
+            "payloadData": null,
+            "attributedBody": null,
+            "handle": null,
+            "hasDdResults": false,
+            "threadOriginatorGuid": null,
+            "wasDeliveredQuietly": false
+          }
+        ],
+        "status": 200
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T20:38:22.923Z"
+}

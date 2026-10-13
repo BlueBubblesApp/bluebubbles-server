@@ -1,0 +1,884 @@
+# Testing strategy
+
+*What* is asserted and why. How to run any of it is in
+[`../.claude/docs/workflow.md`](../.claude/docs/workflow.md).
+
+The organising idea: **the failure mode that keeps recurring is code that is written,
+unit-tested, reported healthy, and reachable from nothing.** Unit tests cannot catch it by
+construction: the missing thing is the call site, and a test is itself a call site. A module with
+passing tests and no production caller looks exactly like a module that works.
+
+So a component is not done when its tests pass. **It is done when the composition root calls it
+and a test asserts that call exists.** `Tests/CompositionTests/EventDeliveryWiringTests.swift` is
+the pattern: it asserts *wiring* rather than behaviour, because behaviour was never the part that
+was broken.
+
+---
+
+## The parity harness: the backbone
+
+`Tests/CompatibilityTests/FixtureReplayTests` mounts the **shipping** router in-process:
+`ServerComposition.buildHandlers`, over the synthetic `chat.db` from `Tools/chatdb-fixtures`,
+replays every recorded v1 fixture against it, and structurally diffs the answers. Runs in CI.
+
+**Two things it must be read with:**
+
+- **It compares SHAPE, not values.** The fixtures were recorded against a real Mac holding real
+  conversations; the replay runs against three synthetic chats. No count, GUID, address or body
+  text can agree. So `DiffMode.shape` keeps keys, types, and the literal strings that ARE the
+  contract (`status`, `message`, `error.type`) and drops the rest. Value-level parity needs two
+  servers over one database, which is `bb-parity` below.
+- **The baseline is a ratchet, not a suppression list.**
+  `Tests/CompatibilityTests/Fixtures/replay-baseline.json` lists the fixtures that cannot match
+  here and why: HARNESS (no helper, no network, no log sink), DATA (the recorded row is not in
+  the synthetic database), OPEN (a real divergence, with an entry in `TODO.md`), and DECIDED (a
+  divergence we examined and chose to keep (contact ids are the standing example). A fixture
+  that starts matching must be **removed** from it or the suite fails, and one that stops
+  matching and is not listed fails too.
+
+  **Only OPEN is work.** The split exists because a settled won't-fix left sitting under OPEN
+  makes the ratchet overstate what is left to do, and the next person re-litigates a decision
+  instead of reading it. A DECIDED entry is added only once the reasoning is written in
+  `TODO.md`, and it states the decision inline so the baseline can be read on its own.
+
+**Nothing that acts on the machine is ever replayed.** This is not tidiness: the first run of the
+harness locked the developer's Mac and restarted Messages, on a machine being used over a remote
+session. `ReplayDenyListTests` asserts it.
+
+**What a fixture reaches is a ladder, not a yes/no** (`ReplayTier`). The flat deny-list was right
+about the danger and too coarse about the cause: in the in-process harness the server's `app.db`
+is in memory and its `chat.db` is a temporary copy, so what actually matters is whether a route
+leaves the process. Three rungs, plus a floor that does not move:
+
+| Tier | Reaches | Admitted by |
+|---|---|---|
+| `harness` | the in-memory `app.db` and the `chat.db` copy: every GET but an unacknowledged admin one, the four query POSTs, and the writes named as touching only our own tables | **the default** |
+| `stub` | the published `FailingPrivateAPI` double and nothing further: every other write carrying `requires: .privateAPI` | `BB_PARITY_TIER=stub` |
+| `live` | Messages.app through AppleScript, FindMy, the system, and every write nothing above names | **not built** |
+| `never` | `mac/lock`, `mac/imessage/restart`, the FaceTime restart, both server restarts, the update install, and any path the route table does not serve | nothing |
+
+The middle rung is safe for a specific, checkable reason: `FailingPrivateAPI` is a struct with no
+socket and no IMCore whose members throw unless a closure or a success-set entry says otherwise,
+so a gated call cannot arrive anywhere. **The classification is derived from the route table**
+— `ReplayTierSelection.routeReach`, over every route in `RouteCatalog` — and it fails closed: a
+write is `harness` only when its handler is named as server-local, `stub` only when it carries
+the gate, and `live` otherwise, and a path no route serves is `never`. A list of dangerous paths
+fails open the day a route is added outside it. `ReplayTierSelectionTests` asserts that every
+route is classified, that every route below `live` is there for a reason the table states, and
+that no route that can send is ever admitted.
+
+Raising the tier is a deliberate act and the suite says what it covered, every run:
+
+```
+fixture replay: BB_PARITY_TIER=stub
+  compared 70 of 117 v1 fixtures
+  0 withheld by the tier
+  22 never replayed: they act on this Mac
+```
+
+A value that is unrecognised, or names a rung that is not built, **fails the suite** rather than
+falling back to the default: a run that quietly dropped a tier would report a pass over routes it
+never replayed, which is the failure the whole ladder exists to prevent.
+
+`BB_PARITY_TIER=stub` raised coverage from 61 fixtures to 70 and immediately found two v1
+contract breaks — `POST` and `DELETE /chat/:guid/typing` answered the default `"Success"` where
+the reference sends `"Successfully started typing!"` and `"Successfully stopped typing!"`. Neither
+was reachable before: `SuccessMessageTests` is forward-only by design (it checks that every string
+we send is one the reference sends, not that every string the reference sends is present), and the
+replay denied every helper-backed route outright. Its own header had already named the fixture
+replay as the thing positioned to catch exactly that.
+
+An environment variable rather than a flag, and that is forced rather than preferred: `swift test`
+parses its own arguments and refuses an unknown one, with or without a `--` separator. It is also
+how the other opt-in suites here are gated (`BB_LIVE_TOOL_INSTALL=1`, `BB_BENCH=1`).
+
+**A deny-listed fixture is still diffed, just not by replaying it.** Thirteen of them record
+what a real Node server answered, and the refusal to replay used to be silent about that: the
+recordings sat in the corpus and nothing compared them. Two had drifted unnoticed —
+`POST /chat/new` answered with one key against the reference's twelve, and `PUT /chat/:guid`
+answered `data: null`. Three suites now serialize a real row through the same call the handler
+makes and diff the KEY SET against the recording, with no server and no requests:
+`SendShapeTests` (the eight message sends), `ChatWriteShapeTests` (the two chat writes) and
+`ScheduleWriteShapeTests` (the two scheduled-message writes). `DenyListedShapeCoverageTests` is
+the ratchet over all three: it enumerates every deny-listed, **Node-recorded** fixture carrying
+a payload and fails if one is not claimed by a named suite, so a fourteenth cannot appear
+unnoticed. Self-recorded fixtures are excluded by construction — diffing one compares the
+candidate against a photograph of the candidate.
+
+### The event pipeline, end to end
+
+`Tools/event-probe/probe.mjs` attaches to a RUNNING server on all three delivery channels at
+once: the socket, a webhook it registers against itself, and ntfy (point `ntfy_server` at the
+probe), triggers real activity, and prints what each channel received.
+
+It exists because neither half of the pipeline was ever tested against a payload the change
+detector produced. `SocketEndToEndTests` drives the transport with hand-built events and the
+webhook suite drives delivery with hand-built events, so both were green while every emitted
+event carried `chats: []`.
+
+```bash
+node Tools/event-probe/probe.mjs --password "$PW" --seconds 40 \
+    --send 'any;-;someone@example.com' --react
+```
+
+No dependencies: the socket is Engine.IO v4 over long-polling, the same path
+`SocketEndToEndTests` uses. `--send` and `--react` reach a real conversation: pass them
+deliberately, and only to an address cleared for testing.
+
+**What it cannot show on every Mac.** Typing indicators and FindMy locations are INBOUND
+events, observed through the helper. When the server logs "The helper attached to no
+inbound-event source on this macOS", neither is ever emitted and neither channel can be
+checked; see `docs/OBSERVATION_LADDER.md`.
+
+### What a fixture database cannot tell you
+
+**A fixture database has its rows already complete. A live one does not, and the difference is
+where the bugs are.** Every one of these passed a full green suite and was found by sending a
+real message:
+
+| Assumption | What Messages actually does |
+|---|---|
+| A sent message's `text` column holds its text | **NULL** on an AppleScript send, and never filled in; the words are in `attributedBody`. Match `universalText()`. |
+| A message row arrives with its chat | The `chat_message_join` row lands **after**. A wait for "the row exists" answers `chats: []`. |
+| An unsend moves `dateRetracted` | It moves **`dateEdited`**; `dateRetracted` stays null. Watching the obvious column times out every time. |
+| A helper call that compiles, works | `notifyAnyways` took only a message GUID and could never resolve the chat. Every call failed; nothing tested it. |
+
+So: **anything that depends on the timing or completeness of what Messages writes is unverified
+until it has run against a real send.** `FailingPrivateAPI` proves the translation of a refusal
+and nothing about IMCore's behaviour.
+
+Running one, on a Mac with the Private API set up:
+
+```bash
+swift build --arch arm64e --product BlueBubblesHelper     # Messages runs arm64e; a plain arm64 dylib maps nowhere
+.build/arm64-apple-macosx/debug/bluebubbles-server --headless     --set socket_port=1234 --set password=… --set enable_private_api=true     --set private_api_helper_path="$PWD/.build/arm64e-apple-macosx/debug/libBlueBubblesHelper.dylib"
+```
+
+`server/info` reports `helper_connected`. **Send only to an address you have been told you may
+send to** (these reach real people) and never commit one.
+
+**A fixture is only a contract if the REFERENCE recorded it.** Fifteen v1 routes have no fixture
+except one this server produced, which cannot fail and proves nothing;
+`CorpusProvenanceTests` pins that set so it cannot grow. The source is inferred from the CORS
+header, because the recorder does not stamp it.
+
+**A missing key always fails, and an added key fails unless it is declared** in
+`acceptedDifferences`. The first is the compatibility contract; the second is a drift check, so a
+field that replaced another cannot pass as an addition. Together they are what mechanically
+enforce the contract: every opt-in field (`?fields=extended` on
+alerts, `replay=1` on the socket, negotiated codecs) is proven *absent* from the default response
+rather than merely intended to be. Broadcast socket frames are asserted byte-identical for a
+client that requests nothing.
+
+It asserts status codes, `error.type` strings, **key presence/absence** (not just values),
+epoch-ms date encoding, and the macOS-version-gated field sets across all three schema profiles.
+
+The envelope's `message` and `error.message` are checked for PRESENCE and for being a string,
+never for their words, in both modes (`DiffMode.wordingPaths`): v1's sentences may be reworded
+or made more specific, and only the keys, the status and `error.type` are fixed
+(`.claude/docs/decisions.md` § "Messages are ours to word"). The relaxation is by path, so a
+field called `message` inside `data` is content and is compared as content.
+
+### The corpus is committed, and scrubbed
+
+`Fixtures/http/`. Recording runs against a real Mac with real conversations, and this repository
+is public, so the scrub is what makes the corpus committable.
+
+**It replaces personal values while keeping everything the diff asserts**: keys, types, array
+lengths, and the literals a client branches on. The envelope's sentences survive verbatim too
+(`"message": "Successfully fetched messages!"`), as the record of what the reference said; message text becomes `REDACTED`; every address becomes
+`person@example.com`. Addresses are stripped from **paths and filenames** too, since a chat GUID
+is an address.
+
+`--no-scrub` exists for a local run and its output must never be committed; a test fails if it is.
+
+**If you record against a live server, re-audit before pushing.** The scrubber is a filter, not a
+guarantee, and it has been wrong before: multipart bodies once bypassed scrubbing entirely,
+link-local IPv6 addresses embed the interface MAC, and stack traces carried absolute
+`/Users/<name>` paths.
+
+### A field one release omits needs a recording from that release
+
+The payload schemas in `Sources/BBOpenAPI/Resources/schemas.json` are inferred from the corpus,
+and inference marks a key **required when every recording has it**. A corpus recorded on one
+macOS therefore publishes as guaranteed every field that release happens to answer, including the
+ones an older or newer release leaves out on purpose. A hand edit to the schema table does not
+fix that: `infer-schemas --check` regenerates the table and fails on any difference, which is the
+point of it.
+
+The fix is evidence. The chat-filter routes record both shapes: the `any;-;person@example.com`
+fixtures were recorded on macOS 26, where `filter_category` is readable, and the
+`any;+;b070791abb7e9ea04a21756bd0b7325e` fixtures (`filter` GET and POST, `known`, `junk`, `spam`)
+were recorded on macOS 27.0.1, where it is not and the serializer omits it. Together they make it
+optional. The 27 `junk` and `spam` recordings send `dryRun: true`, which reads a count and reports
+nothing.
+
+`GET /api/v2/chat/:guid/presentation` is the case this cannot yet cover: each of its seven fields
+arrived in a different release, so one release's recording would publish all seven as required.
+It stays in `docs/api/uncovered-routes.txt`, with its declaration in `ResponseBodies`, until a
+macOS 14 recording can sit beside a later one.
+
+### Live differential runs
+
+`bb-parity` diffs two running servers against identical traffic:
+
+```bash
+BB_REFERENCE_PASSWORD=… BB_CANDIDATE_PASSWORD=… swift run bb-parity \
+    --reference http://localhost:1234 --candidate http://localhost:1235 --chat-guid '…'
+```
+
+Three properties make the output trustworthy rather than merely reassuring:
+
+- **The corpus is read-only, and a test asserts it.** This runs against a real Mac with real
+  conversations. A corpus that sent anything would send it *twice* (once per server) to a real
+  person.
+- **It shares `ResponseDiff` with the fixture harness.** Two copies of a comparison this specific
+  would drift, and the drift would be silent: a live run reporting "no differences" because its
+  copy had stopped checking something.
+- **It was validated in both directions.** Two identically configured servers report clean;
+  running one with a non-legacy codec is caught as two added keys on `server/info`, and the tool
+  exits non-zero.
+
+Requests are issued **sequentially, not concurrently**: both servers read the same live
+`chat.db`, and a message arriving between two parallel requests shows up as a real but meaningless
+difference in counts.
+
+---
+
+## Default-off enforcement
+
+The tests that keep "available but unused" from quietly drifting into "used":
+
+- With default settings the **full route table matches the reference**: the auth endpoints **404,
+  not 401**.
+- **No signing key, device table, or enrollment state is created** on a fresh install.
+- An `Authorization: Bearer` header is **ignored rather than evaluated** under
+  `auth_mode = password`.
+- A default server emits `legacy-v1` to every target **regardless of what any client advertises**,
+  and advertises no new `server/info` fields.
+
+---
+
+## `chat.db` is never written
+
+**`Tests/BBIMessageTests/ChatDatabaseSafetyTests.swift`.** Three assertions, against a working
+copy of the committed per-release fixtures, so it runs anywhere without a live Messages:
+
+- a write reaching past every repository at the connection comes back **`SQLITE_READONLY` (8)**,
+  which is SQLite refusing rather than a Swift guard a refactor could remove;
+- a representative read (tables, columns, rows from `message` and `chat`, a change token) leaves
+  the file, its `-wal` and its `-shm` **identical in size and mtime**;
+- **no `SELECT *`** appears anywhere in `Sources/BBIMessage`, because Apple owns this schema and
+  it changes per release.
+
+The strongest guarantee is still structural rather than tested: `ReadOnlyDatabase` vends no write
+API, so nothing *can* write. The suite exists because that is one refactor from gone.
+
+What the suite deliberately does NOT pin is *which* layer refuses the write. Measured: with
+`configuration.readonly = true` the connection refuses and `PRAGMA query_only` reads 0; set that
+flag to `false` and GRDB sets `query_only = 1` inside every `read` block instead, and the write
+is refused identically. Either satisfies the rule, so asserting one would fail on a GRDB release
+that changed the other.
+
+### Not yet done
+
+Stated as work, not as coverage. Everything above this heading exists; nothing below it does.
+
+- Run the full read surface against all three schema profiles and assert that columns absent from
+  a profile produce **absent fields rather than nulls or crashes**, including the case that bites
+  hardest, a table present in Sonoma and gone in Sequoia (`message_processing_task`).
+- Run `EXPLAIN QUERY PLAN` over every `chat.db` query in CI and **fail any that full-scans
+  `message`**. `ReadOnlyDatabase.explainQueryPlan` exists for this and has no caller. We cannot
+  add indexes, so a query that misses the ones Apple ships is a defect, and it is the kind that
+  only hurts on the old hardware the memory budget is written for.
+
+### Timestamps
+
+Round-trip every date column through `AppleTimestamp` at both unit scales, asserting the High
+Sierra boundary. Separately assert Notification Center's Cocoa *seconds* are not decoded with the
+nanosecond scale: the two live in one codebase and the failure is a plausible-looking wrong date
+rather than an error.
+
+---
+
+## The deployment matrix
+
+Integration tests run against **four** configurations, not one: socket-only (no push, no
+webhooks); webhook/ntfy-only; full push; and each of those **with and without the Private API**.
+
+**A test that only passes in the fully-configured case is a failing test.**
+
+Specifically assert that a socket-only install starts with **zero warnings**, completes setup with
+no Firebase step, and reports its active delivery routes accurately.
+
+**Non-SIP send path** is a first-class suite, not a fallback afterthought: send text, send an
+attachment, and start both a 1:1 and a group chat with the helper absent, asserting the returned
+`Message` matches the Private-API path's shape. Assert the capability matrix in
+`GET /api/v1/server/info` reports honestly in both modes.
+
+---
+
+## What the audit pass added
+
+Five suites, each written against a specific way the code could go wrong again:
+
+- `SocketTransportTests`: the Private API event stream fans out. Two subscribers taken before
+  a helper registration both receive it. Against the previous single-shared-`AsyncStream` this
+  fails, with one subscriber never served.
+- `DeviceRegistrationTests`: the push registration WRITE runs. Nothing had ever executed it,
+  which is how it kept inserting into a column a frozen migration had renamed. One test pins
+  the migrated column name directly.
+- `OptionalAuthenticationTests`: drives the real listener and asserts a blocked caller is
+  refused on the one route whose credential check is optional, and never reaches the handler.
+- `HelperVocabularyTests`: what the compiler cannot check about the helper command enums:
+  the two stay disjoint, raw values stay kebab-case and unique, and the client keeps sending
+  cases rather than strings. Exhaustiveness is the build's job and is deliberately not
+  restated here.
+- `PrivateAPIPumpOrderTests`: structural, and says so: the event pump must be attached before
+  the runtime starts. The behaviour needs a real injection to reproduce, so the order is
+  asserted in the source in the same shape as `NamingConventionTests`.
+- `OwnedTaskPolicyTests`: a stored bare `Task` anywhere under `Sources/` or `Helper/` is
+  refused, and a service's `stop()` must await each `OwnedTask` it holds. The exemptions are
+  on-demand drain workers whose handle has to clear on the actor; each names its reason.
+
+## Per-subsystem assertions
+
+**Recovery from a transient failure, in three places it used to be permanent.** Each of these
+guards a path where something that can only go wrong once was treated as terminal; see
+[`../.claude/docs/decisions.md`](../.claude/docs/decisions.md) § 4a for what each one was.
+
+*The listener saying it died.* `HTTPListenerExitTests` binds a real port with placeholder
+handlers — never the shipping registry, because these tests drive a live listener and the real
+handlers act on this Mac. It asserts both directions, and the second is what keeps the first
+usable: an exit nobody asked for is reported exactly once, and an ordinary `stop()`, a failed
+bind, and a `stop()` following an exit that was already reported are all silent. A notice that
+cries wolf on every shutdown is one people learn to ignore.
+
+*The tunnel coming back.* `TunnelReconnectionTests.retriesAfterTheBudgetIsSpent` drives a shell
+script that serves once, dies, fails more times than `maximumRestarts` allows, and then serves
+again. `restartWindow` is set far longer than the test runs, so the recovery can only come from
+the slow retry phase and never from the budget resetting itself — which is the distinction the
+old code got wrong. It also asserts the user was told **once**, at the transition, rather than
+never or on every attempt.
+
+*The address being recorded.* `ServerAddressAnnouncerTests` injects a fast retry schedule (the
+production one is measured in minutes, and a test that waited it out would be a sleep nobody
+trusts) and asserts three things: a failed durable write is retried until it lands, retrying
+outlasts the stepped schedule and continues at the steady interval, and a newer address
+supersedes a retry still chasing the old one rather than letting a stale write land on top.
+
+All three suites were checked by mutation — reverting each fix in turn and confirming the
+relevant tests fail — because a regression test for a silent failure is exactly the kind that
+can pass without exercising anything.
+
+
+**The audit log: the record, the wiring and the document.** `BBAuditTests` holds the module:
+`AuditRepositoryTests` pins newest-first paging with the total from the same read, the
+oldest-first keyset walk the export uses, filters that escape `LIKE` wildcards and the
+retention sweep; `AuditRecorderTests` pins that a disarmed recorder drops and an armed one
+stores and forwards in storage order; `SyslogMessageTests` pins the RFC 5424 header field by
+field, the category as `MSGID` (and that a kind would not fit), octet counting by byte and
+the refusal of unreadable PEM; `AuditCSVTests` pins RFC 4180 quoting and the formula
+defence. `AuditDocumentationTests` reads `docs/AUDIT_LOG.md` and fails on any kind, metadata
+field, category, outcome, severity, source, actor kind, subject kind or CSV column the code
+has and the page does not, because the page is what a SIEM rule is written against.
+`CompositionTests/AuditWiringTests` is the wiring half: each bridge translates its emitter's
+value into the right kind with the right actor, the settings store reports a write with the
+task-local actor in scope, and `AuditLogService` started against the fixture context arms the
+container's recorder and leaves `recording_started` and `recording_stopped` as the run's first
+and last rows. `AccessControlAuditingTests` and `AuthenticationAuditingTests` pin that the
+emitters hand over every refusal and change, against the route template and never the path;
+`LicenseStageTests` does the same for a refusal at the subscription gate, and
+`LicenseRuntimeTests` that every status move, exchange, revocation and removal reaches the
+licence auditor once, with a repeated revocation and a reload that moved nothing both silent.
+The app's `SidebarDestinationsTests` pins that the Audit Log row is shown only when the
+feature is known to be on and that a selection whose row leaves falls back to Home.
+
+**The contact index: behaviour AND cost.** `ContactSearchTests` covers paging, SQL search and
+ordering; `ContactEnablementTests` covers which contacts are served; `ContactPageCostTests`
+covers what a page costs. The split is deliberate, because two of these fail in ways a
+behavioural test cannot see.
+
+*Cost.* Reading a page hydrates addresses in one query. The per-row form is for single lookups,
+and using it for a list made a page of fifty issue fifty-two selects — an implementation that
+passes every behavioural assertion in the suite. The test counts statements through GRDB's
+trace hook (installed via `Configuration.prepareDatabase`, the only hook that sees the reads
+inside `database.read`) and asserts the count does not grow with the page. It also asserts the
+addresses still ARRIVE, because a batch that returned none would be very fast indeed.
+
+*Surviving a re-index.* `reindexAll` deletes every address-book row and re-inserts it, so
+anything about a contact kept on `contact` is wiped whenever the address book is re-read. The
+test performs exactly that delete-and-reseed and asserts a disabled contact is still disabled.
+Without it, enablement stored as a column passes every other test here and silently reverts in
+the field.
+
+*The lookup cache.* A disabled contact must stop resolving a handle to a name, and the
+resolution cache holds records by address — so the test warms the cache first, then switches
+the contact off, then asserts the lookup misses. Without the warm-up it passes against an
+implementation whose setting takes five minutes to take effect.
+
+**Messages-backed interfaces.** Every operation carried out by Messages reports a backend refusal
+as `IMessageError` (HTTP 500, `error.type = "iMessage Error"`) rather than as a generic
+`Server Error`, and a `BadRequest` the interface raised itself still arrives as a 400.
+`ChatFailureTests` asserts this by walking **all twenty-four** chat operations rather than
+sampling: the risk with a rule applied call site by call site is not that the rule is wrong, it is
+that one call site was missed, and only an exhaustive walk finds it. Verified non-vacuous by
+unwrapping one operation and confirming the walk fails.
+
+`FailingPrivateAPI` (`Tests/BBTestSupport/`) is the fake that makes this reachable. It conforms
+to the whole of `PrivateAPI` and throws from every member, which is affordable because each one is
+`async throws`: **every stub body is `throw error` and no return value has to be constructed**.
+Reach for it for the exhaustive walks above rather than writing a narrower stub; a selective one
+cannot catch the missed call site. `InterfaceFixtures` supplies the empty database these interfaces
+need to exist but never read.
+
+**When the helper answers.** A double that throws can only ask "was this wrapped". Everything on
+the other side (did the interface send down what the caller asked for, does it return what came
+back) needs one that succeeds, and for a long time none existed: a conformance was an
+all-or-nothing 76-member obligation, so the failing double was the only one anybody could justify
+writing.
+
+`PrivateAPI` is now a composition of sixteen ROLES (`PrivateAPIConnection`, `MessageSending`,
+`ChatMuting`, `HandleAvailability`, `FaceTimeControl`, …), and each interface declares the roles it
+calls as its `MessagesBackedInterface.Helper`. `HandleInterface`'s slice is three methods and
+`AttachmentInterface`'s is one, so a succeeding stub for either is a dozen lines:
+`Tests/BBTestSupport/SucceedingHelpers.swift`, driving `HelperSuccessPathTests`. Two rules there: a stub **records what
+it was asked**, because half the value is asserting what went down rather than what came back; and
+an unarranged member **throws** rather than returning a default, so a test that wanders onto an
+unexpected path fails there instead of passing on a zero value.
+
+Prefer the narrowest role that covers the operation. A real `any PrivateAPI` still satisfies every
+one of them, so nothing at the composition root changes.
+
+**Where a suite lives.** `BBInterfacesTests` stands up ONE interface against a repository and a
+helper double and asserts what it does, in the interfaces layer's own vocabulary. It builds no
+`AppContext` and links no transport, which is the property that makes it worth having: a failure
+there points at the interface. `CompositionTests` is for what genuinely spans layers: the wiring
+assertions, and the suites that check an `InterfaceError` reaches a client as the right envelope,
+which needs BBInterfaces, BBHandlers and BBHTTPAPI at once.
+
+Fakes both need live in `BBTestSupport`, a plain library target under `Tests/`. It belongs to no
+product, so nothing ships it, and everything in it is public API with no `@testable`, which is
+what lets it be a library at all. Two copies of a fake is how two copies drift, and a drifted fake
+is worse than none: both suites go on passing. It holds:
+
+| What | For |
+|---|---|
+| `Repository` | The checkout root, found once and checked, for any test that reads a file in the tree: `Repository.url("Fixtures/http")`, `Repository.read("docs/AUDIT_LOG.md")`. A test never climbs out of its own `#filePath`; `SourcePathPolicyTests` fails the build on one that does. |
+| `SourceScanner` | The one walk over the tree a policy test reads, with comments lexed out and a floor on what it finds. |
+| `TestSettings` | A `SettingsStore` over an in-memory `app.db`: `store()` with `SettingsSchema` alone, or `store(database:)` over a database the suite also reads. |
+| `CommittedChatDB` | A private copy of a committed `chat.db` fixture (`copy`), or a WAL copy with its writer held open (`walCopy`). A copy belongs to a scope and is removed, sidecars and all, when the scope ends: the suite declares `.removingChatDBCopies`, and a harness with a lifecycle of its own (`ReplayServer.run`) calls `withCopies`. A copy made outside a scope throws, so a forgotten removal fails on its first run instead of filling the temporary directory. |
+| `LegacyConfigDatabase` | An Electron install's `config` table, for the import and its wiring. |
+| `waitUntil`, `waitFor` | Polling for state another task changes, throwing at the deadline. |
+| `InterfaceFixtures` | An empty chat.db, and the repository and serializer an interface needs, for paths that fail before a row is read. |
+| `FailingPrivateAPI`, `SucceedingHelpers` | Private API doubles for the failure and success paths. |
+| `RecordingAlerts` | Every raise as the alert the drawer would show, and the errors as themselves. |
+| `RecordingSink` | An event sink that keeps the events, their names and their payloads. |
+| `CapturingAuditor<Event>` | Any one-method auditing seam's events, in order. It conforms to BBAuth's two seams; a seam only one target tests conforms in that target. |
+
+A fake one target uses stays in that target. Two fakes that share a name and genuinely differ
+are renamed until the name says how: the notification provider that records
+(`RecordingProvider`, BBEventsTests) and the one that drops everything (`InertProvider`,
+CompositionTests); the helper transport (`StubHelperTransport`) and the download transport
+(`StubToolTransport`). BBIMessageTests' `ChatDatabaseFixture` builds a synthetic schema and is
+not `CommittedChatDB`.
+
+**A test that races a write against a poll holds the task and awaits it.** Two of these
+existed and both wrote `Task.detached { try? await ... }`, which discards the error. When the
+write failed the poll simply ran to its limit, so the failure arrived sixty seconds later
+reading "answered before the join": a true sentence about an entirely different cause, and
+one that sends you reading the hydration logic rather than the test's own write. Hold the
+`Task`, `await` its value before the assertions, and let a failed write fail as itself. Pass
+an explicit policy too where the API takes one: `SendHydrationTests.waitsForTheChatJoin` was
+the only test in its file taking the sixty-second default, which is what made its flake
+expensive as well as misleading.
+
+**Diagnostics separation.** `log.error(…)` alone creates **no** `UserAlert`; `alerts.raise(…)`
+creates exactly one; repeated raises with the same `dedupeKey` coalesce and increment
+`occurrenceCount`; `GET /api/v1/server/alert` returns the legacy field shape (asserted by **set
+equality** on the key set); a Copy Diagnostic Report bundle contains **no value sourced from a
+setting marked `isSecret`**.
+
+**Payload codecs.** `legacy-v1` output byte-identical to captured fixtures. `sealed-v2` verified by
+**decrypting what it produced with a real keypair**: a codec round-tripped only through its own
+encoder proves nothing, since the same bug on both sides cancels out, plus tamper tests on the
+ciphertext, the header and the sender hint, and a wrong-key test. Per-device negotiation verified
+by registering one legacy device and one `sealed-v2` device and asserting **one event produces two
+different payloads in one send**.
+
+**Socket conformance.** Replay the captured handshake and frame transcript for both transports and
+both EIO3 and EIO4, asserting frame-level equality. Verified against the canonical
+`socket.io-client@4`, including the polling→websocket upgrade and the silent close on a bad
+password.
+
+> A cautionary case worth keeping in mind: the packet codec and server existed with golden-vector
+> tests and **nothing was mounted**: `/socket.io/` 404'd and no client could connect, while every
+> unit test in the module passed.
+
+**Settings.** Every key round-trips to its declared type, with explicit cases for a numeric setting
+whose value is `0` or `1`, a password of `"1"`, and a delay stored as `"0.0"`. Secrets land in the
+Keychain and plaintext rows are gone. `RenderableSettingsTests` fails when a setting declares a
+presentation and is missing from `Settings.renderable`; `SettingApplicationTests` pins which
+settings need a restart to apply and that every legacy row stays hidden.
+
+`KeychainFallbackTests` covers the one place the Keychain is exercised for real rather than
+through `InMemorySecretStore`. Two halves. `KeychainFallback.decide` is the rule as a value —
+which `OSStatus` from the data protection keychain means "try the legacy one", and which of
+those also means "this build has no entitlement" — because it used to be three lines of control
+flow reachable only through a real Keychain on a real signature, and the case that was *wrong* (a
+lookup answering `errSecItemNotFound`) could be stated by no test. The other half seeds an item
+into the legacy keychain with `SecItemAdd` directly, under a per-run service name, and asserts
+`KeychainSecretStore.get` finds it. Seeded directly on purpose: going through `set` would latch
+`entitlementIsMissing` on the way in, and the read would then skip the data protection attempt
+entirely — which is exactly how `checkKeychainAndExit` passed over the bug for as long as it did.
+`resetEntitlementLatchForTesting` is what puts the test in the app's ordering (read first) rather
+than the probe's (write first).
+
+`UnreadableSecretTests` holds the three-way verdict the store has to reach about a secret:
+`readSecret` for the value, `presence(ofSecretKey:)` for existence without reading, and both
+agreeing that a Keychain which *refuses* is not a Keychain with nothing in it. Including the
+cases that look like nothing and are not — a secret genuinely stored as the empty string, and a
+command-line override that must resolve without a Keychain call at all.
+
+**Service lifecycle.** Start/stop ordering under a synthetic dependency graph, restart-with-
+dependents on a `socket_port` change, gated services declining to start, and supervised
+restart-with-backoff on a service that throws, with an alert raised on policy exhaustion.
+
+**Contacts.** Benchmark lookup against a synthetic 5,000-contact address book and assert it is an
+**indexed lookup, not a scan**. Assert the bulk ingest never requests image data, that an
+incremental re-index touches only changed identifiers, and that two contacts sharing a full name do
+not collide.
+
+**Memory.** Assert the budget table in CI on a fixture dataset, plus a 24-hour soak driving the
+poller, socket and send paths that asserts a **flat** memory curve. Assert that downloading a large
+attachment does not grow the heap proportionally to file size.
+
+**Access control.** The highest-value test is the tunnel footgun: simulate requests arriving
+through a trusted proxy and **assert the tunnel egress address is never blocked**, with failures
+attributed to the forwarded client. Assert that with no resolvable client address the system falls
+back to global throttling instead of blocking the proxy. Assert blocks expire on their TTL, survive
+a restart, escalate on repeat offences, that loopback and allowlisted CIDRs are never blocked, that
+unblocking takes effect immediately, and that `--clear-blocklist` recovers a fully locked-out
+server.
+
+**Permissions.** Assert Full Disk Access detection is the authoritative `chat.db` open. Assert
+`AEDeterminePermissionToAutomateTarget` is called with `askUserIfNeeded: false` so status checks
+never surface a prompt. Assert every deep link opens the correct pane, that the walkthrough refuses
+to advance past an unmet required permission without a recorded acknowledgement, that revoking a
+permission at runtime raises an alert, and that the registry refuses to start a service whose
+required permission is missing.
+
+**Message search.** Five suites, and the thing they mostly guard is not "does search work"
+but "can the index ever return LESS than the server did without it".
+
+*The defect itself.* `MessageSearchRoutingTests.emptyTextIsFoundThroughTheIndex` inserts a row
+whose `text` column is empty and whose words live only in `attributedBody` — the macOS 26
+shape — and asserts the **rows and the `total`**. Both, because they are computed by different
+call paths sharing one predicate, and a page of matches beside a whole-database total is the
+bug that made the incremental sync page everything.
+
+*Never narrower than `LIKE`.* The index and the column answer different questions and neither
+answer contains the other, so `resolvingSearch` ORs them. Three tests hold that, each failing
+if the `OR` half goes: `infixTermFallsBackToLike` (a fragment mid-word — the index matches no
+token where `LIKE` matched 2,020 messages), `partialIndexMatchStillUnionsWithLike` (the index
+matches *one* token by prefix, which looks like a working answer while 2,030 rows go missing)
+and `unspacedScriptFallsBackToLike` (`unicode61` makes a whole Chinese sentence one token).
+
+*The two ways the index can be silently wrong about which database it is describing.*
+`replacedDatabaseDiscardsTheIndex` rewrites the pinned row's `guid`, which is what a restore
+looks like, and requires the index to be thrown away; `deletingTheNewestMessageIsNotAReplacement`
+deletes the newest row — which puts `MAX(ROWID)` below the cursor in a file nobody touched —
+and requires the index to be **left alone**. The pair is the point: the first version compared
+maxima and passed the first test while failing the second, which would have rebuilt a
+418,000-row index every time somebody unsent a message.
+
+*Residue.* `deletedMessagesArePruned` deletes a message from `chat.db` and requires its words
+to leave the index. It passes `pruneInterval: .zero` so the assertion does not turn on whether
+the delete landed before or after the first sweep.
+
+*The state machine.* `steadyStateIsNotABuild` indexes one arriving message and asserts health
+is still `.running` — the shared walk used to announce `.building` on every page of both
+phases, so one message left a finished index reporting itself as building for ever.
+
+*The promises the copy makes.* `SearchIndexStoreTests` asserts that turning it off removes the
+file **and its sidecars**, that the file is `0600` in a `0700` directory, and — as a privacy
+assertion rather than a capability one — that a phrase query **fails**, because token positions
+are what would make the index reconstructable into sentences.
+
+Measuring any of this by hand needs care: a reader opened with `immutable=1` skips the WAL, and
+on a live Mac that means invented orphans and a `MAX(ROWID)` several below the truth. See
+`ReadOnlyDatabase`, which never sets it.
+
+**Security regression suite.** Each finding of the 2023 report is a permanent test so it cannot
+silently return: no plaintext credential on disk after provisioning; Keychain items carrying an
+ACL bound to the app's code signature; the published ruleset denying `write` on `/server/config`
+while `/server/commands` **remains writable**; the restart limiter capping at one per hour with
+replayed and stale commands ignored; auto-remediation rewriting permissive rules **and a simulated
+client still able to read config and write `nextRestart` afterward**; lockout triggering under
+sustained failures with a `UserAlert` naming the source IP.
+
+---
+
+**Home, and the server's own numbers.** The dashboard is decided off the view and the
+numbers are sampled on the server, so both halves are stated in tests rather than looked at.
+
+*What a card says.* `HomeDashboardTests` poses `HomeDashboard` the questions a summary gets
+wrong: a switched-off service is counted and not reported, a degraded service that measures
+its progress is in flight and not a problem, failures list ahead of degraded ones, a failed
+sign-in lands in its own hour and one outside the window is dropped, minutes fold into a
+wider bucket by sum, peak or mean according to what the metric is, overlapping availability
+spans count once, and a relative age is to the minute and never mentions seconds.
+
+*What a visit costs.* `ScreenModelTests` pins `reload(for:unlessFresherThan:)`: a visit inside
+the age with the same key reads nothing, a moved key or a stale value reads, a failed refresh
+keeps the value and loses its freshness, a manual reload keeps the key, and a cancelled read is
+not a failure. `ReadFreshnessTests` pins the value type underneath. `HomePlaceholderTests`
+asserts every placeholder carries every row a card can add, that a card has arrived only when
+everything it draws has, and that a device or webhook version moves the Delivery card's key
+and no other. `HomeDetailTests` round-trips the Basic/Advanced choice through a settings
+store and reads an unknown spelling as Basic.
+
+*What the server counts.* `ServerMetricsTests` drives `ServerMetrics` on a manual clock:
+requests, events and pushes count from start, a finished minute holds that minute's
+difference and reaches `MetricsStore`, a helper's availability span opens and closes with its
+connection, stopping closes every span and a span a crash left open is closed at the next
+start, and nothing older than the retention window survives a prune. Its `wiring` test reads
+the `ServerComposition` family and the services for the four lines that, deleted, leave everything
+above passing and the dashboard reading zero.
+
+*What the message queries return.* `MessageActivityQueryTests` seeds a fixture `chat.db` and
+asserts each message is counted once in its local hour, the day's offset moves it out of its
+UTC hour, start is inclusive and end exclusive, a tapback is neither a message nor the start
+of a conversation, twins under two service prefixes are one entry, and an old conversation's
+new service twin is not a new conversation. `MessageFlowTests` covers the day boundaries,
+including a 23-hour day across a clock change, and the fold into days and the heatmap.
+
+## What CI cannot cover
+
+Private API, permissions and AppleScript need a real Mac. **A green PR is meaningful but not
+sufficient before a release.**
+
+Two categories are only reachable by *running* the thing:
+
+- **Wiring.** Static sweeps find code with no caller; they cannot tell you whether a wired call
+  site is *correct*. Live exercises are what found duplicated sends, a silent `sendAttachment`, a
+  `setDisplayName` timeout, a contacts wipe, and a misleading AppleScript error, none of which any
+  static analysis would have shown.
+- **Host-environment behaviour.** `NSAppleScript` re-entrancy under a nested run loop, and TLS
+  hostname selection: a SAN dNSName is an ASN.1 IA5String and the macOS default computer name is
+  `<Name>’s MacBook Pro` with a **U+2019 apostrophe**, so certificate generation throws on a stock
+  Mac and HTTPS silently degrades.
+
+**Manual end-to-end on a real Mac** with Full Disk Access and SIP disabled: send text and
+attachment via both backends; create a group; rename it; add and remove participants; send and
+remove a tapback; edit and unsend; receive a message and confirm it arrives over socket, push and
+webhook simultaneously with the correct per-sink payload shape; toggle each proxy service; change
+the password mid-session and confirm connected clients are kicked; pair a device and confirm it
+keeps working after the password changes.
+
+**Opt-in live tests** sit between the two. `TailscaleLiveInstallTests` downloads the
+recommended Tailscale bottle from `ghcr.io` into a temporary directory, checks it against the
+digest pinned in `BuiltInTools.tailscale`, and runs both `tailscaled` and its `tailscale`
+companion. It is the only check that the pinned digests are the registry's, and it is skipped
+unless `BB_LIVE_TOOL_INSTALL=1` is set, because it needs the internet and a 20 MB download:
+
+```bash
+BB_LIVE_TOOL_INSTALL=1 swift test --filter TailscaleLiveInstall
+```
+
+Run it after bumping a Tailscale pin, on each architecture the pin covers. What it does not
+reach is the daemon signed in (the browser link, `serve` and `funnel`) which needs a tailnet
+and a person, and is on the manual list above.
+
+**CI itself** is verified too: a PR from a **fork** builds and tests green with no secrets
+available; the release workflow refuses a tag that is not an ancestor of the default branch, and
+refuses a tag whose version disagrees with the app target.
+
+---
+
+## The recorded fixtures are replayed
+
+`Fixtures/http/` holds **186** recorded request/response pairs from the reference server, and they
+are the most precise statement of the contract this project has. `FixtureReplayTests` replays the
+v1 subset against a real listener on every run; see **Fixture replay** above for what it compares
+and why the baseline is a ratchet.
+
+This section used to say the opposite — that nothing replayed them and that a replay harness was
+"the highest-value test still missing" — for long enough that the harness was written, wired into
+the gate, and described ninety lines earlier in this same file while this paragraph still called
+it absent.
+
+The gap it described was not theoretical, and is worth keeping as the reason the harness exists.
+Two `POST /api/v1/backup/*` defects sat in shipped code and were found by reading a fixture rather
+than by a failing test: the response carried a `data` key the reference does not send, and the
+success message fell back to `"Success"` because its `SuccessMessages` key was misspelled. Both
+were single-line diffs against a fixture that was already committed.
+
+`SideBySideRunner` still cannot run here, and correctly says so: value-level parity needs both
+servers live against one database, which is `bb-parity` and a Mac.
+
+---
+
+## Success-message keys must name real routes
+
+`SuccessMessageTests` checks the message STRINGS. `SuccessMessageKeyTests` checks the KEYS, and
+they are different failures: a key matching no route is not a wrong string, it is a string
+nothing looks up, so the route silently answers `"Success"`: the exact bug the table was added
+to fix, returning as a typo. Four keys had drifted (`backup.saveTheme`, `backup.saveSettings`,
+`chat.setIcon`, `chat.removeIcon`; the routes are spelled `create…`, `setGroupIcon`,
+`removeGroupIcon`).
+
+The check runs against `RouteCatalog.routes`, not `RouteTable.groups`, because two of the four
+belonged to additive routes a v1-only check would not have seen.
+
+---
+
+## Do not grep for whether a handler is implemented
+
+Handlers are not all registered from a string literal. Several are registered from a loop:
+
+```swift
+for (name, pinned): (HandlerID, Bool) in [("chat.pin", true), ("chat.unpin", false)] {
+```
+
+so `grep 'registry.register("chat.pin")'` finds nothing and reports a working route as missing.
+Backups are registered the same way, through `HandlerID(id)` built from a variable. **The
+authoritative answer is `HandlerRegistry.missing(for:)`**: the same question the router asks at
+mount time, and the count is logged at start-up as `"Endpoints not yet implemented"`. Exactly
+one route is unimplemented today: `icloud.contactCard`.
+
+---
+
+## Source-scanning policy tests read through one scanner
+
+A rule the compiler cannot check ships with a test that reads the tree for it, and the list in
+`CLAUDE.md` names them. Every one reads through `SourceScanner` in `Tests/BBTestSupport`, which
+makes the three decisions such a test depends on, once:
+
+- **What a comment is** comes from a lexer, not a `//` prefix. A trailing `// …` and a `/* … */`
+  block are comments; `//` inside a string literal, raw or multi-line, is code. `SourceLine.code`
+  is a line with its comments removed and its strings kept, because several rules are about
+  string literals; `SourceLine.comment` is the comment text, for `DocumentationStyleTests`, which
+  reads whole-line comments only.
+- **What is read** is every file under the named roots, skipping hidden directories (`.build`,
+  `.git`), `node_modules` and `.claude/worktrees`, so an agent's copy of the tree is never
+  scanned a second time.
+- **A scan that finds too little throws.** Each call has a floor, at least one file, because a
+  policy test that reads an empty tree passes, and a moved directory is how a tree goes empty.
+
+Offenders are reported as `path:line: text`, with the path relative to the repository root, so
+an editor can jump to each. Two tests keep their own comment rule on purpose and say so in place:
+`TestDataPolicyTests` reads whole files, comments included, because an address is forbidden in a
+comment too, and `ToolScriptTests` strips `#` lines, because it reads shell.
+
+`SourceWalkPolicyTests` holds the line: a test outside `BBTestSupport` that calls
+`.enumerator(`, `contentsOfDirectory(` or `subpathsOfDirectory(` fails the build, unless what it
+walks is not source (a temporary directory, the recorded fixture corpus) and its exemption says so.
+`SourcePathPolicyTests` does the same for paths: a statement outside `BBTestSupport` that starts
+from `#filePath` (or a value bound from it) and calls `deletingLastPathComponent` fails the build,
+because a ladder of hops is right only until the file or the package moves. `Repository` is the
+one place that climbs, and it checks where it landed.
+
+---
+
+## Tests that bind a port: one harness, port 0, an awaited stop
+
+A suite that asserts what the server puts on the wire runs the real listener and router
+through `TestHTTPServer.run` (`Tests/CompositionTests/Support/TestHTTPServer.swift`). It takes
+what suites actually vary (the handler registry, extra route groups, `HTTPAPIConfiguration`,
+the authentication stage and access control, the Private API stage, the activity hook, a
+Socket.IO stack and TLS material) and owns the lifecycle, which is not a parameter:
+
+```swift
+try await TestHTTPServer.run(
+  registry: TestHTTPServer.registry(id) { _ in .data(nil) },
+  groups: [group],
+  authentication: .password("hunter2hunter2")
+) { port in
+  let reply = try await TestHTTPServer.send(port: port, path: "/api/v1/edge/ok")
+  #expect(reply.status == 200)
+}
+```
+
+**The listener is stopped, and the stop awaited, before `run` returns or rethrows.** Thirteen
+suites used to stop it with `defer { Task { await listener.stop() } }`. `defer` cannot await,
+so that spawns a task nobody waits for: the test ends, the next one starts, the old listener
+may still be up, and a stop that fails is never seen. `ListenerStopPolicyTests` fails the build
+on the shape anywhere under `Tests/`. The replay suite's `ReplayServer.run` is the same door
+for the shipping-registry server.
+
+It lives in `CompositionTests`, not `BBTestSupport`, because every suite that starts a listener
+is in that target, and `BBTestSupport` is linked by targets that have no HTTP stack.
+`ReplayServer` builds a whole `AppContext` around its listener and keeps its own `run`.
+
+**Every listener binds port 0 and reads `HTTPListener.port` back**: never a random high port,
+and never a retry loop around one.
+
+Guessing a port is a birthday problem against the rest of the run, and it produced real
+intermittent failures: `PeerAddressTests` and `SignalOwnershipTests` reporting "Port N is
+already in use" perhaps once in a few hundred runs, which is often enough to be seen and rare
+enough to be re-run and ignored. Three suites had grown retry loops, which lower the odds
+without removing them; one of those loops fell through **without calling its assertion body**
+when every attempt failed, so a fully-collided run passed green having tested nothing.
+
+The kernel does not hand out a port it has already given away, so there is nothing left to
+collide and nothing to retry. `HTTPListener.port` reports the assigned port rather than the
+requested one, which is what makes this work, and is the truthful answer anyway.
+
+The one test that needs a *specific* port, `SignalOwnershipTests.stopWorksWithoutSignals`,
+binds 0, reads the assigned port, stops, and rebinds that exact port to prove it was released.
+That is stronger than the guess it replaced: a guessed port that was never free would have
+failed the first bind and never reached the claim under test.
+
+---
+
+## Waiting for asynchronous work
+
+**A test waits for a condition, never for a guessed interval.** `waitUntil` and `waitFor`
+(`Tests/BBTestSupport/Waiting.swift`) poll on BBCore's `poll` and, at the deadline, throw
+`WaitTimedOut` naming what never happened:
+
+```swift
+try await waitUntil("the block to be persisted") {
+  try await persisted(database).blocked.count == 1
+}
+let output = try await waitFor("both lines of output") {
+  let output = await daemon.recentOutput
+  return output.count >= 2 ? output : nil
+}
+```
+
+A wait that falls through at its deadline without failing is a test that asserts nothing on the
+run where it matters, so the helpers throw rather than return a `Bool`. A suite-specific helper
+that waits on something with real logic of its own (a syslog receiver counting messages, a
+recorder holding a write at a gate) keeps its name and calls these inside. The first element of
+a stream within a deadline is `withTimeout` (`BBCore/Timeout.swift`), not a task group racing a
+sleep.
+
+**Where the code under test sleeps, inject a clock instead of waiting it out.** A type that
+sleeps between units of work takes `clock: any Clock<Duration> = ContinuousClock()`, as `poll`
+and `retrying` take `clock:`; `PermissionsService`, `ChangeDetector`, `FCMSender`,
+`AuditRecorder` and `NetworkPathObserver` do. The test passes a `TestClock` (`Tests/BBTestSupport/TestClock.swift`):
+stepped by default, where a sleep parks until `advance(by:)` and `waitForSleepers` returns once
+the code has reached its next wait, or `TestClock(skipsSleeps: true)`, where every sleep returns
+at once. Either way `waits` records the schedule the code followed, so the cadence is asserted
+rather than timed. "Nothing more arrives" needs no quiet window either: advance the clock past
+every deadline that could still be pending and check, as `NetworkPathObserverTests` does. A
+wall-clock sleep stays only where the code under test does not take a clock.
+
+---
+
+## Test data: never real addresses
+
+`Tests/CompatibilityTests/TestDataPolicyTests.swift` fails the build on a phone number that could
+ring a handset or an email that could reach a mailbox, anywhere under `Sources`, `Tests`, `Helper`,
+`Tools`, `docs` or `.claude`. This is enforced, not requested.
+
+**Chat GUIDs and message bodies are policy but are not enforced**, and this page used to claim
+otherwise. The blocker for GUIDs is measured: the recorded corpus is named after the requests it
+captured, so real group identifiers are spelled into dozens of fixture filenames, and the recorder
+scrubs addresses without scrubbing those. Re-recording with scrubbed identifiers comes first.
+
+Fixtures come from generators. `python3 Tools/chatdb-fixtures/generate.py` produces deterministic,
+byte-identical databases so they never appear as diff noise. `Tools/send-probe` takes the chat GUID
+on the command line specifically so no real address is ever committed.

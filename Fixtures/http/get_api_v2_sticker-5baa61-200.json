@@ -1,0 +1,313 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/sticker?password=__REDACTED__",
+    "headers": {
+      "host": "127.0.0.1:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "data": [
+          {
+            "shelf": "recent",
+            "external_uri": "sticker:///user/identifier/F1D76DE3-2724-426B-9569-EA43C0430C87",
+            "name": null,
+            "library_index": 16384,
+            "accessibility_name": "final smoke",
+            "kind": "user",
+            "attribution_name": "Stickers",
+            "search_text": null,
+            "attribution_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:+15555550100:com.apple.Stickers.UserGenerated.MessagesExtension",
+            "effect": -1,
+            "identifier": "E5319610-D541-4467-ADB1-FAD35A1654CB",
+            "created_at": 1788447769320,
+            "representations": [
+              {
+                "byte_count": 528,
+                "role": "",
+                "width": 160,
+                "height": 160,
+                "mime_type": "image/png",
+                "is_preferred": true,
+                "uti": "public.png",
+                "identifier": "D531F8F8-77C8-4C1B-895C-3CE819ED498C"
+              }
+            ],
+            "byte_count": 528,
+            "last_used_at": 1788447769320
+          },
+          {
+            "last_used_at": 1788446797838,
+            "external_uri": "sticker:///user/identifier/691A104F-5487-40A7-B1CE-FDF8C4CED64F",
+            "kind": "user",
+            "accessibility_name": "teal circle round two",
+            "library_index": 15360,
+            "byte_count": 528,
+            "created_at": 1788446797838,
+            "shelf": "recent",
+            "effect": -1,
+            "attribution_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:+15555550100:com.apple.Stickers.UserGenerated.MessagesExtension",
+            "representations": [
+              {
+                "role": "",
+                "height": 160,
+                "width": 160,
+                "identifier": "DBA0213F-A062-4610-AE05-5C88D832F7F3",
+                "uti": "public.png",
+                "mime_type": "image/png",
+                "byte_count": 528,
+                "is_preferred": true
+              }
+            ],
+            "attribution_name": "Stickers",
+            "name": "BB Test 2",
+            "identifier": "EADAA97E-1126-409E-9000-74BD19B39E32",
+            "search_text": null
+          },
+          {
+            "accessibility_name": "teal circle test sticker",
+            "search_text": null,
+            "effect": -1,
+            "created_at": 1788446170587,
+            "last_used_at": 1788446170587,
+            "library_index": 14336,
+            "kind": "user",
+            "attribution_name": "Stickers",
+            "shelf": "recent",
+            "representations": [
+              {
+                "width": 160,
+                "is_preferred": true,
+                "byte_count": 528,
+                "uti": "public.png",
+                "identifier": "693AEEFA-742C-4E68-B9B0-C3D281BCA849",
+                "height": 160,
+                "role": "",
+                "mime_type": "image/png"
+              }
+            ],
+            "external_uri": "sticker:///user/identifier/8A7657D3-E58A-440B-8FCA-7F4389F49DEA",
+            "attribution_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:+15555550100:com.apple.Stickers.UserGenerated.MessagesExtension",
+            "byte_count": 528,
+            "name": "BB Test",
+            "identifier": "70942C7C-02CA-4D17-BEAA-A731C25B8048"
+          },
+          {
+            "external_uri": "sticker:///memoji/cow/cow_smiling_face_with_heart-shaped_eyes",
+            "created_at": 1788393987536,
+            "library_index": 13312,
+            "identifier": "7608FF1D-006B-4E00-B15A-DDB5001BCBF6",
+            "shelf": "recent",
+            "search_text": null,
+            "name": null,
+            "accessibility_name": "Smiling face with heart-shaped eyes",
+            "kind": "memoji",
+            "last_used_at": 1788393987536,
+            "effect": -1,
+            "representations": [
+              {
+                "uti": "public.png",
+                "byte_count": 109962,
+                "is_preferred": true,
+                "role": "",
+                "mime_type": "image/png",
+                "width": 420,
+                "identifier": "6F696C19-523D-4F5C-B0F4-15C3317BB676",
+                "height": 420
+              }
+            ],
+            "byte_count": 109962,
+            "attribution_name": "Stickers",
+            "attribution_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:+15555550100:com.apple.Stickers.UserGenerated.MessagesExtension"
+          },
+          {
+            "shelf": "recent",
+            "search_text": null,
+            "accessibility_name": null,
+            "identifier": "C229525C-3074-4687-8B63-2AF7D1A6C01F",
+            "effect": 0,
+            "byte_count": 416295,
+            "representations": [
+              {
+                "role": "com.apple.stickers.role.still",
+                "mime_type": "image/heic",
+                "is_preferred": true,
+                "height": 712.5553914327917,
+                "identifier": "5430ECBB-7BEC-461B-97FA-742AF9C5ECE3",
+                "uti": "public.heic",
+                "width": 900,
+                "byte_count": 400454
+              },
+              {
+                "mime_type": "image/png",
+                "byte_count": 15841,
+                "is_preferred": false,
+                "width": 100,
+                "height": 79.1728212703102,
+                "uti": "public.png",
+                "identifier": "553ABED3-C7C5-4496-B6A2-1F41982106D2",
+                "role": "com.apple.stickers.role.keyboard"
+              }
+            ],
+            "attribution_name": null,
+            "created_at": 1775229413897,
+            "name": null,
+            "last_used_at": 1779477812898,
+            "library_index": 12288,
+            "kind": "user",
+            "external_uri": "sticker:///user/identifier/AC20781C-5A31-40D9-8931-3619AA9783C9",
+            "attribution_bundle_id": null
+          },
+          {
+            "byte_count": 137069,
+            "external_uri": "sticker:///emoji/identifier/😭",
+            "library_index": 3072,
+            "created_at": 1775229277331,
+            "identifier": "0C4D639C-1BCC-4EC6-BCE5-49549E89FE86",
+            "attribution_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:+15555550100:com.apple.Stickers.UserGenerated.MessagesExtension",
+            "shelf": "recent",
+            "name": null,
+            "effect": -1,
+            "search_text": null,
+            "last_used_at": 1775229277331,
+            "kind": "emoji",
+            "attribution_name": "Stickers",
+            "representations": [
+              {
+                "width": 320,
+                "role": "",
+                "mime_type": "image/png",
+                "identifier": "138794C0-3168-4B9C-A6C6-4E4E57591EEB",
+                "height": 320,
+                "is_preferred": true,
+                "byte_count": 137069,
+                "uti": "public.png"
+              }
+            ],
+            "accessibility_name": "loudly crying face"
+          },
+          {
+            "accessibility_name": "dvd",
+            "attribution_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:+15555550100:com.apple.Stickers.UserGenerated.MessagesExtension",
+            "attribution_name": "Stickers",
+            "kind": "emoji",
+            "effect": -1,
+            "byte_count": 158178,
+            "identifier": "8189AEFB-EBD5-47A2-89B6-5036319D94D2",
+            "name": null,
+            "external_uri": "sticker:///emoji/identifier/📀",
+            "search_text": null,
+            "library_index": 2048,
+            "representations": [
+              {
+                "uti": "public.png",
+                "byte_count": 158178,
+                "identifier": "79CFDBFC-5164-4487-91A7-A13C6D815FAB",
+                "width": 320,
+                "is_preferred": true,
+                "height": 320,
+                "role": "",
+                "mime_type": "image/png"
+              }
+            ],
+            "shelf": "recent",
+            "created_at": 1775229100658,
+            "last_used_at": 1775229100658
+          },
+          {
+            "byte_count": 416295,
+            "attribution_name": null,
+            "shelf": "saved",
+            "created_at": 1775229413871,
+            "accessibility_name": null,
+            "external_uri": "sticker:///user/identifier/AC20781C-5A31-40D9-8931-3619AA9783C9",
+            "effect": 0,
+            "search_text": null,
+            "library_index": 1024,
+            "last_used_at": 1779477812887,
+            "attribution_bundle_id": null,
+            "kind": "user",
+            "representations": [
+              {
+                "width": 900,
+                "height": 712.5553914327917,
+                "uti": "public.heic",
+                "byte_count": 400454,
+                "role": "com.apple.stickers.role.still",
+                "identifier": "5430ECBB-7BEC-461B-97FA-742AF9C5ECE3",
+                "is_preferred": true,
+                "mime_type": "image/heic"
+              },
+              {
+                "byte_count": 15841,
+                "height": 79.1728212703102,
+                "mime_type": "image/png",
+                "is_preferred": false,
+                "uti": "public.png",
+                "width": 100,
+                "role": "com.apple.stickers.role.keyboard",
+                "identifier": "553ABED3-C7C5-4496-B6A2-1F41982106D2"
+              }
+            ],
+            "identifier": "AC20781C-5A31-40D9-8931-3619AA9783C9",
+            "name": null
+          },
+          {
+            "last_used_at": 1775228247484,
+            "search_text": null,
+            "attribution_name": "Stickers",
+            "accessibility_name": "alien monster",
+            "library_index": 1024,
+            "representations": [
+              {
+                "width": 320,
+                "mime_type": "image/png",
+                "role": "",
+                "identifier": "C1C4F1F3-284C-452E-905E-7ACC63EABD30",
+                "height": 320,
+                "uti": "public.png",
+                "is_preferred": true,
+                "byte_count": 91065
+              }
+            ],
+            "byte_count": 91065,
+            "identifier": "38BDA88D-A0DA-484F-B31B-79EE45C14230",
+            "effect": -1,
+            "kind": "emoji",
+            "name": null,
+            "external_uri": "sticker:///emoji/identifier/👾",
+            "attribution_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:+15555550100:com.apple.Stickers.UserGenerated.MessagesExtension",
+            "shelf": "recent",
+            "created_at": 1775228247484
+          }
+        ],
+        "status": 200,
+        "message": "Success",
+        "metadata": {
+          "limit": 100,
+          "offset": 0,
+          "recent": 8,
+          "count": 9,
+          "total": 9,
+          "saved": 1
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-09-04T15:12:39.947Z"
+}

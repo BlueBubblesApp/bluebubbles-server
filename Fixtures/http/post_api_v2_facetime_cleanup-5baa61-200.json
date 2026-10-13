@@ -1,0 +1,38 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v2/facetime/cleanup?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "message": "Success",
+        "status": 200,
+        "data": {
+          "dismissed_alerts": 0,
+          "failure": "1 link(s) could not be invalidated yet: they are not in FaceTime's current link list, which only refreshes when FaceTime restarts. Restart FaceTime and try again.",
+          "count": 0,
+          "invalidated_links": [],
+          "left_calls": []
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T18:32:10.724Z"
+}

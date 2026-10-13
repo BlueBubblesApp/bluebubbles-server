@@ -1,0 +1,752 @@
+# Architecture
+
+How the server is put together, and which layer a change belongs in.
+Subsystem detail lives alongside: [`../../docs/EVENTS.md`](../../docs/EVENTS.md),
+[`../../docs/AUTH.md`](../../docs/AUTH.md).
+
+---
+
+**Platform floor: macOS 14 (Sonoma).** `Package.swift` declares `.macOS(.v14)`. It is set by
+Hummingbird, which declares `.macOS(.v11)` and then gates its entire public API behind an
+`@available(macOS 14)` availability macro, so check a dependency's macros, not just its
+`platforms:`, before adopting it.
+
+## The shape
+
+```
+BlueBubblesApp (SwiftUI)  ─┐
+bluebubbles-server (CLI)  ─┴─> BlueBubblesServerCore ──> BB* modules
+```
+
+Two executables, one core. `BlueBubblesServerCore` is the composition root plus the handler and
+interface layers; everything below it is a leaf module that takes what it needs as a parameter
+and knows nothing about the whole.
+
+### Modules
+
+| Module | Responsibility |
+|---|---|
+| `BBCore` | Domain primitives, `BBError`, `Subprocess`, retry/debounce, Apple timestamps |
+| `BBDiagnostics` | Structured logging **and, separately**, the alert centre |
+| `BBSettings` | Typed `Setting<T>` descriptors, Keychain secrets, layered providers, feature flags |
+| `BBServiceKit` | `Service` protocol, registry, dependency graph, supervision, manifests |
+| `BBBuiltIns` | The built-in services as data: manifests, tool descriptors, enablement, and `ServiceSettingsBridge`, which applies a manifest's fields to the settings store |
+| `BBFaceTime` | FaceTime link minting, hand-off tracking and cleanup: a coordinator with its own state, above `BBPrivateAPI` |
+| `BBPersistence` | `AppDatabase` (ours, read-write) and `ReadOnlyDatabase` (`chat.db`) |
+| `BBIMessage` | `chat.db` repositories, `SchemaProfile`, typedstream decoding, `ChangeDetector` |
+| `BBContacts` | Streaming contact ingest, persistent address index |
+| `BBSerialization` | Wire types and serializers: the single definition of "what a message looks like" |
+| `BBAuth` | Authentication schemes, access control, enrollment, device registry |
+| `BBAudit` | The audit log: the event envelope and kind catalogue, the `audit_event` table, the recorder every emitter holds, retention, CSV export, the syslog forwarder. Below `BBInterfaces`, so an interface can record what it changed |
+| `BBHTTPAPI` | `RouteTable`, middleware chain, Hummingbird server, multipart |
+| `BBSocketIO` | Native Engine.IO / Socket.IO implementation |
+| `BBEvents` | Event bus, sinks, payload codecs, webhook delivery |
+| `BBPushKit` | FCM and Firebase provisioning: entirely optional |
+| `BBProxy` | ngrok / Cloudflare / zrok / Tailscale / dynamic DNS / LAN |
+| `BBAppleScript` | OSAKit send path for installs without the Private API |
+| `BBPrivateAPI` | Client and transport for the injected helper |
+| `BBSystem` | NSWorkspace, permissions, Keychain, SMAppService, media, certificates |
+| `BBTooling` | Finding, downloading, verifying and version-managing external binaries |
+| `BBUpdates` | Appcast, semantic versions, update checking |
+| `BBInterfaces` | The domain layer: what an operation MEANS. **Does not depend on BBHTTPAPI** |
+| `BBMedia` | Attachment conversion, the upload store, blurhash, the conversion gate, transcript backgrounds. Infrastructure the domain layer calls, not domain logic |
+| `BBAppStore` | The `app.db` repositories — scheduled messages, alerts, webhooks, devices, backups — and the schema they contribute |
+| `BBHandlers` | The HTTP controllers. Parse, call one interface, serialize, return |
+| `BBOpenAPI` | Generates `docs/api/openapi.json` from the route table |
+| `BBParity` | Replays recorded response fixtures and diffs them against live output |
+| `BBPrivateAPICatalog` | Which Private API capabilities exist, and the macOS floor each one needs |
+| `BBShortcuts` | The user-installed Shortcut, which is the only group-chat path without the Private API |
+| `BBTypedStreamShim` | The Objective-C barrier around `NSUnarchiver`, so a torn `attributedBody` throws rather than trapping |
+
+`Package.swift` is the only thing enforcing this layering, and
+`python3 Tools/package-graph/check.py` is the only thing keeping `Package.swift` honest.
+Run it after touching any `import`.
+
+---
+
+## Three targets, not four directories
+
+```
+BlueBubblesServerCore   builds the graph, owns AppContext, registers services
+        |
+        v
+BBHandlers              thin: parse request -> call an interface -> serialize -> return
+        |
+        v
+BBInterfaces            the business logic and its repositories; shared by HTTP,
+                        socket and the SwiftUI app. NO transport dependency.
+```
+
+These were four directories inside one target until the layering was only a convention. They
+are separate targets now, so **the direction is checked rather than reviewed**: `BBInterfaces`
+does not declare `BBHTTPAPI`, so a domain type reaching for a status code fails
+`python3 Tools/package-graph/check.py`.
+
+Note what that does and does not buy. The Swift compiler will still resolve a transitively
+reachable module, so an undeclared `import` compiles locally: **the graph check is the
+enforcement, and it runs in CI**. Run it after touching any `import`.
+
+The capability protocols (`InterfaceProviding`, `SettingsProviding`, `PushSetupProviding`, …)
+live in `BBInterfaces/Capabilities.swift`. Three consumers compose them: the handlers, the
+composition root and the SwiftUI app, so they sit below all three; putting them in `BBHandlers`
+made the app link the HTTP controller target to name a protocol. The three that only handlers
+compose (`AccessControlProviding`, `TokenAuthProviding`, `UpdateInstallerProviding`) live in
+`BBHandlers/HandlerCapabilities.swift` for the mirror-image reason: keeping them in the domain
+layer made it import auth and updates to name protocols nothing in it used. The ones only a
+SERVICE composes live in `BlueBubblesServerCore/Composition/Services/ServiceCapabilities.swift`
+and are internal, for both of those reasons and one more: `ToolProviding` and
+`SocketRuntimeProviding` would drag the tool downloader and the socket transport into the
+domain layer, and the three publishing capabilities are a privilege a handler should not be
+able to name at all. The `extension AppContext: …Providing {}` conformances live in the
+composition root, in `AppContextCapabilities.swift`, which is the whole of what joins them.
+
+**macOS permissions are declared, shown, and — for `.required` — a START GATE.** A
+`ServicePermission` carries the id, whether it is `.required` / `.recommended` / `.feature`,
+and a purpose sentence in the service's own words. `ManifestValidator` checks each is named
+once and has a reason: a permission with no stated reason is one a user can only refuse or
+blindly accept.
+
+This paragraph used to say permissions were "never enforced" and that "nothing can make it a
+control". **That is wrong and the correction matters in both directions.**
+`ServiceRegistry.performStart` returns early for any `.required` permission the check refuses,
+recording an `inactiveReasons` entry, and `Service.swift`'s own docstring says so — so a
+service that will not start for want of Full Disk Access is behaving as designed, not
+mysteriously. `.recommended` and `.feature` are NOT gates; they degrade a feature and are
+reported where that feature is.
+
+What is true is the reason the old sentence gave, and it is worth keeping separately: macOS
+grants TCC to the APPLICATION, so once BlueBubbles has Full Disk Access every line in the
+process has it. A permission is therefore a lifecycle gate and a statement to the user, and
+cannot be a security boundary BETWEEN services in this process. That is a different claim from
+"never enforced", and conflating the two is what made a live gate read as decoration. What the declaration buys is the thing the user
+actually needs: knowing what a service will reach before enabling it. It renders on the
+service's page today and is what a third-party approval screen will be built from, which
+makes accuracy a correctness property even with no enforcement behind it. The permission set
+is open (`PermissionID` is a `RawRepresentable`, and BBSystem adds `sip-disabled` in an
+extension), so an unrecognised id renders as its raw identifier rather than disappearing.
+
+**A view reaches the server through a grouped facade, never through `AppContext`.**
+`AppModel` carried eighteen flat forwarding properties, one per server capability, on the model
+every view holds, so it grew by a line per capability, and one of the eighteen
+(`permissionsService`) was reachable from thirty-three view files and called by none. The doors
+are unchanged and still narrow; they are now sorted into `security`, `messaging` and `delivery`
+in `ServerAccess.swift`, with `settings`, `alertCenter`, `tools` and `serverAdmin` left flat
+because the model's own extensions use them. `AppModel.context` stays private, so a facade is
+the only way in, and no door returns the context as a capability existential (a cast would
+recover the container from it): a protocol-typed door returns a private forwarder. This is
+deliberately NOT the protocol-composed `Host` pattern a service uses:
+a service is constructed once with what it needs, while a SwiftUI view is re-evaluated
+constantly and reaches state through `@Observable`, which existentials fight for a benefit that
+is organisational only.
+
+**A service reads settings through its scope, never through the store.** `ScopedSettings` is
+built from the service's manifest and refuses anything the manifest does not declare:
+`get`/`set` throw, and `valueOrDefault`/`trySet` return the default while logging at error
+level for call sites with no error channel. **There is no built-in exemption.** A secret is
+refused to everyone and cannot be declared at all: `ManifestValidator` rejects a manifest
+naming one. **A service is never handed the store**: its `Host` takes
+`ScopedSettingsProviding`, which answers `scopedSettings(for: Self.manifest)` and nothing
+else, and `ServiceHostPolicyTests` refuses `SettingsProviding`, `SettingsStore` or a
+hand-built scope under `Composition/Services/`. Work that genuinely needs the store (adopting
+the core `ntfy_*` keys, token included, into ntfy's namespace) is the composition root's, and
+runs before any service starts. The handlers keep `SettingsProviding`: they have no manifest
+for a scope to check against.
+
+**Handlers are thin and interfaces are where logic lives.** The test: *could the SwiftUI
+settings window call this without going through HTTP?* If not, it is in the wrong place.
+
+This is what keeps the SwiftUI app off the HTTP API and out of a parallel IPC channel layer.
+Logic written into a handler is logic the app cannot call, and the only way to reach it then is
+to add a hand-written channel on both sides: one per operation, forever.
+
+**Interfaces return typed values, never wire JSON.** `interfaces.message.query(...)` returns
+`[MessageProjection]`, `send…` returns `SendOutcome`, `countByService` returns `ChatCounts`,
+`webhooks()` returns `[Webhook]`. Each has exactly one projection onto the wire: a `serialize`
+on the interface, a static `serialize(_:)`, or a `json` property on the record, and the handler
+calls it. An interface that returned pre-serialized JSON grew a second `…List()`/`records()`
+method the moment the app needed the value, which is the drift this rule ends.
+
+Absent-vs-null is not the handler's problem: whether a field appears is decided by
+`SchemaProfile` inside the serializer, so moving the serialize call cannot change the bytes.
+
+---
+
+## Services and the registry
+
+Every subsystem is a `Service` (`Sources/BBServiceKit/Service.swift`) with an id, declared
+`dependencies`, and a restart policy. The registry derives **start order topologically and
+stops in exact reverse**: there is no second hand-maintained list.
+
+```swift
+protocol Service            { static var id; static var dependencies; func start(); func stop() }
+protocol ConfigurableService: Service { static var watchedSettings; func apply(_:) -> ReloadAction }
+protocol GatedService:        Service { func canRun(_ settings:) -> Bool }
+```
+
+**The manifest is the only place a service declares anything.** `id`, `dependencies`,
+`watchedSettings` and `requiredPermissions` are all DERIVED from it: there is no second
+declaration site and no protocol to remember to conform to. A service that needs Full Disk
+Access says so in `permissions:`, and the registry reads it from there.
+
+Built-in service ids (`Sources/BBBuiltIns/BuiltInManifests.swift`, `BuiltInManifests.ID`):
+`http`, `socket`, `permissions`, `changeDetection`, `contacts`, `privateAPI`,
+`scheduledMessages`, `sleepPrevention`, `launchAtLogin`, `toolUpdates`, `push`, `webhooks`,
+and the six `proxy*` connection methods.
+
+A service's registry key IS its manifest identifier: `Service.id` returns `manifest.id`, the
+registry keys on `ServiceIdentifier`, and there is no second identifier type. A dependency is
+written as `BuiltInManifests.ID.http`, the same value the manifest declares, so it cannot
+silently name a service that does not exist.
+
+A settings change is routed only to services whose `watchedSettings` intersect it; the returned
+`ReloadAction`s are coalesced, and restarting a service restarts its dependents automatically.
+It is also the moment a **gate is re-evaluated**: a `GatedService` that declined at startup has
+no instance, so there is nothing for the routing loop above to reach, and `apply` therefore
+attempts `start` for every registered service that has none and whose `watchedSettings` the
+change touches. Without it, turning the Private API on wrote `enable_private_api`, reached
+nothing, and injected no helper until the server was relaunched, which from the UI is
+indistinguishable from the switch not working. `applyEnablement` had solved the same shape for
+the Integrations switch; a gate is the other way a service can be absent, and it reads ordinary
+settings.
+
+**Two services and one dependency edge can close a restart cycle, and neither declaration is
+wrong on its own.** `ServiceManifest.watchedSettingKeys` subtracts what a service WRITES so it
+cannot restart on its own write, but that only sees a one-hop loop. A connection method writes
+`server_address`; `HTTPService` READS it (for a generated certificate's SAN) and restarted on
+it; the five proxies declare a dependency on the HTTP service, so they restarted with it; and
+the restart reconnected the tunnel, which published the address again. Measured: the listener
+rebuilt and cloudflared respawned about twenty times a second, indefinitely. So a service that
+watches a key some OTHER service publishes routinely must decide per key whether it genuinely
+has to restart; see `HTTPService.liveKeys`, and `SettingsStore.write` announces only the keys
+whose stored value actually moved, which is the second guard for when a republished value is
+unchanged.
+
+Every start, stop, restart and supervised retry for one service passes through that service's
+**lane** in the registry: a chain of tasks, one per service, each waiting for the last. The
+actor is free while a service's own `start()` runs, and the lane is what stops a `stop` or a
+second `restart` from landing in that window: it waits, then runs against a service that is
+genuinely up or genuinely failed. `health()` reports `.starting` while a start is in flight.
+**A start that throws is stopped in the same lane before anything else happens**: before
+the next retry, and before the registry gives up. So a service's `start()` never unwinds its
+own partial work, and its `stop()` must undo a start that got part-way and tolerate being
+called twice (`Service.stop()` says so).
+
+Each service is an `actor`: `Service` refines `Actor`, so this is checked rather than asked
+for, or `@MainActor` where it touches AppKit. Its own state is an ordinary `private var`. If
+you are reaching for a lock, or for a single-purpose actor to hold one `Task`, you are
+probably in the wrong type.
+
+### Health is read on demand and published on report
+
+`health` is a getter the registry reads when it publishes, and it publishes after a
+transition it performs, on `noteHealthChanged(_:)`, and on its liveness tick, withholding a
+snapshot equal to the last one so nothing downstream churns. A report names the service that
+made it, and only that service's `health` is read again; the transitions and the tick read
+every service. So a `health` computed from
+state that moves without the registry (a runtime's status, a listener that died, a permission
+revoked in System Settings, a webhook added over the API) has to report each move through
+`HealthChangeReporting`, or the app shows the value captured at the last publication for as
+long as the server runs. The licence service found it: a key redeemed after a failed first
+check read "cannot reach the license service" until the next restart. The liveness sweep is
+the safety net for the one state with no event (Login Items approval), measured in tens of
+seconds, and not the answer for anything that has one. `ServiceHealthReportingTests` scans
+every service whose `health` awaits something and fails the build on one that never reports,
+unless it is exempted there with the reason.
+
+### What a service is built from
+
+`Service.Host` is an associated type, and it **is** the service's dependency list. A service
+declares the capabilities it uses and is handed nothing else:
+
+```swift
+actor SleepPreventionService: Service, ConfigurableService, GatedService {
+  typealias Host = any ScopedSettingsProviding
+  private let scoped: ScopedSettings
+  init(host: Host) { self.scoped = host.scopedSettings(for: Self.manifest) }
+}
+```
+
+The registry is generic over one host, so `register(_:)` on its own would force every service
+to name the whole container in order to reach two members of it. `register(_:from:)` takes a
+projection: written at the call site as `registry.register(MyService.self) { $0 }`, so the
+check that the host can supply what the service asked for is still made by the compiler, and
+lands where the wiring is instead of inside an initialiser.
+
+When the set a service needs is large **and cohesive**, the answer is a purpose-built host
+value rather than a longer composition. `HTTPService` is the only one: its twelve members are
+not eleven independent capabilities it happens to want, they are between them everything
+required to stand up the listener, and a protocol naming all of them would be `AppContext`
+under another name. `HTTPServiceHost` names the job instead, the composition root projects
+into it: `registry.register(HTTPService.self) { HTTPServiceHost($0) }`, and the service can
+be built in a test from eleven values rather than from a whole server. `ProxyHost` is the same
+shape one level down.
+
+Use the composition when the members are independent things the service happens to need; use
+a host struct when they are one job's worth of plumbing. **Nothing takes `AppContext`.** The
+container is what the composition root assembles, never what a service is handed.
+
+**Three services publish as well as consume.** `ContactsService`, `PushDeliveryService` and
+`PrivateAPIGatedService` each construct something while they run: the ingestor, the push
+service, the Private API client, and hand it to the container so handlers, the app and
+`interfaces()` can reach it. That direction has its own capabilities
+(`ContactsIngestorPublishing`, `PushDeliveryPublishing`, `PrivateAPIPublishing`) and they are
+**internal to `BlueBubblesServerCore` on purpose**: publishing a runtime is a service's
+privilege, and a handler able to hand over a Private API client (or withdraw the one that is
+there) would be a bug that type-checks. A publish and its withdrawal live in one protocol so
+nothing can take back what it never supplied.
+
+### Adding a service
+
+1. Declare a manifest in `Sources/BBBuiltIns/BuiltInManifests.swift`, including any `tools:` it needs.
+2. Conform in its own file under `Composition/Services/` (connection methods under
+   `Services/Proxy/`), declaring `dependencies` through the manifest.
+3. Declare `typealias Host` as the capabilities it uses, and register it with
+   `registry.register(MyService.self) { $0 }`. If a capability it needs does not exist yet,
+   add it: `BBInterfaces/Capabilities.swift` when the app or the root composes it too,
+   `Composition/Services/ServiceCapabilities.swift` when only a service does, and conform
+   `AppContext` in `AppContextCapabilities.swift`. Taking `AppContext` is not available and
+   is not a shortcut worth restoring: it is the one signature that says nothing about what
+   the service needs, and nothing can then construct it without constructing everything.
+4. Gate it with `GatedService.canRun` if it should be absent when unconfigured: **absent, not
+   disabled**. An unconfigured optional subsystem is never constructed and its routes are never
+   registered.
+5. `Tests/BBServiceKitTests/` and `Tests/CompositionTests/BuiltInManifestTests.swift` will check
+   the manifest, the graph and the enablement gate.
+
+---
+
+## The composition root
+
+`ServerComposition` is the only code that knows the whole graph. It is one type split by concern:
+`Sources/BlueBubblesServerCore/Composition/ServerComposition.swift` holds `assemble`, which calls
+every step in order, and each `ServerComposition+*.swift` beside it holds one step (storage, the
+read path, the shared services, the transport, the services, the routes, start and stop). A test
+that pins a wiring line reads the whole family through `SourceScanner.family`. It guarantees three
+things:
+
+1. **The server starts even when things are wrong.** No Full Disk Access, no Firebase, no
+   helper: it still comes up, so the user can reach the UI and fix it.
+2. **Optional subsystems stay absent when unconfigured**, rather than running degraded.
+3. **Start order is derived; stop order is its exact reverse.**
+
+`AppContext` (`Composition/AppContext.swift`) is the shared handle, assembled from the four
+groups `ServerComposition` builds: storage, the read path, the shared services and the
+transport. It **holds references and does not act**: whole-server verbs live on
+`ServerLifecycle`, device and webhook administration on `DeviceDirectory` and
+`WebhookDirectory`, and what is built on first use on `LazyCollaborators`. Note the accessors:
+`interfaces()` returns `nil` when there is no message access, and `requireInterfaces()` throws.
+The SwiftUI app reaches state through narrow accessors on `AppModel`: never `AppContext`
+directly, which is private for exactly that reason.
+
+**Nothing resolves a service by type.** The container has no generic `service(_:)` lookup: it
+had one, with a single caller, and that caller was the route gate asking
+`PrivateAPIGatedService` whether the helper was connected. A lookup by type returns nil
+silently when it misses, and nil reached the gate as "no helper", so a service renamed,
+deregistered or switched off would have made every Private-API route refuse while
+`server/info` went on reporting the helper as connected. Both now read
+`AppContext.isHelperConnected`, and `HelperConnectedAgreementTests` drives the container
+through both states asserting they cannot come apart. A component that needs something a
+service owns takes a capability protocol; a service that has something to share publishes it
+into the container, as `PrivateAPIGatedService` does with the client and the runtime.
+
+**Setup is a plan, not a script.** `OnboardingFlow.swift` declares every step as data: when it
+is included (a function of the goals chosen on the first screen and the connection method), whether
+it may be skipped, and what gates Continue, and `OnboardingPlan.steps(for:)` filters the catalogue.
+The wizard shell walks the plan; each step's view embeds the existing settings surface
+(`PermissionRow`, `SettingRow`, `ServiceFormView`, `ManagedToolSection`, `FirebaseView`,
+`WebhooksView`) rather than re-drawing it. The rules live off the view so `OnboardingFlowTests` can
+assert the branches: a phone gets Firebase for notifications, a desktop client behind a tunnel gets
+it for address updates only, one on a fixed address never sees it.
+
+**Adopting an Electron installation is its sibling, and it is deliberately not the same thing.**
+Onboarding configures a server that has nothing; migration adopts one that already has settings,
+credentials and certificates belonging to the Electron server. It is declared the same way: the
+steps are data in `Sources/BlueBubblesServerCore/Migration/MigrationState.swift`, the work is
+`MigrationRunner`, and `Views/Migration/MigrationView.swift` walks it, but three properties
+separate it from setup:
+
+- **Nothing moves without a click.** `ServerComposition.build` no longer migrates anything, and
+  neither does `PushService.start`. Both used to, silently, mid-composition.
+- **The state is per step and lives in `app.db`**, not one Bool and not `UserDefaults`, so the app
+  and the CLI agree on what is already done and a partial migration resumes rather than restarting.
+- **A blocking step stops the server; an optional one does not.** `MigrationStep.isBlocking` is the
+  distinction: settings, secrets and push credentials block, because a server that comes up without
+  them comes up on defaults with no password. Certificates never block: `CertificateStore`'s
+  directory *is* this server's own, so a pure-Swift install with an imported certificate already has
+  files there, and refusing to boot over them would break a working headless server.
+
+The two front ends diverge only in how they refuse. `AppModel.start` runs a preflight after the
+instance lock, sets `ServerPhase.migrationRequired` and presents the wizard. The CLI cannot present
+anything, so it exits non-zero naming what it found and pointing at `--migrate`; headless *app* mode
+takes that same path, because `BlueBubblesApp` has already closed the main window by then and has no
+surface to put a sheet on. Deleting the plaintext credentials the Electron database still holds is a
+third flag, `--remove-legacy-credentials`, because it is the only irreversible step and it is exactly
+what stops a user downgrading.
+
+**TLS material lives in the Keychain, and `Certs/` is a source rather than a store.**
+`TLSProvisioning.material` reads the Keychain; if it is empty and files are present (left by an
+older build, or by the Electron server, which used the same directory) it adopts them, carries
+their provenance into `tls_certificate_origin` / `tls_certificate_expires_at`, and deletes them.
+Everything after that writes the Keychain only, through `persist`, which stores the material and
+advances the renewal clock in one step. Two properties are worth keeping in mind because breaking
+either is silent:
+
+- **The clock is written wherever the material is.** Nothing else writes those rows but the
+  migration runner, the import view and adoption. A renewal that replaces the certificate and
+  leaves the clock behind makes `needsRenewal` permanently true, and the server renews on every
+  start forever while each renewal reports success.
+- **Provenance fails safe toward "the user installed this".** An unrecognised or unset origin
+  reads as `.imported`, which is the value that stops the renewer. Only a certificate this server
+  can prove it generated is ever replaced.
+
+An unsigned build has no `keychain-access-groups` entitlement, so `SecretStore` falls back to the
+legacy keychain: a different store, which is why the files were never a usable fallback for it.
+Such a build generates its own self-signed certificate into its own keychain. A restore to a new
+Mac is the one lossy case: items are `AfterFirstUnlockThisDeviceOnly` and do not travel, so a
+self-signed certificate is regenerated silently and an imported one raises an alert saying it is
+gone.
+
+**The window's persistent chrome is the sidebar, and it carries three things.** `BrandHeader`
+(`Branding.swift`) at the top, the navigation list, and `ServerStatusBar` at the foot: both
+ends pinned with `safeAreaInset` rather than being list rows, so neither scrolls away or
+becomes selectable. The product name is also the window title, with the page as its subtitle
+(`RootView`), which is the only branding that survives someone hiding the sidebar. `Branding`
+is the one place that knows the mark: the logo is a SwiftPM resource
+(`Resources/Branding/Logo.png`, copied from `Artwork/Icons/`), decoded once into a `static let`,
+with an SF Symbol fallback so a bundle assembled without its resource bundles still renders a
+name rather than a gap.
+
+**An address a user is going to paste somewhere is a `CopyableValue`, never a hand-written
+`Text` plus a pasteboard button.** Four screens show one: Home's connection card, the
+read-only settings row, the API address on webhooks, and the address on Guides, and before it
+existed the copies had already drifted over whether the button was hidden, disabled or
+tooltipped. Empty means "there is no value yet" and renders the caller's placeholder with no
+button, because copying an empty string looks like it worked. It is deliberately not used for
+the bulk "Copy" buttons on Logs and Notifications, which are page actions rather than fields.
+
+**The app does not start itself, and cannot restart itself.** `BlueBubblesLauncher` is a small
+`LSUIElement` bundle at `Contents/Library/LoginItems/`, registered with
+`SMAppService.loginItem(identifier:)`: the only path `LaunchAtLogin` offers, since the launch
+agent that used to sit beside it registered nothing and is gone. It exists for the half
+`ServerLifecycle` cannot cover: `execv` replaces the image on a DELIBERATE restart, and a crash,
+an OOM kill or a `SIGKILL` leaves nothing running and nothing watching.
+
+Three things about it are load-bearing:
+
+- **The app says why it stopped, in a file.** `LauncherContract.Intent` is read by the launcher
+  *after* the process is gone, so the answer has to outlive its author, which rules out a
+  notification or an XPC connection, both of which die with the sender. `supervise` is the
+  resting value and therefore what a crash looks like; `quit` and `restart` are written
+  deliberately and reset once read.
+- **It polls; it does not observe `NSWorkspace.didTerminateApplicationNotification`.** That
+  notification did not arrive, reduced to a minimal observer, launched both ways. The cause was
+  never established, which is the argument: a supervisor whose wake-up it cannot verify fails
+  silently at the one moment that matters.
+- **Restarts route through it when it is running.** `ServerLifecycle.replaceProcess` writes
+  `.restart` and exits, rather than `execv`-ing a GUI process whose AppKit, LaunchServices and
+  window-server state would all outlive the image they belong to. Without a launcher (the CLI,
+  a `swift run` build) `execv` is still correct and still used.
+
+The decisions are `LauncherPolicy` and `RunStateTracker` in `BBCore`, both pure and tested. The
+launcher itself is only the world around them: when to look, what to launch, and where it is.
+
+---
+
+## Events
+
+`ServerEvent` (`Sources/BBEvents/ServerEvent.swift`) is the **only** event vocabulary, and it is
+client-facing and wire-constrained: every case exists because a client consumes it. There is no
+second internal event stream and no subscription API. `EventBus` is an actor holding registered
+sinks, and `emit` fans out to them.
+
+Sinks are independently optional and there is **no primary delivery route**: socket (always), push
+(only if Firebase is configured), `WebhookSink`, `NtfySink`. A socket-only install is first-class
+and must not warn about the sinks it lacks. **Registration is the on-switch**: an unconfigured
+sink is *not registered*, never registered-and-disabled.
+
+Two events suppress push while keeping the socket: `typing-indicator` and `new-findmy-location`
+(`EventRouting.policy(for:)`). Nothing else suppresses anything, and webhooks have no suppression
+flag at all.
+
+**`emit` returns once the event is queued, never once it is delivered.** Each sink has its own
+lane: a serial queue with a per-event timeout (30 s default) so order is kept per sink and a
+slow webhook delays only itself. Nothing emits from a detached task to get around the bus; a
+test that must observe delivery calls `settle()`, and shutdown calls `flushPending()`.
+
+Rate-limited events **coalesce rather than drop**, keyed per chat or device so a busy one cannot
+starve a quiet one. `new-findmy-location` is limited *globally* instead, because the server is one
+FindMy client as far as Apple is concerned and per-device keying would multiply the permitted rate
+by the number of devices.
+
+Full subsystem reference: [`../../docs/EVENTS.md`](../../docs/EVENTS.md).
+
+---
+
+## The server's own numbers
+
+`ServerMetrics` (`Composition/ServerMetrics.swift`) is an actor `AppContext` owns and
+`RunningServer` starts before the services and stops after them. Every few seconds it reads a
+`Sources` value of closures that `AppContext.metricSources()` resolves per sample (the socket
+server's connection count and sequence, `RequestMetrics`, the client-activity tracker, the
+Private API runtime's connected helpers) plus `getrusage` and the process footprint, and
+publishes a `Snapshot` on `snapshots()`. Two things feed it synchronously from other
+isolation domains, through a lock: the event bus's dispatch observer, a tap rather than a sink
+so an install with no sinks still reports "no sink" honestly, and `PushService.onReport`.
+Each finished minute goes into the in-memory hour ring and into `MetricsStore` (`app.db`,
+see [`database.md`](database.md)). `RequestMetrics` lives on the context rather than inside
+the HTTP builder so a listener restart keeps counting into the same numbers.
+
+The app never runs a timer of its own for any of this: `MetricsModel` (`AppModel.metrics`)
+follows the stream and lands it on three properties that move at three rates (`snapshot` per
+sample, `ring` per minute, `newMessageMinute` per message and at most once a minute), because
+a SwiftUI view observes a property, and a chart woken by a memory reading it does not show
+was most of what Home cost. `Sources/BlueBubblesApp/CLAUDE.md` has the rules that follow.
+
+---
+
+## Diagnostics: logging and alerting are not the same system
+
+These are two systems, and the split is enforced by convention. Coupling them (where writing an
+error log also creates a user-visible alert) means every diagnostic log line becomes a
+notification, and the notification list stops being worth reading:
+
+- **Logging**: `swift-log` to OSLog plus a rotating file at
+  `~/Library/Logs/bluebubbles-server/main.log`. **Never produces a user-visible item.**
+- **Alerting**: `alerts.raise(...)`, always explicit. `UserAlert` carries severity, title,
+  body, source, `dedupeKey` (repeats coalesce into an occurrence count), and a `Diagnostics`
+  payload with redaction-aware typed context.
+
+`BBError` carries `isUserFacing`; most errors are log-only. If you add an error, decide which
+it is. Either way it conforms to `BBError`: whether a value reaches a person is decided by
+every `catch` above it, not by the type, so the sentence is written once, on the type.
+`ErrorTypePolicyTests` holds `Sources/` to that, outside the two developer tools.
+
+**One direction is wired, and only one.** Nothing that is logged becomes an alert; everything
+that is raised is logged. `AlertCenter.raise` writes a line on both its paths — the new alert
+AND the coalesced recurrence — at a level taken from the alert's own severity (`.critical` →
+`critical`, `.error` → `error`, `.warning` → `warning`, `.info`/`.success` → `notice`, so no
+alert ever sits below the default level). This is what an UNATTENDED install has, and the
+distinction matters: the drawer and the badge are not missing — under the launcher, and under
+`--headless`, the app is running with its status item intact and the drawer is one click away.
+They are simply unobserved, because nobody is sitting at that screen. `GET /alert` is the other
+surface and it is pull-only over the listener that is down whenever there is anything worth
+alerting about. So the log is the record that survives to be emailed in. It notifies nobody and
+is not meant to — the claim is that the condition is findable afterwards.
+`Tests/BBDiagnosticsTests/AlertLoggingTests.swift`.
+
+**The alert BODY is never logged.** Bodies are free prose written at the call site, and
+several interpolate what the redaction rules below forbid: `ProxyService`'s body carries the
+server's own public URL, `AccessControl`'s carries a blocked IP. `Redaction.url` strips
+credentials but keeps the host, so there is no wrapping that makes a body safe, and no
+function that finds an address inside arbitrary prose. Title, source, code and occurrence
+count name the condition; the body stays on the alert, where the drawer and `GET /alert` read
+it.
+
+### What a log line carries, and at which level
+
+The log is the artefact a person pastes into a public issue, so what goes in is decided by
+that reader, not by whoever is debugging at the time.
+
+**Levels.** One process-wide level, set by the `log_level` setting and applied live
+(`LoggingSystemBootstrap.setLevel`; the change itself is logged at info so a later reader
+can see where the debug lines start). Pick by what the line is FOR:
+
+| Level | What it is | Examples |
+|---|---|---|
+| `info` | A state transition a support log wants by default | `Service started`, `Chat created`, `Scheduled message sent`, `Blocked a client after repeated failed logins`, `Log level changed` |
+| `debug` | One line per unit of work, so a reader can follow one message through | `Request` (the HTTP access line), `chat.db changes detected`, `Announcing message change`, `Event dispatched`, `Broadcasting to sockets`, `Webhook delivered`, `Sending message` / `Message sent`, `Private API request` / `reply` |
+| `trace` | Per-iteration chatter that would drown debug | `chat.db tick found nothing` (twice a minute), typing indicators, `Sink delivered` timing, daemon stderr |
+| `warning` / `error` | A failure, with the same metadata the success line would have carried | `Private API request timed out`, `Webhook is failing persistently` |
+
+**Redaction.** Two rules, enforced by `Tests/BBCoreTests/LogRedactionPolicyTests.swift`,
+which scans every `logger.<level>(…)` call in the tree:
+
+1. A metadata key that names a person or a place a person is reached (`address`, `handle`,
+   `chat`, `participant`, `alias`, `email`, `phone`, `recipient`, `sender`, `url`) wraps
+   its value in `Redaction` (`Sources/BBCore/Redaction.swift`): `Redaction.address`
+   (`+12025550143` → `+1…0143`, `someone@example.com` → `so…@example.com`),
+   `Redaction.chatGUID` (the address field of a direct chat; a group GUID passes through)
+   or `Redaction.url` (credential query values blanked). Enough to match against
+   Messages.app, not enough to dial.
+2. A key that names content (`text`, `message`, `subject`, `body`, `payload`, `password`,
+   `token`, `secret`, `displayName`, `arguments`, `data`) is never a log key. There is no
+   redacted form of a message body worth writing down.
+
+Not PII, and logged freely: message and attachment GUIDs, `chat…` room names, transaction
+ids, event names, route templates, counts, byte sizes, durations. Client IPs are named as
+`client`: they are what an operator blocks and unblocks. Two things are never logged even
+though no key rule catches them: the resolved request path or query (`/handle/:guid` carries
+an address, `?password=` carries the password; the access line logs the route template) and
+the server's own public tunnel URL (`ProxyCoordinator` and `ServerAddressAnnouncer` have it
+in hand and omit it on purpose).
+
+**Labels.** Every type takes `logger: Logger = Logger(label: "bluebubbles.<subsystem>")` and
+the composition root leaves that default alone unless it has a more specific label to give.
+Injecting the root `bluebubbles` logger over a subsystem default (which `HTTPService` and
+`PrivateAPIGatedService` once did) makes the label useless for filtering; the exception is a
+service whose own lines ARE the root's (`ServerComposition`).
+
+`BBError` and `HTTPError` are **separate hierarchies with one bridge**, and the bridge runs in
+`ErrorRenderer` only. A `BBError` reaching an HTTP handler renders as a 500 carrying its `body`,
+with its structured fields logged rather than serialized; see
+[`api.md`](api.md) § What happens to an error that is not an `HTTPError`. If a domain error
+needs a status of its own, conform it to `HTTPError` as well; do not teach the renderer to
+guess one from `severity`.
+
+That bridge is the safety net, not the mapping.
+
+**The interfaces layer does not import BBHTTPAPI at all.** It throws `InterfaceError`: a
+`BBError` with seven cases in domain terms, and the projection onto status codes lives in
+`Handlers/InterfaceError+HTTP.swift`, the one file that knows the vocabulary has an HTTP
+spelling. That is what lets the SwiftUI app call an interface and catch something it can switch
+on rather than an envelope it has no use for. Adding a `BadRequest` to `Interfaces/` or
+`Persistence/` puts the transport back below the boundary; use `InterfaceError` instead.
+
+Errors from Messages get a deliberate mapping a layer earlier still:
+`MessagesBackedInterface.throughMessages` turns a backend refusal into
+`.messagesFailed`, so "Messages refused this" stays distinguishable from "the server broke".
+Six interfaces conform, and one that reaches Messages without conforming is the gap to look
+for.
+
+---
+
+## The audit log is a third system
+
+Logging says what the code did, alerting says what a person must do, and the audit log says
+what HAPPENED: who caused it, to what, with what outcome, in a shape that leaves the machine.
+It is neither of the other two. A log line is free text for a developer and is never
+forwarded; an alert is a summons and clears when acted on; an audit record is a durable,
+structured fact with a documented schema (`docs/AUDIT_LOG.md`), kept for a retention period,
+exported as CSV and forwarded as RFC 5424 syslog with the record as its JSON body.
+
+Four parts, in four places:
+
+- **The recorder** (`AuditRecorder`, in `BBAudit`) exists for the life of the server and is
+  held by every emitter from construction: the HTTP dispatcher, the authentication stage, the
+  settings store, the access controller, the interfaces. Disarmed, `record` drops the event;
+  armed, it buffers in the order events were recorded, writes one batch at a time in one
+  transaction and hands each batch to the exporters in that order.
+  That is what makes "turn the audit log on" a service starting rather than every emitter
+  restarting. It also limits a refused client to one stored record per kind, route and minute
+  (`AuditRepeatLimiter`), counting the rest into `audit.repeats_suppressed`, because a refusal
+  is free to send and a row per refusal is a way to fill the disk.
+- **Who did it** rides a task-local (`AuditContext`, in `BBCore`), set at the boundary that
+  knows and read where the record is built: the HTTP dispatcher sets the client and a
+  per-request id before the handler runs, the registry sets the service around `start` and
+  `stop`, `ScopedSettings` sets the service around its own writes, the composition root sets
+  `startup` and `shutdown`, and the app wraps every change a person makes in `asOperator`
+  (`OperatorAttributionPolicyTests` enforces it). What nothing set is `unattributed`, never
+  the person: see `decisions.md`.
+- **The emitters that may not import `BBAudit`** (the auth layer, the settings store, the
+  HTTP layer, the licence runtime) declare a protocol in their own vocabulary
+  (`AuthenticationAuditing`, `AccessControlAuditing`, `SettingsWriteObserving`, the
+  request-completed callback, `LicenseRefusalAuditing` at the subscription gate,
+  `LicenseAuditing` on `LicenseRuntime`) and `Composition/AuditWiring.swift` holds the
+  bridges that translate each into an `AuditEvent`.
+  A handler records nothing: the dispatcher records its request and the interface records
+  what changed, so a handler able to write records would be a second author of the same
+  history.
+- **The service** (`AuditLogService`) is the switch. It arms the recorder with the table and,
+  when configured, a `SyslogForwarder`; runs the retention sweep; turns the registry's health
+  snapshots into `service.started` / `stopped` / `failed` records for every other service;
+  and disarms on stop. It ships in `disabledByDefault`, and the app shows the Audit Log page
+  only while it is on.
+
+Two rules a record is held to, because it is the artefact most likely to leave this Mac: no
+message content and no address other than a client's (routes are templates, never resolved
+paths), and no secret value (`JSONValue.redacted` in its place). `AuditEventKind` declares
+every kind and every metadata key, and `AuditDocumentationTests` fails the build if
+`docs/AUDIT_LOG.md` does not describe one.
+
+## Two ways to run, and they are not interchangeable
+
+`BlueBubblesApp` (SwiftUI, ships in the bundle) and `bluebubbles-server` (CLI, links no AppKit,
+ships **inside** `BlueBubbles.app` so it shares the signature and notarization ticket).
+
+`--headless` on the app sets `.accessory`, **not** `.prohibited` — this doc said `.prohibited`
+for a while and that is the opposite of a decision made on purpose. `.prohibited` suppresses
+the Dock icon *and every other way the app can present itself*, menu bar included, so a
+headless server would run with no indication whatsoever that it is running and nothing to
+click to stop it. `.accessory` is what "no Dock icon" actually means, and it is the same policy
+`hide_dock_icon` reaches (`AppBehaviourPolicy.activationPolicy(headless:)`; the two inputs are
+resolved in one place by `shouldHideDockIcon`, because they used to fight and a headless run
+regained its Dock icon with no window behind it).
+
+Either way it means "no Dock icon", **not** "no GUI session". `App` goes through
+`NSApplicationMain`, which needs a WindowServer connection. So:
+
+- A launch **agent** in a user session: either binary works.
+- CI, or any use with no WindowServer at all: **must** use the CLI.
+
+**A launch daemon is not on this list, because it cannot work.** Messages.app requires a GUI
+session, so a daemon cannot drive it however the server is packaged — see
+[`../../docs/SUBSCRIPTION_PLAN.md`](../../docs/SUBSCRIPTION_PLAN.md) §14.6, where the same
+constraint caps multi-account hosting. This is also why **an unattended Mac should run the APP,
+not the CLI**: a daemon is unavailable, a launch agent needs the same GUI session the login item
+already has and would be labelled in Background Task Management from the signing certificate's
+Organization field rather than the bundle (the developer's legal name, for an individual
+enrolment — the reason the launch agent that used to sit beside the launcher was retired), and
+the CLI is the one shape `BlueBubblesLauncher` cannot supervise: it matches on
+`LauncherContract.mainBundleIdentifier`, and the nested CLI carries `….cli`. The supported
+unattended setup is the login item plus `--headless` or `hide_dock_icon`, which keeps
+supervision, keeps the BlueBubbles name in Login Items, and keeps the alert drawer reachable
+from the status item.
+
+---
+
+## The Private API path
+
+`BBPrivateAPI` talks to a dylib injected into Messages.app over a **Unix-domain socket inside
+Messages' own container**, with the peer verified by audit token against Messages' code
+signature. There is exactly **one** transport (`SocketTransport`) and one framing (4-byte length
+prefix). A loopback TCP alternative cannot identify its peer, so any local process could drive the
+Private API; do not add one.
+
+`PrivateAPITransport` is a protocol because it is the seam test doubles substitute at
+(`Tests/BBPrivateAPITests/FakeHelper.swift`).
+
+Sending has two backends: the Private API when the helper is connected, AppleScript
+(`BBAppleScript`) otherwise. Both must work.
+
+**They are not equivalent in capability.** AppleScript can send text, send an attachment and start
+a chat; everything interactive (reactions, edit, unsend, typing, mark read, group management,
+FaceTime, chat controls) is Private-API-only, and 69 of 168 routes are gated on it. Reading and
+event delivery are unaffected either way. See [`imessage.md`](imessage.md#sending-two-backends-and-one-of-them-is-much-smaller).
+
+Full rules: the sandbox, the container socket, one socket per app, peer verification, the
+observation ladder, are in [`private-api.md`](private-api.md).
+Directory-local: [`Helper/CLAUDE.md`](../../Helper/CLAUDE.md).
+
+## Where a connection method's program comes from
+
+Four connection methods wrap someone else's binary. `ToolManager` answers one question for
+them — `executablePath(for:)` — and the order it answers in is the design:
+
+    a binary the user chose  →  the managed install  →  a copy already on this Mac  →  bundled
+
+**The user's own choice wins** because pointing at a file is an explicit act: someone who has
+done it is working around something. It is honoured even after that copy drifts out of the
+declared range; the scan says so loudly rather than overriding them.
+
+**A copy found on this Mac sits below the managed install**, and that is deliberate. Discovery
+exists so a duplicate is never DOWNLOADED, which is served completely by filling the empty
+slot; it was never a reason to change what a working server runs. A managed install only
+exists because a person pressed Install — nothing here downloads itself — and `brew upgrade`
+can replace the other one without anybody touching BlueBubbles. Update, Revert and the
+two-version prune all operate on the managed install, so preferring discovery would leave
+Revert a button that appears to work and changes nothing.
+
+`ToolPreference.dedicated` removes the first and third from the order entirely, and clears any
+chosen path at the WRITE rather than shadowing it, so a forgotten path cannot reappear when
+the preference flips back.
+
+**Resolution is synchronous**, because it is reached at service start. Probing a binary is
+not. So the scan (`ToolDiscovery`, driven by `ToolManager.scanForExistingCopies`) records its
+answer in each tool's `state.json` and resolution reads it back; `ServerComposition` runs one
+bounded scan after registering tools and before starting services, and
+`ToolUpdateService` rescans on its own schedule. `ToolDiscoveryPolicyTests` fails the build if
+`ToolManager` ever names `Subprocess`, which is that split written down mechanically.
+
+What licenses running a binary nobody vetted: a fixed prefix list (never `$PATH`), a directory
+no other user can write to, every declared companion beside it, and a version inside the range
+the manifest declares. A tool that declares no range is never scanned for.

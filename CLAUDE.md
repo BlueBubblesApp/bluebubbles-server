@@ -1,0 +1,498 @@
+# BlueBubbles Server (Swift): agent guide
+
+The BlueBubbles server: a native Swift macOS application and CLI that reads the local iMessage
+database, serves an HTTP and Socket.IO API to BlueBubbles clients, and drives Messages.app for
+sending.
+
+**This file is a router.** It carries only what every task needs. Everything else is a link:
+follow the one that matches the task before you start editing.
+
+---
+
+## Read this first
+
+Ten rules override anything you would otherwise infer from the code.
+
+1. **Client compatibility outranks everything, including security fixes.** Shipped clients are
+   not under our control and cannot be updated in step with the server. The route table, the
+   response envelopes and the event payloads a default-configured server presents are a fixed
+   contract, enforced mechanically by the parity harness. A fix that would require a client to
+   change ships behind a setting, or is deferred.
+   → [`.claude/docs/decisions.md`](.claude/docs/decisions.md)
+
+   **The requirement, stated plainly: every field the reference's v1 response carries must
+   be present in ours.** That is the contract. A MISSING field is the break: a client reads
+   it and it is not there. An extra field of ours is tolerable; clients ignore what they do
+   not know.
+
+   The parity diff nevertheless reports additions too, and that is a drift check rather than
+   a second rule: one-way, it stops detecting a field that REPLACED another, or an internal
+   value that leaked into a response, because both look like an addition plus a removal and
+   only the removal half would be caught. So an addition you meant goes in
+   `acceptedDifferences` (`Sources/BBParity/ResponseDiff.swift`) with a line saying what it
+   is, and one you did not mean fails, which is the point. Two things to know before adding
+   one anyway: it becomes a contract as soon as a client reads it, so taking it back later IS
+   a break; and the **FCM payload is capped at 4096 bytes** (`FCMSender.maximumPayloadBytes`),
+   where an extra field can push a notification over and `FCMSender` has to shed the chat
+   roster to fit. The bar is real: `backend` on `POST /message/text`
+   was declared for a day and then deleted, because nothing read it and the comment saying
+   clients did was never true.
+
+   **Frozen means the fields, not the wording.** What v1 may never lose is STRUCTURE: every
+   key the reference sends, at the same path, with the same type, plus the status code and
+   `error.type` for each outcome, the route table and the event names. The human-readable
+   strings inside that structure are ours to improve: the envelope's `message`, the error's
+   `error.message`, and any other detail sentence may be reworded or made more specific to
+   the request (name the field that was wrong, the GUID that matched nothing, which half of a
+   gate failed). Keep each string in the slot the reference uses for it (the sentence in
+   `message`, the detail in `error.message`), and never change a status or an `error.type`
+   to go with it: those are what a client branches on.
+
+   **Wording is the only thing that is free. VALUES are not.** The content of a response
+   (a message's text, a date, a GUID, a count, a flag, anything read from a database
+   column) must match what the reference would send for the same data as closely as we can,
+   including its type and encoding, because clients store it, compare it and act on it. The
+   one deliberate exception is `id` on the contact routes: a string for every contact, where
+   the reference sends its integer primary key for a contact created through `POST /contact`.
+   The client was confirmed to handle the string. A second exception needs the same: the
+   client checked, and the divergence written down.
+   → [`.claude/docs/decisions.md#messages-are-ours-to-word`](.claude/docs/decisions.md)
+
+2. **`chat.db` is Apple's, and it is opened read-only by construction.** Never add a write path.
+   Never `SELECT *` against it. → [`.claude/docs/database.md`](.claude/docs/database.md)
+
+3. **Chat GUIDs are not stable and not comparable.** They differ **between servers on the same
+   iCloud account**, and macOS 26 rewrote every prefix to the literal `any`. Never compare with
+   `==`, never derive a service from the prefix, never write `c.guid = ?`, never hard-code one.
+   Use `ChatGUID.sameChat(_:_:)` and `ChatGUID.lookupCandidates()`; in SQL, the one clause
+   producer is `MessageQueryPlan.chatCondition`, and `ChatGUIDClausePolicyTests` enforces it.
+   → [`.claude/docs/imessage.md`](.claude/docs/imessage.md)
+
+4. **A helper is built for the slice of the app it is injected INTO, never the slice this
+   server runs.** On Apple Silicon, Messages.app and FaceTime.app run **`arm64e`**
+   (`lipo -archs` reports `x86_64 arm64e` for both), and dyld **will not** load an `arm64`
+   dylib into an `arm64e` process. It reports nothing when it declines: the insert is skipped,
+   the app launches normally, and the Private API is simply absent: no crash, no log line, no
+   failed request. So the two dylibs are built `arm64e + x86_64` while the app and the CLI stay
+   `arm64 + x86_64`, which is why there is a SECOND `swift build` for them that asserts the
+   slices with `lipo` before anything is copied. It has one implementation,
+   `bb_build_injected` in `Tools/helper-build.sh`, which `Packaging/build-app.sh`,
+   `Tools/dev-bundle.sh` and the observation probe (`Tools/observation-probe/run-probe.sh`)
+   all call; `ToolScriptTests` fails the build on a helper build or a dylib slice check
+   anywhere else. Never take a helper from a plain `swift build`; never "simplify" the second
+   build away. `private_api_helper_path` exists to name an arm64e build when running from
+   `.build`.
+
+5. **The injected helper runs inside a sandboxed app and cannot reach outside its container.**
+   That is why the Private API socket lives inside Messages'/FaceTime's own container, why there
+   is **one socket per app**, and why `NSHomeDirectory()` must never be used for a path both sides
+   compute. → [`.claude/docs/private-api.md`](.claude/docs/private-api.md)
+
+6. **The deployment floor is macOS 14 (Sonoma), and version guards belong at the *top* of the
+   range.** `Package.swift` declares `.macOS(.v14)`. Nothing below Sonoma needs a branch, a
+   fallback or an `@available`; anything that only serves an older release is dead code. Guard
+   **newer** surface instead: `if #available(macOS 26, *)` plus a runtime `NSClassFromString` /
+   `respondsToSelector` check, since Apple removes API as well as adding it.
+
+7. **Never put real phone numbers, emails or message content in tests or fixtures.**
+   `Tests/CompatibilityTests/TestDataPolicyTests.swift` fails the build if you do.
+
+8. **Say what the reference does only when you have looked.** Every statement about v1
+   behaviour has to be traceable to `electron/packages/server/src/…` or to a recorded fixture, in the
+   comment that makes it. Confident prose with nothing behind it is the single most expensive
+   failure mode this project has: `CompatibilityContractTests` opened with "Replays fixtures
+   recorded from the running Node server" and replayed nothing for months; `RequestValues`
+   called its own invented wording "what clients have been shown"; a serializer comment reasoned
+   that a send needs no attachments and the reference sends them. Each read as settled fact and
+   each was wrong. **Cite it or find out.** The procedure, and the shapes that look verified
+   and are not, are the `verify-a-claim` skill.
+
+   **And before citing it, ask whether it is even relevant.** The reference constrains the v1
+   WIRE: status codes, `error.type`, envelope keys, payload shapes, the route table. Its
+   WORDING is not part of that: a `message` may be reworded or made more specific (rule 1).
+   It does not constrain how this server is built. We are MODELLED on the Electron server, not a
+   transcription of it: internals should use whatever modern, standard Swift design is best,
+   and "the reference does it this way" is not an argument for anything a client cannot see.
+   → [`.claude/docs/decisions.md#what-the-contract-does-not-constrain`](.claude/docs/decisions.md)
+
+   This is not a style note. Every reference claim that has been found FALSE was an appeal to
+   the reference about an internal: never about the wire, because the wire is diffed and prose
+   is not. `PasswordPolicy` said `generateRandomString` used `Math.random` (it uses
+   `randomBytes`, and the security concern did not exist); `ServiceAccount` justified requiring
+   `client[]` by citing an `isValidClientConfig` that does not exist (the reference validates
+   that file not at all); `MessageSending` attributed its 60-second ceiling to `resultAwaiter`'s
+   defaults (the default is 30_000; the send path overrides it), which would have made
+   "restore the default" look safe. Each was decoration on a decision that stood on its own,
+   and the decoration is what was wrong. **If a client cannot observe it, justify it on the
+   merits and leave the reference out of it.**
+
+9. **A service declares every setting it touches, and the declaration is enforced.** Reads
+   and writes go through `ScopedSettings`; an undeclared one THROWS, and a service is
+   handed only the scope, never the store (`ScopedSettingsProviding`). There is no trusted
+   tier: the built-in bypass was removed, and a built-in is checked exactly like a plugin.
+   Two consequences that look like problems and are not. **The permissions list names a
+   setting by its STORAGE KEY** — `db_poll_interval`, not "Backup Check Interval (ms)" —
+   because that list answers what a service can TOUCH, and the key is the identity: unique,
+   present for every setting, and the same string the reader meets in the config file, in
+   `--set`, in the API and in the logs, so it is the one they can go and check. A label is
+   part of a setting's `presentation`, so resolving one there pointed a capability list at a
+   UI decision, and it could not answer for the bookkeeping keys a service mostly WRITES —
+   one list in two vocabularies, decided by whether a setting happened to have a screen.
+   `Settings.label(forKey:)` keeps its own job: naming a setting the person has just edited,
+   in the restart notice. And a **secret is never declarable**: `ManifestValidator` refuses a manifest naming one, and
+   `checkRead` refuses it before it looks at entitlements. A service needing a credential
+   checked asks the host to check it.
+
+   **Why this matters more than it looks.** For the services compiled into this binary the
+   check keeps the manifest honest, not contained: in-process code can open `app.db`
+   directly, and pretending otherwise would be theatre. The point is what comes next: the
+   same manifests and the same validator are the boundary for third-party plugins, enforced
+   out-of-process, and the permissions list is the only thing a person has when deciding
+   whether to trust one. Built-ins are the worked examples a plugin author copies. A
+   built-in with a sloppy manifest teaches the pattern that a malicious plugin will exploit,
+   so they have to be exactly right **now**, years before anything third-party loads.
+   → [`.claude/docs/architecture.md`](.claude/docs/architecture.md)
+
+10. **Odd-looking code is usually load-bearing.** Duplicate routes, a route order that looks
+   arbitrary, timeouts that differ by orders of magnitude, a `Double` where an `Int` would
+   do: these are transcriptions of client-observable behaviour. The file header almost always
+   says why. Read it before "cleaning up".
+
+---
+
+## Where to go
+
+| If the task is about | Read |
+|---|---|
+| Module graph, services, composition root, event bus, layering | [`.claude/docs/architecture.md`](.claude/docs/architecture.md) |
+| `app.db`, `chat.db`, migrations, schema profiles, settings storage | [`.claude/docs/database.md`](.claude/docs/database.md) |
+| Routes, envelopes, auth, v1 vs v2, OpenAPI, sockets | [`.claude/docs/api.md`](.claude/docs/api.md) |
+| Chat GUIDs, attributedBody/typedstream, the send backends, AppleScript | [`.claude/docs/imessage.md`](.claude/docs/imessage.md) |
+| Group chat creation without the Private API; the Shortcuts boundary | [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) |
+| Injection, the sandbox/container, helper transport, selectors, swizzling | [`.claude/docs/private-api.md`](.claude/docs/private-api.md) |
+| Memory budgets, child processes, async traps | [`.claude/docs/performance.md`](.claude/docs/performance.md) |
+| Event routing, sinks, payload codecs, socket delivery | [`docs/EVENTS.md`](docs/EVENTS.md) |
+| Message search: why `LIKE` finds nothing on macOS 26, and the indexed fix | [`docs/SEARCH.md`](docs/SEARCH.md) |
+| Auth modes, enrollment, access control, permissions | [`docs/AUTH.md`](docs/AUTH.md) |
+| The audit log: what is recorded, the record's shape, every event kind, CSV, syslog | [`docs/AUDIT_LOG.md`](docs/AUDIT_LOG.md) |
+| What the test suites assert and why | [`docs/TESTING.md`](docs/TESTING.md) |
+| Why something is the way it is; what is deliberately deferred | [`.claude/docs/decisions.md`](.claude/docs/decisions.md) |
+| Building, running, testing, and what CI will fail you on | [`.claude/docs/workflow.md`](.claude/docs/workflow.md) |
+| Naming: DB columns, settings keys, wire keys, spelling | [`docs/NAMING.md`](docs/NAMING.md) |
+| Writing any documentation: voice, structure, formatting, and what a document may claim | [`docs/WRITING.md`](docs/WRITING.md) |
+| What works on which macOS, and what needs a guard vs a ladder | [`docs/MACOS_COMPATIBILITY.md`](docs/MACOS_COMPATIBILITY.md) (start here) |
+| Selector-level IMCore reference | [`docs/PRIVATE_API_SURFACE.md`](docs/PRIVATE_API_SURFACE.md) |
+
+Nested `CLAUDE.md` files load automatically when you touch files under them:
+`Sources/BBInterfaces/`, `Sources/BBHandlers/`, `Sources/BlueBubblesServerCore/`,
+`Sources/BBPersistence/`, `Sources/BlueBubblesApp/`, `Helper/`.
+
+**Six skills cover the multi-step jobs that are easy to get wrong. Invoke them rather than
+improvising the order:**
+
+| Skill | For |
+|---|---|
+| `add-api-route` | Adding, changing or removing an endpoint; a failing route-table, request-parameter, parity or OpenAPI check |
+| `implement-imcore-method` | Implementing a `notImplemented` helper stub, adding an IMCore call or inbound event, chasing a vanished selector |
+| `add-a-service` | A new subsystem with a lifecycle: its manifest, entitlements, permissions, managed tools, watched keys and wiring |
+| `add-a-setting` | Declaring a setting, giving it a row, marking it secret, making it depend on a switch, letting a service read it |
+| `macos-release-sweep` | A new macOS or beta; dumping headers; deciding guard against ladder; the capability catalog and the compatibility matrix |
+| `verify-a-claim` | Auditing or reviewing; checking whether a comment, header or doc line is true **and** enforced; citing the reference |
+
+---
+
+## Where do I add…?
+
+| To add | Go to |
+|---|---|
+| A setting | `Sources/BBSettings/SettingsRegistry.swift`: declare a `Setting<T>` with `presentation:` and add it to `Settings.renderable` (or `Settings.hidden` if it has no UI). `allKeys` is derived. A `.number(range:)` control's range is ENFORCED, on writes and on `--set`/config-file overrides alike (`Setting.rangeViolation`); do not repeat it in `validate`, which is for anything else and binds writes only. Mark it `application: .composition` if only a restart applies it. Never write a key as a string literal elsewhere: use `Settings.x.key`. **If a service reads it, add it to that service's `readSettings` entitlement too**: an undeclared read throws. **If it does nothing while another switch is off, say so**: `presentation: .init(…, requires: Settings.parent.key)` greys the generated row out and names the switch to turn on, so no screen has to know the group by name. Presentation only, never a gate on reads or writes; chains are walked whole (`Settings.requirementChain`) and the row names the OUTERMOST switch that is off, because the ones under it are greyed out too. `SettingDependencyTests` enforces the shape, and pins the two settings that look like dependencies and are not |
+| An API route | `Sources/BBHTTPAPI/RouteTable.swift` (or `AdditiveRoutes` if Node does not have it), then a handler in `Sources/BBHandlers/` |
+| A validation rule on a v1 route | `Sources/BBHTTPAPI/ValidationRules.swift`, keyed by `HandlerID`. **Only to match the reference**: this layer exists to refuse what `validators/*.ts` refuses and nothing more, because the one way it can break a client is by being STRICTER than the reference. Regenerate `Tools/validation-rules/extract.py` and let `ValidationRuleParityTests` diff it; a divergence needs an entry in `knowinglyDivergent` with a reason. Never add a rule the reference does not have |
+| A `where` filter on `/message/query` | A case on `MessageFilter` (`Sources/BBIMessage/`), its statement shape in `parse`, its SQL in `MessageQueryPlan.predicate(for:)`, and a test in `MessageFilterSQLTests` asserting the ROWS **and** the `total`. It is a typed allowlist, not the reference's SQL passthrough: anything unrecognised is a 400 naming the statement. Never accept a filter you do not apply |
+| Logic behind a route | `Sources/BBInterfaces/`: **not** the handler. Interfaces return typed values; one `serialize` step projects them. Anything reaching Messages goes inside `throughMessages { … }` |
+| A capability a handler, service or view may reach | `Sources/BBInterfaces/Capabilities.swift` if the app or the root composes it too, `Sources/BBHandlers/HandlerCapabilities.swift` if only a handler does, `Sources/BlueBubblesServerCore/Composition/Services/ServiceCapabilities.swift` if only a service does; then conform `AppContext` in `AppContextCapabilities.swift`. Never take the whole `AppContext` |
+| A setup (onboarding) step | `Sources/BlueBubblesApp/Onboarding/OnboardingFlow.swift`: a case in `OnboardingStep.ID`, an entry in `OnboardingCatalog.steps` with its `isIncluded` rule and `gate`, and a view case in `Views/Onboarding/OnboardingSteps.swift` (the switch is exhaustive). Build the view from the settings screens that already exist; never a second copy of a control |
+| A migration step (adopting an Electron install) | `Sources/BlueBubblesServerCore/Migration/MigrationState.swift`: a case on `MigrationStep`, its `isBlocking` and `prerequisite`, then the work in `MigrationRunner`. **`isBlocking` is the decision that matters**: a blocking step stops the server until the user acts, so only claim it for something whose absence means coming up on defaults with no password. This is NOT onboarding: nothing here runs without a click, and the state is per step in `app.db` so the CLI and the app agree |
+| A page in the app | `Sources/BlueBubblesApp/Views/`: reach state through `AppModel` and its three facades, never `AppContext`; live state is followed from the server's streams, never polled; a read that can fail goes through `ScreenModel`; manifests come from `IntegrationCatalog`. The rules and their tests: [`Sources/BlueBubblesApp/CLAUDE.md`](Sources/BlueBubblesApp/CLAUDE.md) |
+| A page in the app that is built around a `Table` | `TablePage` (`Views/Components/SettingsLayout.swift`), never `SettingsPage`. `SettingsPage` is a `ScrollView`, and a `Table` inside one has no height of its own: it loses its own scrolling and the row recycling that makes a long list cheap. Both wrap the same `PageFrame`, so the centred column is identical either way. `TablePage` also paints the window background, which the scroll view was silently providing everywhere else — without it the detail column is a transparent hole and the glass card, and the SIDEBAR beside it, sample the desktop through it |
+| A validation rule on a SERVICE field (a manifest form) | `FieldValidation` on the `FieldDescriptor` (`Sources/BBServiceKit/ServiceManifest.swift`): a pattern and the message to show, as DATA so a third-party manifest can express one. `ServiceFormLayout.validationFailure` puts it under the field and `ServiceFormView.save` refuses the write. Check only what can be checked — zrok's reserved name is `[a-z0-9]{4,32}`, and its profanity screen is deliberately not modelled because the list is not published and a guess would refuse names zrok accepts. Not to be confused with `ValidationRules.swift`, which is the v1 REQUEST layer |
+| What a page shows when the server is not running | `ServerStoppedNotice` (`Sources/BlueBubblesApp/Views/`) with a `placement:` (`.page`, `.section` or `.card`) and the `purpose:` as the tail of "Start the server to …". It carries the Start button; a hand-written "Server not running" fails `ServerStoppedNoticeTests` |
+| An address or identifier a user will copy | `CopyableValue` (`Sources/BlueBubblesApp/Views/`), never a `Text` beside a hand-written `NSPasteboard` button. Pass the empty string for "no value yet" and say which kind of nothing it is in `placeholder:` |
+| A macOS permission a service needs | A `ServicePermission` on its manifest: id, `.required`/`.recommended`/`.feature`, and a purpose sentence. `Service.requiredPermissions` derives from it; there is no protocol to conform to. **`.required` IS a start gate**: `ServiceRegistry.performStart` refuses to start a service whose required permission is missing and records why. `.recommended` and `.feature` are not gates. None of them is a boundary between services — macOS grants TCC to the app, not to code inside it — and all of them are what the user is SHOWN, so they have to be accurate |
+| A service | One file per service under `Sources/BlueBubblesServerCore/Composition/Services/`, declaring `typealias Host` as the capabilities it actually uses (**never `AppContext`**); declare its manifest in `Sources/BBBuiltIns/BuiltInManifests.swift` and register it in `ServerComposition` as `registry.register(MyService.self) { $0 }`. Start order is derived from `dependencies`. Its registry key is its manifest identifier; there is no separate `ServiceID` |
+| A table in `app.db` | A `SchemaContributor` in the module that owns it, then append it to `AppSchema.contributors`. **Not** `AppDatabase`; see [`Sources/BBPersistence/CLAUDE.md`](Sources/BBPersistence/CLAUDE.md) |
+| An event | `Sources/BBEvents/ServerEvent.swift` plus its per-sink projection |
+| A user-visible alert | Raise it explicitly through `BBDiagnostics`. Logging must never produce one |
+| A Private API call | `Helper/BBPrivateAPIContract` first: a case on `MessagesHelperAction` or `FaceTimeHelperAction`, any new payload field as a case on `WireKey` (never a string literal on either side; a test fails the build on one), then the contract method **on the ROLE protocol it belongs to** (`MessageSending`, `ChatMuting`, `FaceTimeControl`, …; `PrivateAPI` composes the sixteen roles and declares nothing itself) then `Helper/BlueBubblesHelper`. Each dispatch is exhaustive over its enum, so the helper side will not compile until you handle it. Go through `IMCoreRuntime`, never IMCore directly |
+| An audit event kind | A case on `AuditEventKind` (`Sources/BBAudit/AuditEventKind.swift`) spelled `<category>.<name>`, its `metadataFields` (every key the emitter writes, with a type and a sentence), and its entry in `docs/AUDIT_LOG.md`, which `AuditDocumentationTests` fails the build without. Emit it where the fact is KNOWN: an interface records what it changed, a service what it did, never a handler. Build the `AuditEvent` with no `actor:`, so the task-local `AuditContext` names who (a client inside a request, a service inside its start, the operator otherwise), unless the record is the server's own decision taken inside somebody else's request, as an automatic block is. A record carries no message content, no address other than a client's, and a secret only as `JSONValue.redacted`; a route is always the template. If nothing in the server has to import `BBAudit` to know the fact (the auth layer, the settings store), declare a protocol beside the fact and translate in `AuditWiring.swift` |
+| An external binary a service runs | A `ManagedToolDescriptor` on its manifest (`Sources/BBBuiltIns/BuiltInTools.swift`). Do not write a downloader. **Declare `compatible:`**, the range of versions your code actually drives, or a copy the user already has is never used and a duplicate is downloaded beside it. It is not `recommended` (the one build we fetch) and is strictly wider; its ceiling is EXCLUSIVE, which is what keeps a published major that dropped a subcommand — zrok 2 — from being adopted off disk. Measure both bounds by running a build; a floor fails closed, refusing a copy that works |
+
+---
+
+## Non-negotiables that a compiler will not catch
+
+- **Never construct `Process`.** Use `BBCore/Subprocess.swift`. Its timeout argument is
+  required on purpose. The one exception is `BBProxy/DaemonProcess`, and it stays the exception.
+- **Never hand-roll a timeout.** `BBCore/Timeout.swift` has `withTimeout(_:operation:)`. Six
+  copies of the same task group existed before it. A wait that SOMEBODY ELSE resumes (a
+  helper reply, a daemon's readiness line, a browser callback) uses
+  `awaitContinuation(timeout:timeoutError:register:abandon:)` beside it and stores the
+  `OnceContinuation` it is handed, never a raw `CheckedContinuation`: a task group racing a
+  bare continuation against a sleep cannot finish when the sleep wins, which is how the
+  Firebase sign-in's five-minute timeout never fired. The one shape that genuinely differs
+  stays where it is and says why in place: the permission probe races a `Thread` and answers
+  rather than throwing. A deadline that passes throws `TimedOut`, never a struct of your own;
+  but a BACKEND's timeout (a helper that did not reply, a killed child, a sign-in window)
+  keeps its own case, because inside a request `TimedOut` is answered as the route's 504.
+  The same file family holds the other two shapes that kept being
+  rewritten: a loop that tries again on a schedule is `retrying` / `poll` with a
+  `RetrySchedule` (`BBCore/Polling.swift`, injectable clock, cancellation always ends it), and
+  a long-running task something owns is an `OwnedTask` (`BBCore/OwnedTask.swift`), which
+  cancels on replace and clears its own handle when its body ends, so `isAlive` can be read
+  from it. A stored bare `Task` is refused anywhere under `Sources/` and `Helper/`, and a
+  service's `stop()` must `await` the `stop()` of each `OwnedTask` it holds, so a stop that
+  returns has nothing of the service still running; `OwnedTaskPolicyTests` scans for both
+  and lists the few on-demand drain workers that keep a bare task, with the reason.
+- **Error text a person will read goes through `DiagnosticText.sentence(for:)`.**
+  `String(describing: error)` in an alert body prints a Swift enum at the user;
+  `BBError.body` is the sentence written for them. Raw dumps are correct in LOG metadata and
+  inside a typed error's own `reason`, and nowhere else. That function is the ONLY rule:
+  do not hand-roll a cast chain beside it, however short. Five existed (`userFacingMessage`
+  in the app, two in `FirebaseSetupModel`, two views dumping the raw value) and they had
+  already drifted apart; `DiagnosticTextTests` now pins the four steps, including the
+  `localizedDescription` step that makes `CocoaError` and `DecodingError` readable. The other
+  half is the type: an error declared under `Sources/` conforms to `BBError` (a `code`, a
+  `domain`, a `title` and the `body`), or to `LocalizedError` where it cannot link BBCore, so
+  the function has a sentence to find. `ErrorTypePolicyTests` fails the build on a plain one.
+- **A control a person can press has a name.** A label containing text (`Button("Remove")`,
+  `Label("Refresh", systemImage:)`) is accessible by construction. A label that is only an
+  image is not: it renders correctly, it has a tooltip, and to VoiceOver it is an unnamed
+  button, which a tooltip cannot fix because it needs a pointer. Add `.accessibilityLabel`
+  naming the ACTION. `AccessibilityPolicyTests` fails the build otherwise. Two related habits
+  that no test can check: a row of `Text`s that describes one thing takes
+  `.accessibilityElement(children: .combine)` so it is one stop rather than five, and a
+  decorative symbol beside text that already says the same thing takes
+  `.accessibilityHidden(true)`.
+- **Never log a secret, and never log a person.** Anything from a setting marked `isSecret`
+  is wrapped as `DiagnosticValue.secret` and renders as `••••`. A phone number, an email, a
+  handle or a chat GUID in log metadata goes through `Redaction` (`BBCore/Redaction.swift`:
+  `+1…0143`, `so…@example.com`, `iMessage;-;+1…0143`), and message text, subjects, display
+  names, file names, push tokens, request payloads and the server's own public URL are never
+  logged at all. Message GUIDs, room names, event names, transaction ids, counts and
+  durations are not PII and go in freely. `LogRedactionPolicyTests` scans every
+  `logger.<level>(…)` call for a key that names an address without `Redaction`, or a key that
+  names content. Levels: `info` is a state transition a support log wants by default (a
+  service up, a block, a scheduled message sent); `debug` is one line per unit of work (a
+  request, a detected change, an event dispatched, a delivery, a send); `trace` is
+  per-iteration chatter (a tick that found nothing, typing, daemon stderr).
+  → [`.claude/docs/architecture.md`](.claude/docs/architecture.md#diagnostics-logging-and-alerting-are-not-the-same-system)
+- **A service that watches a key another service PUBLISHES must decide per key whether to
+  restart.** `ServiceManifest.watchedSettingKeys` already subtracts what a service writes, but
+  that only breaks a one-hop loop. `HTTPService` reads `server_address`, the five proxies write
+  it and depend on the HTTP service, and an unconditional `.restart` respawned cloudflared
+  twenty times a second forever. `HTTPService.liveKeys` is the pattern; `SettingsStore.write`
+  announcing only the keys that actually moved is the backstop.
+- **Migrations are append-only.** Never edit a released one. Rename via a new migration.
+- **A header states the decision and the failure it prevents. It does not narrate history.**
+  What the code *used to* do, what a previous pass replaced and why it was measured belong in
+  git and [`.claude/docs/decisions.md`](.claude/docs/decisions.md). Narrative above a
+  declaration rots the moment the declaration changes: the audit found a delegate doc that
+  said "NOT `.terminateLater`" above a `return .terminateLater`. When you change code under a
+  comment, the comment is part of the change.
+- **What Messages writes, and WHEN, can only be learned from Messages.** A fixture database has
+  its rows already complete; a live one does not, and the gap is where the bugs are. Measured,
+  each after passing a full green suite: an AppleScript send lands with `text` **NULL** and the
+  words only in `attributedBody` (so match `universalText()`, never the column); the
+  `chat_message_join` row arrives **after** the message row (so a wait for "the row exists"
+  answers `chats: []`); `date_edited` moves on an unsend while `date_retracted` stays null.
+  Anything that depends on the timing or completeness of what Messages writes is unverified
+  until it has been run against a real send. → [`docs/TESTING.md`](docs/TESTING.md)
+- **A request parameter the server accepts and ignores is worse than one it refuses.** `where`
+  on `/message/query` was parsed by nobody: a client's "give me messages after ROWID n" was
+  answered with the newest thousand messages and a `total` counting the whole database, with a
+  200 on it. The client cannot tell. Three separate user-visible failures came out of that one
+  omission (incremental sync timing out, search returning arbitrary results, notification
+  hydration reading the wrong messages). Auditing the rest of the v1 surface for the same
+  shape found **eleven more on nine routes**, including a full sync that imported no edits and
+  an edit route that discarded the user's own fallback text because it read the reference's
+  INTERNAL name for a field rather than the wire name. When a route takes an option, apply it
+  or refuse it; `RequestParameterParityTests` now fails the build on a v1 parameter this
+  server names nowhere, and a deliberate exception goes in its `knowinglyInert` list with the
+  reason. → [`.claude/docs/api.md`](.claude/docs/api.md)
+- **Read the VALIDATORS as well as the routers when citing the reference.** A Node router that
+  destructures a parameter without checking it may still sit behind a validator that requires
+  it: `/message/count/updated` looked like a route where we were wrongly strict, until
+  `messageValidator.ts` turned up `after: "required|numeric|min:0"` and a recorded 400
+  confirmed it. The routers are half the contract.
+- **A literal in a serializer is invisible to the parity diff.** The diff compares keys and
+  types, so `object.set("metadata", .object([:]))` and `height: 0` passed every check for as
+  long as they existed: the shape was right and the values were placeholders. When you write a
+  constant into a response, either it IS the contract (and says so, with a citation) or it is a
+  stub that needs a test asserting the real value. A parameter no call site passes:
+  `AttachmentSerializer`'s `dimensions` is the same bug wearing a signature.
+- **The plugin manifest surface is frozen.** Third-party plugins are wanted but are not being
+  built now, so `BBServiceKit` is closed to new capability: no new entitlement kinds, no new
+  manifest fields for hypothetical plugin needs, no widening of the tool or migration
+  descriptors. A field a *built-in* service needs today is fine; a field a future plugin might
+  want is not. See the header of `Sources/BBServiceKit/ServiceManifest.swift`.
+- **`Package.swift` must match the imports.** `python3 Tools/package-graph/check.py` fails CI
+  when a target declares an unused dependency or imports an undeclared module: neither is
+  visible to the compiler.
+- **British spelling** in prose and in identifiers we own (`colour`, `behaviour`, `offence`).
+  Apple's API names keep theirs. The rest of how documentation is written here — voice, tense,
+  headings, code font, what a document may claim — is
+  [`docs/WRITING.md`](docs/WRITING.md), which follows the Google developer documentation style
+  guide except where it says otherwise.
+- **Only two things may cap a dependency version:** the macOS 14 (Sonoma) floor and the pinned
+  Swift toolchain. An API rename or a deprecation is work to do, not a reason to pin back. Check a
+  dependency's **availability macros**, not just its `platforms:`: Hummingbird declares
+  `.macOS(.v11)` and then gates its entire public API behind `@available(macOS 14)`, which is what
+  set the floor.
+- **Without the Private API the server is limited to what AppleScript can do**: send text, send
+  an attachment, start a **one-to-one** chat. Group creation needs the Private API or the
+  user-installed Shortcut (`BBShortcuts`); AppleScript has had no group path since Big Sur, three
+  releases below our floor. 69 of the 168 route definitions in `RouteTable.swift` are gated
+  on `requires: .privateAPI`. Both
+  configurations are supported; only one is capable. Gate the route, and make the capability
+  discoverable before a client tries. → [`.claude/docs/imessage.md`](.claude/docs/imessage.md)
+- **Every call that reaches Messages goes through `throughMessages { … }`.** An unwrapped one
+  compiles, passes, and reports each Messages refusal as a generic 500 `Server Error` instead of
+  the `iMessage Error` clients branch on. The interface conforms to `MessagesBackedInterface`,
+  which also supplies `requirePrivateAPI(for:)`: do not hand-roll either; they were duplicated
+  three times before it existed. → [`Sources/BBInterfaces/CLAUDE.md`](Sources/BBInterfaces/CLAUDE.md)
+- **A module is not done until the composition root calls it and a test asserts that call
+  exists.** `Tests/CompositionTests/EventDeliveryWiringTests.swift` is the pattern.
+- **A route added to `RouteTable.groups` that Node does not have fails the parity test.**
+  It belongs in `AdditiveRoutes`.
+- **A rule the compiler cannot check ships with a test that scans the source for it.** A
+  comment saying "never X" is read once; a test that greps for X runs on every build.
+  **Forty** exist and are the pattern: `SettingKeyLiteralTests` (a declared setting key
+  spelled as a literal outside the registry), `HelperVocabularyTests` (a wire field spelled as
+  a string on either side of the helper socket), `IntegrationCatalogTests` (an app file
+  reading `BuiltInManifests.all`), `TestDataPolicyTests` (a real address in a fixture **or in a document**),
+  `RequestBodyPolicyTests` (a handler reading a request with `try?`),
+  `HandlerBoundaryPolicyTests` (a handler taking the Private API client, the FaceTime
+  coordinator or the FindMy runtime directly, spawning a `Task`, or declaring a serializer),
+  `LogRedactionPolicyTests` (an address in log metadata without `Redaction`, or message content in a log at all, and in the injected
+  helper an address, content, a name or a file path in any log line), `AccessibilityPolicyTests`
+  (an image-only control with no `.accessibilityLabel`), `AllocationPolicyTests` (the helper
+  allocating anywhere but through its one door), `ScreenLoadingStatePolicyTests` and
+  `ScreenReloadPolicyTests` (a page that reads from the server and does not say it is
+  reading, draws a list's states itself instead of through `ListPage`, or does not read again
+  when the server starts), `ServerStoppedNoticeTests` (a page
+  hand-writing its own "server not running" state), `SharedComponentPolicyTests` (a view
+  hand-drawing a service status line, a navigable row's chevron, a file drop target, a
+  titled card, a section's empty line, a failure line, a divided list or a membership
+  binding instead of using `ServiceStatusLine`, `ManifestRow`, `DropZone`, `TitledCard`,
+  `SectionEmptyText`, `ErrorLine`, `DividedForEach` or `Binding(contains:in:)`, colouring a
+  state with a colour of its own instead of a `StatusTone`, reading `server_address` in a
+  view instead of drawing `ServerAddressRow`, or app code formatting a relative age or
+  writing the pasteboard anywhere but `HomeDashboard.relative` and `Pasteboard.copy`),
+  `DesignTokenPolicyTests` (a literal corner radius or ideal sheet size in an app view
+  instead of a `SettingsMetrics` token or a `SheetSize`), `NamingConventionTests` (the rules in
+  `docs/NAMING.md`), `RequestParameterParityTests` (a v1 parameter this server names
+  nowhere), `OperatorAttributionPolicyTests` (an app write to audited server state outside
+  `asOperator` or the `model.settings` door, which the audit log would record as nobody's),
+  `ViewPlumbingPolicyTests` (a view holding the raw `SettingsStore`, subscribing to
+  `.changes()` itself, committing or writing a setting in `.onDisappear`, or hand-building a
+  `get: { x != nil }` presence binding), `ChatGUIDClausePolicyTests` (a
+  chat-GUID comparison in SQL built anywhere but `MessageQueryPlan.chatCondition`),
+  `ListenerStopPolicyTests` (a test stopping a listener or server from a `Task` spawned in a
+  `defer` instead of awaiting the stop through `TestHTTPServer.run` or `ReplayServer.run`),
+  `ToolStoreIsolationPolicyTests` (a test building a `ToolManager` or `ToolStore` on the real
+  `Tools` directory), `ToolRecordPolicyTests` (a tool's record saved outside
+  `ToolManager.commit` / `commitTolerating`), `SharedUtilityPolicyTests` (a home directory, a constant-time
+  comparison, base64url, the bundle version, epoch milliseconds or a plural done by hand
+  instead of through its one door in BBCore), `SQLPlaceholderPolicyTests` (a `?, ?, ?` list
+  built by hand instead of through `SQLPlaceholders`), `SelectorLookupPolicyTests` (a selector
+  looked up in the helper anywhere but `IMCoreRuntime`), `OwnedTaskPolicyTests` (a stored
+  bare `Task` anywhere instead of an `OwnedTask`, or a service stop that does not wait for
+  one), `ContinuationDeadlinePolicyTests` (a raw continuation raced against a sleep instead of
+  `awaitContinuation`, or a deadline loop that a cancelled sleep spins to its end),
+  `SettingsWritePolicyTests` (a settings write behind `try?`), `ErrorSentencePolicyTests` (a
+  person-facing error read from `localizedDescription` instead of `DiagnosticText`),
+  `StagingOrderPolicyTests` (an attachment staged inside `throughMessages`), `ServiceHostPolicyTests` (a service
+  handed the raw `SettingsStore` instead of its manifest's `ScopedSettings`, asking for
+  another service's scope, or naming a capability in its `Host` it never uses),
+  `ErrorTypePolicyTests` (an error type under
+  `Sources/` that conforms to neither `BBError` nor `LocalizedError`), `UnarchivePolicyTests`
+  (a keyed unarchive with secure coding off, outside its recorded exception),
+  `FrontEndPlumbingPolicyTests` (an app child model attached or detached outside the one
+  attachment list, a facade door returning the `AppContext`, or an exporter, importer or
+  migration run built from storage's fields instead of through `Storage`),
+  `AuthClockPolicyTests` (a wall-clock read in `BBAuth` instead of its injected `BBClock`),
+  `OSVersionGateTests` (an
+  interface gate reading the host's macOS version instead of the injected `osMajorVersion`),
+  `InterfaceRequestTypePolicyTests` (an interface operation taking a raw `JSONValue` body),
+  `SourceWalkPolicyTests` (a test outside `BBTestSupport` walking a directory itself instead
+  of reading through `SourceScanner`), `SourcePathPolicyTests` (a test outside `BBTestSupport`
+  climbing out of `#filePath` with `deletingLastPathComponent` instead of asking
+  `Repository`) and `DocumentationStyleTests`
+  (a time-anchored word, a Latin abbreviation or a non-inclusive term in any document, or in
+  any Swift comment). Each reads the tree through `SourceScanner` (`Tests/BBTestSupport`),
+  which decides what a comment is with a lexer rather than a `//` prefix, skips hidden
+  directories, `node_modules` and agent worktrees, and throws when a scan finds fewer files
+  than its floor; each prints every offender as `path:line: text`. When you add a "never" to
+  this file, add the test that enforces it in the same change.
+- **A `try?` says where the failure goes.** `(try? await x) ?? []` makes "refused" and "none"
+  the same value, which is how the devices page showed an empty list for a server that was
+  answering 500. A `try?` is allowed when the failure is reported on another path (name it in
+  the comment), when the value is a glance rather than the content (Home's count tiles), or
+  on `Task.sleep`, whose only error is cancellation. Anything else propagates, and a screen
+  whose content is the read goes through `ScreenModel`. A settings write is never `try?`.
+- **Identity is never a display string.** An enum whose raw value is what a person reads
+  (`case devices = "Devices"`) cannot be renamed without changing every comparison, every
+  stored selection and, where it is one, the wire. The case is the identity, `title` is a
+  computed property, and a value that goes on the wire lives on its own property with a
+  comment naming the contract it serves. `Destination`, `SettingsTab` and `Repeats` are the
+  shape.
+- **What is built on first use is one type, not a `private var` and a flag.** On the server it
+  is `LazyCollaborators`; a new on-demand subsystem goes there. A `loaded` flag beside an
+  optional on a container is the shape that was replaced.
+
+---
+
+## Fast commands
+
+```bash
+swift build && swift test
+swift test --filter BBSettingsTests
+swift run bluebubbles-server --headless --set socket_port=1234 --set password=dev-password
+Tools/dev-bundle.sh --run          # required for anything permission-shaped
+swift format lint --strict --recursive Sources Tests Helper
+python3 Tools/package-graph/check.py
+```
+
+Full loop, including the generated-artifact checks CI runs → [`.claude/docs/workflow.md`](.claude/docs/workflow.md).
+
+**A change is done when all five pass: `swift build`, the strict build
+(`-Xswiftc -warnings-as-errors -Xswiftc -Wwarning -Xswiftc DeprecatedDeclaration`), the lint,
+the package-graph check, and `swift test`.** Report which ran and what they said; "the tests
+pass" with the strict build unrun is how a warning-as-error reaches CI. **None of the five
+takes minutes**: the whole loop is under two minutes from a clean build directory, and
+`swift test` past about 90 seconds is a hang rather than a slow build. The durations, and how
+to tell one from the other in a single `ps`, are in
+[`.claude/docs/workflow.md`](.claude/docs/workflow.md). Comments under changed
+code, and the `CLAUDE.md` for the module, are part of the change; see the non-negotiables.
+
+---
+
+## Reference documents (long; read a section, not the file)
+
+| Document | Size | What it is good for |
+|---|---|---|
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | ~77 KB | Human setup, permissions, SIP, signing, releases |
+| [`TODO.md`](TODO.md) | ~76 KB | Outstanding work, ordered by priority; finished work is deleted, not struck through |
+| [`docs/api/README.md`](docs/api/README.md) | ~29 KB | The REST API explained in prose |
+| [`docs/PRIVATE_API_SURFACE.md`](docs/PRIVATE_API_SURFACE.md) | ~60 KB | Every IMCore call and its selectors |
+| [`docs/MACOS_COMPATIBILITY.md`](docs/MACOS_COMPATIBILITY.md) | ~28 KB | Capability and selector matrix across 14 / 15 / 26 |
+| [`docs/OBSERVATION_LADDER.md`](docs/OBSERVATION_LADDER.md) | ~20 KB | How each inbound event is observed, and the fallbacks |
+| [`docs/TESTING.md`](docs/TESTING.md) | ~55 KB | **What** the suites assert and why |
+| [`docs/EVENTS.md`](docs/EVENTS.md) | ~16 KB | Event routing, sinks, payload codecs, socket delivery |
+| [`docs/SEARCH.md`](docs/SEARCH.md) | ~39 KB | The search plan: what it costs, what it stores, what the user is told |
+| [`docs/AUTH.md`](docs/AUTH.md) | ~21 KB | Auth modes, enrollment, access control, permissions |
+| [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) | ~13 KB | Why AppleScript cannot create group chats, and what Shortcuts can and cannot do |
+| [`docs/AUDIT_LOG.md`](docs/AUDIT_LOG.md) | ~34 KB | The audit log: every event kind and its metadata, the envelope, CSV columns, the syslog layout, SIEM and Postgres notes |
+
+**Source file headers are the primary documentation.** Most files open with 10–25 lines
+explaining the design and the failure it prevents. Read the header before changing the file.

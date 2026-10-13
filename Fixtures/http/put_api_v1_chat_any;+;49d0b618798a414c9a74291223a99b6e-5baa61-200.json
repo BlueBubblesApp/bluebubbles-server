@@ -1,0 +1,58 @@
+{
+  "request": {
+    "method": "PUT",
+    "path": "/api/v1/chat/any;+;49d0b618798a414c9a74291223a99b6e?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "displayName": "REDACTED"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Successfully updated the following fields: displayName",
+        "data": {
+          "originalROWID": 480,
+          "guid": "any;+;49d0b618798a414c9a74291223a99b6e",
+          "style": 43,
+          "chatIdentifier": "REDACTED",
+          "isArchived": false,
+          "displayName": "REDACTED",
+          "participants": [],
+          "isFiltered": false,
+          "groupId": "0F4B116C-4092-44A6-B5B7-CA5390D8507E",
+          "properties": [
+            {
+              "pv": 1,
+              "numberOfTimesRespondedtoThread": 2,
+              "shouldForceToSMS": false,
+              "lastSeenMessageGuid": "REDACTED",
+              "hasBeenAutoSpamReported": true,
+              "groupPhotoGuid": "2885FE0B-263F-4F+15555550100A530F34B57",
+              "markedAsKnownDate": "+15555550100T18:46:03.537Z",
+              "LSMD": "+15555550100T15:46:30.482Z"
+            }
+          ],
+          "lastAddressedHandle": "REDACTED"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:46:43.048Z"
+}
