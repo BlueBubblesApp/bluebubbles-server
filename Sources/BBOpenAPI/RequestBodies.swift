@@ -503,6 +503,27 @@ public enum RequestBodies {
       properties: [chatGUID("The conversation the scheduled message is in.")],
       example: .obj([("chatGuid", .string("iMessage;-;+15551234567"))])),
 
+    .serverScheduleUpdate: Body(
+      summary:
+        "Downloads the newest release now and holds its relaunch until the window opens. "
+        + "Replaces Install Updates Automatically's hours for this update. A window that "
+        + "closes without the install comes round the next day at the same times.",
+      properties: [
+        Property(
+          "window_start", .integer,
+          "When the relaunch may start, epoch MILLISECONDS. Already past means from now.",
+          required: true),
+        Property(
+          "window_end", .integer,
+          "When it must have started by, epoch MILLISECONDS. Later than `window_start`, in "
+            + "the future, at most seven days ahead and at most a day after `window_start`.",
+          required: true),
+      ],
+      example: .obj([
+        ("window_start", .int(1_788_418_800_000)),
+        ("window_end", .int(1_788_429_600_000)),
+      ])),
+
     // MARK: Polls
 
     .messageCreatePoll: Body(
@@ -1908,6 +1929,9 @@ public enum RequestBodies {
   /// already has — the path, a query parameter — rather than merely asserting that the body
   /// is empty.
   public static let bodyless: [HandlerID: String] = [
+    .serverCancelScheduledUpdate:
+      "Withdraws the window a client asked for. There is only ever one, so there is nothing "
+      + "to name.",
     .chatPin: "The conversation is the path; pinning takes no options.",
     .chatUnpin: "The conversation is the path; unpinning takes no options.",
     .chatFetchBackground: "The conversation is the path. `?wait=` is a query parameter.",

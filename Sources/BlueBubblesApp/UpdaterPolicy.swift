@@ -36,15 +36,18 @@ enum UpdaterPolicy {
     return .available
   }
 
-  /// Whether a downloaded update's relaunch should be waiting for the install hour.
+  /// Whether a downloaded update's relaunch should be waiting for its window.
   ///
-  /// Only while the server is running and Install Updates Automatically is on. A relaunch
-  /// STARTS the server, so one armed after somebody stopped it undid the stop at the install
-  /// hour; and the switch turned off has to disarm an update already waiting, not just the
-  /// next one. Disarmed, the update is not lost: Sparkle installs it when the app quits.
+  /// Only while the server is running, and only with something to keep: Install Updates
+  /// Automatically on, or a window a client asked for. A relaunch STARTS the server, so one
+  /// armed after somebody stopped it undid the stop at the install hour; and the switch
+  /// turned off has to disarm an update already waiting, not just the next one, unless a
+  /// client's window is what holds it. Disarmed, the update is not lost: Sparkle installs it
+  /// when the app quits.
   static func armsScheduledInstall(
-    hasDownloadedUpdate: Bool, isServerRunning: Bool, installsAutomatically: Bool
+    hasDownloadedUpdate: Bool, isServerRunning: Bool, installsAutomatically: Bool,
+    hasRequestedWindow: Bool
   ) -> Bool {
-    hasDownloadedUpdate && isServerRunning && installsAutomatically
+    hasDownloadedUpdate && isServerRunning && (installsAutomatically || hasRequestedWindow)
   }
 }

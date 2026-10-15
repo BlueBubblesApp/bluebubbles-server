@@ -12,15 +12,26 @@
 //  find, so it emits once; this server keeps checking (three callers, one of them daily),
 //  and re-emitting the same release every morning would notify every phone every morning.
 //  A NEWER release found later is announced again, because it is news.
+//
+//  It also says when what is happening to a found release moves (downloading, scheduled for
+//  a window, installing, nothing pending) as `server-update-status-changed`, so a client's
+//  update page follows a schedule another client set, or the automatic one, without
+//  polling. Once per CHANGE: the updater reports its state at every step of its wait, and
+//  a client is told only when the answer differs.
 
+import BBCore
 import BBEvents
 import BBSerialization
+import BBUpdates
 import Foundation
 
 public actor UpdateAnnouncer {
 
   private let events: EventBus
   private var announcedVersion: String?
+  /// The install state last announced. Starts as "nothing pending", which is what a client
+  /// assumes of a server it has not heard from, so a first report of nil says nothing.
+  private var announcedInstallState: UpdateInstallState?
 
   public init(events: EventBus) {
     self.events = events
@@ -35,6 +46,21 @@ public actor UpdateAnnouncer {
     guard !trimmed.isEmpty, trimmed != announcedVersion else { return false }
     announcedVersion = trimmed
     await events.emit(ServerEvent(name: .serverUpdate, fullPayload: .string(trimmed)))
+    return true
+  }
+
+  /// Emits `server-update-status-changed` unless `state` is what was last announced.
+  ///
+  /// The payload is `{"install": …}` with the same object `GET /api/v2/server/update`
+  /// carries, or null once nothing is pending. Small and bounded, so it fits FCM's 4096
+  /// bytes with no shedding: no release notes, which a client reads from the route.
+  /// - Returns: Whether an event went out.
+  @discardableResult
+  public func announce(installState state: UpdateInstallState?) async -> Bool {
+    guard state != announcedInstallState else { return false }
+    announcedInstallState = state
+    let payload: JSONValue = .object(["install": state?.json ?? .null])
+    await events.emit(ServerEvent(name: .serverUpdateStatusChanged, fullPayload: payload))
     return true
   }
 }

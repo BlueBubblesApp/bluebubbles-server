@@ -45,6 +45,12 @@ extension EventName {
   public static let serverUpdate = EventName("server-update")
   public static let serverUpdateDownloading = EventName("server-update-downloading")
   public static let serverUpdateInstalling = EventName("server-update-installing")
+  /// What is happening to a release already found: downloading, scheduled for a window,
+  /// installing, or nothing pending any more. This server's own, because the reference had
+  /// no updater state to report. The payload is `{"install": …}`, the same object
+  /// `GET /api/v2/server/update` carries under that key, null when nothing is pending. An
+  /// object rather than the bare state so it can grow without changing type.
+  public static let serverUpdateStatusChanged = EventName("server-update-status-changed")
   public static let incomingFaceTime = EventName("incoming-facetime")
   public static let faceTimeCallStatusChanged = EventName("ft-call-status-changed")
   public static let newFindMyLocation = EventName("new-findmy-location")

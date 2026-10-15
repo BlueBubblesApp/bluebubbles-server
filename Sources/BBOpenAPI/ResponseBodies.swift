@@ -266,6 +266,134 @@ public enum ResponseBodies {
       required: true),
   ]
 
+  /// A window an update may relaunch the server in.
+  private static let installWindowProperties: [Property] = [
+    Property("start", .integer, "When the window opens, epoch MILLISECONDS.", required: true),
+    Property("end", .integer, "When it closes, epoch MILLISECONDS.", required: true),
+  ]
+
+  /// `GET /api/v2/server/update`, and the answer to scheduling and cancelling.
+  private static let updateStatusProperties: [Property] = [
+    Property(
+      "current_version", .string, "The version this server is running.", required: true),
+    Property(
+      "available", .boolean, "Whether the feed offers a newer release.", required: true),
+    Property(
+      "update",
+      .object(properties: [
+        Property("version", .string, "The release's version.", required: true),
+        Property("release_name", .string, "The release's title in the feed.", required: true),
+        Property(
+          "release_date", .integer, "When it was published, epoch MILLISECONDS.",
+          required: true),
+        Property("release_notes", .string, "The notes as HTML, or null when the feed has none."),
+        Property(
+          "release_notes_url", .string, "The release's page, for a reader that wants a link.",
+          required: true),
+      ]),
+      "The release on offer. Null when `available` is false.", required: true),
+    Property(
+      "install",
+      .object(properties: [
+        Property(
+          "state", .string,
+          "`downloading`, `scheduled` (downloaded and waiting for a window) or `installing` "
+            + "(relaunching now).",
+          required: true),
+        Property("version", .string, "The release being installed.", required: true),
+        Property(
+          "scheduled_for", .integer,
+          "When the window the relaunch waits for opens, epoch MILLISECONDS. `scheduled` "
+            + "only."),
+        Property(
+          "scheduled_until", .integer,
+          "When that window closes, epoch MILLISECONDS. `scheduled` only."),
+        Property(
+          "scheduled_by", .string,
+          "`client` for a window asked for through this API, `automatic` for Install Updates "
+            + "Automatically's hours. `scheduled` only."),
+      ]),
+      "What is happening to the release. Null when nothing is pending.", required: true),
+    Property(
+      "can_install", .boolean,
+      "Whether this server can install its own update. False under the headless server and "
+        + "on a build that cannot verify downloads; installing and scheduling refuse there.",
+      required: true),
+    Property(
+      "requested_window", .object(properties: installWindowProperties),
+      "The window a client asked for, at its next occurrence: one that closed without the "
+        + "install comes round the next day at the same times. Null when none was asked for.",
+      required: true),
+    Property(
+      "automatic_install",
+      .object(properties: [
+        Property(
+          "enabled", .boolean,
+          "Whether Check for Updates and Install Updates Automatically are both on.",
+          required: true),
+        Property(
+          "start_hour", .integer, "The hour the daily window opens, 0 to 23.", required: true),
+        Property(
+          "end_hour", .integer,
+          "The hour it closes, exclusive. Earlier than `start_hour` runs past midnight.",
+          required: true),
+        Property(
+          "time_zone", .string, "The Mac's time zone, which the hours are in.", required: true),
+        Property(
+          "next_window", .object(properties: installWindowProperties),
+          "The daily window open now or opening next. Reported with the switch off too, as "
+            + "a default to offer.",
+          required: true),
+      ]),
+      "The Mac's own schedule, set in the app.", required: true),
+  ]
+
+  private static let updateStatusExample: OrderedJSON = .obj([
+    ("current_version", .string("1.3.0")),
+    ("available", .bool(true)),
+    (
+      "update",
+      .obj([
+        ("version", .string("1.4.0")),
+        ("release_name", .string("BlueBubbles Server 1.4.0")),
+        ("release_date", .int(1_788_396_119_000)),
+        ("release_notes", .string("<ul><li>Updates can be scheduled from a client.</li></ul>")),
+        (
+          "release_notes_url",
+          .string("https://github.com/BlueBubblesApp/bluebubbles-server/releases/tag/v1.4.0")
+        ),
+      ])
+    ),
+    (
+      "install",
+      .obj([
+        ("version", .string("1.4.0")),
+        ("state", .string("scheduled")),
+        ("scheduled_for", .int(1_788_418_800_000)),
+        ("scheduled_until", .int(1_788_429_600_000)),
+        ("scheduled_by", .string("client")),
+      ])
+    ),
+    ("can_install", .bool(true)),
+    (
+      "requested_window",
+      .obj([("start", .int(1_788_418_800_000)), ("end", .int(1_788_429_600_000))])
+    ),
+    (
+      "automatic_install",
+      .obj([
+        ("enabled", .bool(false)),
+        ("start_hour", .int(3)),
+        ("end_hour", .int(6)),
+        ("time_zone", .string("America/New_York")),
+        (
+          "next_window",
+          .obj([("start", .int(1_788_418_800_000)), ("end", .int(1_788_429_600_000))])
+        ),
+      ])
+    ),
+  ])
+
   public static let byHandler: [HandlerID: Body] = [
 
     .stickerSave: Body(
@@ -360,6 +488,26 @@ public enum ResponseBodies {
     .messageSendApp: .mirroring(.messageSendText, "The app balloon's message row."),
     .messageSendGamePigeon: .mirroring(
       .messageSendText, "The Game Pigeon message's row."),
+
+    .serverUpdateStatus: Body(
+      summary:
+        "What the feed offers, what is happening to it, and when it would install: the "
+        + "page a client opens from a `server-update` notification.",
+      kind: .object(updateStatusProperties),
+      example: updateStatusExample),
+    .serverScheduleUpdate: Body(
+      summary:
+        "The status after the request, as `GET server/update` answers it. The download "
+        + "starts at once, so `install.state` is usually `downloading` here and becomes "
+        + "`scheduled` when it lands; `requested_window` is the window either way.",
+      kind: .object(updateStatusProperties),
+      example: updateStatusExample),
+    .serverCancelScheduledUpdate: Body(
+      summary:
+        "The status after the request, as `GET server/update` answers it. An automatic "
+        + "schedule still stands, and shows as `scheduled_by: automatic`.",
+      kind: .object(updateStatusProperties),
+      example: updateStatusExample),
 
     // MARK: Routes that report nothing
     //

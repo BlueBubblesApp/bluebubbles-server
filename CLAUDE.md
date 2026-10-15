@@ -351,7 +351,7 @@ improvising the order:**
 - **Without the Private API the server is limited to what AppleScript can do**: send text, send
   an attachment, start a **one-to-one** chat. Group creation needs the Private API or the
   user-installed Shortcut (`BBShortcuts`); AppleScript has had no group path since Big Sur, three
-  releases below our floor. 69 of the 168 route definitions in `RouteTable.swift` are gated
+  releases below our floor. 69 of the 171 route definitions in `RouteTable.swift` are gated
   on `requires: .privateAPI`. Both
   configurations are supported; only one is capable. Gate the route, and make the capability
   discoverable before a client tries. → [`.claude/docs/imessage.md`](.claude/docs/imessage.md)

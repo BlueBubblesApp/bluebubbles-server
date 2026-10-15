@@ -710,7 +710,7 @@ Sending has two backends: the Private API when the helper is connected, AppleScr
 
 **They are not equivalent in capability.** AppleScript can send text, send an attachment and start
 a chat; everything interactive (reactions, edit, unsend, typing, mark read, group management,
-FaceTime, chat controls) is Private-API-only, and 69 of 168 routes are gated on it. Reading and
+FaceTime, chat controls) is Private-API-only, and 69 of 171 routes are gated on it. Reading and
 event delivery are unaffected either way. See [`imessage.md`](imessage.md#sending-two-backends-and-one-of-them-is-much-smaller).
 
 Full rules: the sandbox, the container socket, one socket per app, peer verification, the

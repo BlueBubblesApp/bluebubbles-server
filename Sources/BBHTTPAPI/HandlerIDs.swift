@@ -200,6 +200,12 @@ extension HandlerID {
   public static let serverAlertsV2 = HandlerID("server.alertsV2")
   public static let serverSubscription = HandlerID("server.subscription")
   public static let serverCheckUpdate = HandlerID("server.checkUpdate")
+  /// `GET /api/v2/server/update`: what a client's update page shows.
+  public static let serverUpdateStatus = HandlerID("server.updateStatus")
+  /// `POST /api/v2/server/update/schedule`.
+  public static let serverScheduleUpdate = HandlerID("server.scheduleUpdate")
+  /// `DELETE /api/v2/server/update/schedule`.
+  public static let serverCancelScheduledUpdate = HandlerID("server.cancelScheduledUpdate")
   public static let serverInfo = HandlerID("server.info")
   public static let serverInstallUpdate = HandlerID("server.installUpdate")
   public static let serverLogs = HandlerID("server.logs")

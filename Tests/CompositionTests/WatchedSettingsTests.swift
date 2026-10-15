@@ -243,7 +243,7 @@ struct WatchedSettingsTests {
     // Read per request or per operation: a change is picked up on the next one.
     "log_level", "event_payload_codec", "auth_mode",
     "update_feed_url", "check_for_updates", "auto_install_updates", "auto_install_hour",
-    "receive_beta_updates", "landing_page_path",
+    "auto_install_end_hour", "receive_beta_updates", "landing_page_path",
     // Read at each cleanup sweep rather than held by a service, so a change applies to
     // the next sweep with no restart.
     "facetime_link_ttl_hours",

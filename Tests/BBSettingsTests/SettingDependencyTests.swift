@@ -84,11 +84,13 @@ struct SettingDependencyTests {
 
   @Test("the chain is walked whole, nearest first")
   func chainOrder() {
-    // The one two-link chain in the registry, and the reason `requirementChain` exists at
-    // all: reading only the immediate parent draws the hour live while the switch above it
-    // is greyed out.
-    let chain = Settings.requirementChain(for: Settings.autoInstallHour.erased)
-    #expect(chain.map(\.key) == [Settings.autoInstallUpdates.key, Settings.checkForUpdates.key])
+    // The install window's two hours are the two-link chains in the registry, and the
+    // reason `requirementChain` exists at all: reading only the immediate parent draws an
+    // hour live while the switch above it is greyed out.
+    let expected = [Settings.autoInstallUpdates.key, Settings.checkForUpdates.key]
+    #expect(Settings.requirementChain(for: Settings.autoInstallHour.erased).map(\.key) == expected)
+    #expect(
+      Settings.requirementChain(for: Settings.autoInstallEndHour.erased).map(\.key) == expected)
     // A setting with no parent has no chain, which is what keeps this from being a
     // subscription on every row.
     #expect(Settings.requirementChain(for: Settings.socketPort.erased).isEmpty)

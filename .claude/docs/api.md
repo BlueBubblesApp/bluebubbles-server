@@ -216,6 +216,24 @@ Two things a client must know when it reads a scheduled row back:
   neither key is an ordinary message. Without them a pending message looks identical to a sent
   one: `isSent` is 1 the moment Messages accepts it.
 
+### Server updates: `GET /api/v2/server/update` and `…/schedule`
+
+Full reference, including the client flow: [`docs/SERVER_UPDATES.md`](../../docs/SERVER_UPDATES.md).
+
+A client's update page. `GET` answers with the release, what is happening to it (`install`,
+the same object v1's `update/check` carries), the window a client asked for and the Mac's
+automatic hours. `POST …/schedule` takes `window_start` and `window_end` in epoch
+MILLISECONDS, downloads at once and holds the relaunch for that window; `DELETE` withdraws
+it. "Install now" stays v1's `POST /server/update/install`: a v2 route at the same path
+answering differently is the shadowing `RouteTableTests` refuses. Free, `server:admin`, and
+mounted on every server: one that cannot install says so in `can_install` and refuses the
+schedule with a 503.
+
+The window is ABSOLUTE time because the person choosing it may not be in the Mac's time zone;
+the automatic hours are wall-clock hours on the Mac, and `InstallSchedule` (`BBUpdates`)
+turns both into the window the app waits for and the API reports, so the two cannot disagree.
+Every move of `install` reaches clients as `server-update-status-changed`.
+
 ### The sticker library: `/api/v2/sticker`
 
 `docs/STICKER_LIBRARY.md` is the reference. Four routes over

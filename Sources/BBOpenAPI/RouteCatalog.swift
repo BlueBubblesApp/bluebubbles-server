@@ -85,6 +85,7 @@ public enum RouteCatalog {
         CatalogEntry(group: AdditiveRoutes.security, availability: .always),
         CatalogEntry(group: AdditiveRoutes.alerts, availability: .always),
         CatalogEntry(group: AdditiveRoutes.subscription, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.serverUpdate, availability: .always),
         CatalogEntry(group: AdditiveRoutes.contactAvatar, availability: .always),
         CatalogEntry(group: AdditiveRoutes.contactCard, availability: .always),
         CatalogEntry(group: AdditiveRoutes.chatPinning, availability: .always),

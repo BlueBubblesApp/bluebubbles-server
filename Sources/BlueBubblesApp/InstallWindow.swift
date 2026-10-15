@@ -1,14 +1,16 @@
 //  InstallWindow
-//  When an automatically downloaded update may relaunch the app.
+//  Whether a scheduled update may relaunch the app right now.
 //
 //  Sparkle installs a background download when the app quits, or nags after about a week.
 //  A server that runs all day never quits, so "install automatically" would mean "install
 //  next week" and a nag window on a Mac nobody is looking at. Instead `SparkleUpdater`
-//  takes the install handler and calls it at the hour `auto_install_hour` names, provided
-//  nothing is about to go out.
+//  takes the install handler and calls it inside a window (the automatic hours, or one a
+//  client chose), provided nothing is about to go out. Which window is
+//  `InstallSchedule`'s decision, in `BBUpdates`, because the API reports it too; whether
+//  this moment inside it is quiet is this file's.
 //
-//  Pure functions, off the updater, so the calendar arithmetic and the quiet test can be
-//  checked without Sparkle, a bundle, or waiting until 3am.
+//  Pure functions, off the updater, so the quiet test can be checked without Sparkle, a
+//  bundle, or a scheduled message.
 
 import Foundation
 
@@ -20,22 +22,9 @@ enum InstallWindow {
   static let quietMargin: TimeInterval = 15 * 60
 
   /// How long to wait before looking again when the window arrived and it was not quiet.
+  /// Never past the window's end: `SparkleUpdater` wakes at the close instead, and the next
+  /// window takes over.
   static let retryInterval: TimeInterval = 15 * 60
-
-  /// The next moment the wall clock is inside the hour, or `now` if it already is.
-  ///
-  /// "Inside the hour" rather than "at the top of it": a download that finishes at 03:20
-  /// with the hour set to 3 should install now, not tomorrow, and the difference between
-  /// installing at 03:00 and at 03:20 is nothing to anyone.
-  static func nextOpening(hour: Int, after now: Date, calendar: Calendar = .current) -> Date {
-    let clamped = min(max(hour, 0), 23)
-    if calendar.component(.hour, from: now) == clamped { return now }
-    return calendar.nextDate(
-      after: now,
-      matching: DateComponents(hour: clamped, minute: 0, second: 0),
-      matchingPolicy: .nextTime
-    ) ?? now.addingTimeInterval(24 * 60 * 60)
-  }
 
   /// Whether nothing is due soon enough to be disturbed by a relaunch.
   ///

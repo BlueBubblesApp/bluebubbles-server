@@ -635,6 +635,24 @@ public enum AdditiveRoutes {
     ]
   )
 
+  /// A client's server-update page: what is available and what is happening to it, and
+  /// asking for the install inside a window rather than at once.
+  ///
+  /// "Install now" is NOT here. v1's `POST server/update/install` does it, and a v2 route at
+  /// the same path answering differently is the shadowing `RouteTableTests` refuses. A v2
+  /// client installs through v1 and reads the result here.
+  ///
+  /// FREE. Keeping a server up to date is not a feature to sell, and a paywall in front of
+  /// "install this update tonight" would push people towards installing at noon instead.
+  /// `server:admin`, like the v1 update routes: it relaunches the server.
+  public static let serverUpdate = RouteGroup(
+    "Server Update", prefix: "server/update", apiVersion: RouteTable.latestVersion,
+    routes: [
+      .init(.get, "", .serverUpdateStatus, scope: .serverAdmin),
+      .init(.post, "schedule", .serverScheduleUpdate, scope: .serverAdmin),
+      .init(.delete, "schedule", .serverCancelScheduledUpdate, scope: .serverAdmin),
+    ])
+
   /// What this server's subscription is, so a client never has to earn a 402.
   ///
   /// **Free surface, deliberately, and it must stay that way.** Gating the endpoint that

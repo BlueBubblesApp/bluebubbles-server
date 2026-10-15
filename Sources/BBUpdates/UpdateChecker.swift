@@ -13,17 +13,21 @@ import Logging
 
 /// What the hosting app is doing about an update it has already found.
 ///
-/// Reported on `GET /server/update/check` as `install`, so a client that asked for the
-/// install (or one that opens the app the morning after a scheduled one) sees "downloading"
-/// or "scheduled for 3am" rather than the same "available" it saw before it asked.
+/// Reported on `GET /server/update/check` as `install`, on `GET /api/v2/server/update`, and
+/// in every `server-update-status-changed` event, so a client that asked for the install (or
+/// one that opens the app the morning after a scheduled one) sees "downloading" or
+/// "scheduled for 3am to 6am" rather than the same "available" it saw before it asked.
 public enum UpdateInstallState: Sendable, Equatable {
   case downloading(version: String)
-  case scheduled(version: String, at: Date)
+  /// Downloaded, and waiting for `window` to relaunch into it. `window` is the occurrence
+  /// the relaunch is waiting for, so a requested window that closed is reported as the
+  /// next day's, which is when it will be tried.
+  case scheduled(version: String, window: DateInterval, origin: InstallScheduleOrigin)
   case installing(version: String)
 
   public var version: String {
     switch self {
-    case .downloading(let v), .scheduled(let v, _), .installing(let v): v
+    case .downloading(let v), .scheduled(let v, _, _), .installing(let v): v
     }
   }
 
@@ -33,10 +37,18 @@ public enum UpdateInstallState: Sendable, Equatable {
     switch self {
     case .downloading:
       object.set("state", .string("downloading"))
-    case .scheduled(_, let at):
+    case .scheduled(_, let window, let origin):
       object.set("state", .string("scheduled"))
       // Epoch milliseconds, like every other date the API sends except `release_date`.
-      object.set("scheduled_for", .int64(at.epochMilliseconds(rounded: .toNearestOrAwayFromZero)))
+      // `scheduled_for` is the window's opening and was the only field before the window
+      // had an end; the other two are additive beside it.
+      object.set(
+        "scheduled_for",
+        .int64(window.start.epochMilliseconds(rounded: .toNearestOrAwayFromZero)))
+      object.set(
+        "scheduled_until",
+        .int64(window.end.epochMilliseconds(rounded: .toNearestOrAwayFromZero)))
+      object.set("scheduled_by", .string(origin.wireValue))
     case .installing:
       object.set("state", .string("installing"))
     }

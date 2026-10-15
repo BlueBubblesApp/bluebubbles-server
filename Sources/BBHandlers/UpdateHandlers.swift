@@ -1,5 +1,6 @@
 //  UpdateHandlers
-//  `GET /server/update/check` and `POST /server/update/install`.
+//  `GET /server/update/check` and `POST /server/update/install`, and v2's update page:
+//  `GET /api/v2/server/update` and the `schedule` pair beside it.
 //
 //  The check reads the same Sparkle appcast shipped installs read. That sharing is the point:
 //  the reference polls the GitHub releases API while its updater reads something else, so
@@ -37,6 +38,49 @@ public enum UpdateHandlers {
         waitingForDownload: request.truthy("wait"))
       return .data(UpdateInterface.serialize(outcome))
     }
+
+    registry.register(.serverUpdateStatus) { _ in
+      .data(UpdateInterface.serialize(try await interface(context).status()))
+    }
+
+    // Both times absolute, in epoch MILLISECONDS like every other date on this API: the
+    // person choosing the window may not be in this Mac's time zone, and an instant means
+    // the same thing on both ends. The interface decides whether the window is usable;
+    // this only refuses what cannot be a window at all.
+    registry.register(.serverScheduleUpdate) { request in
+      try await scheduleUpdate(request, context: context)
+    }
+
+    registry.register(.serverCancelScheduledUpdate) { _ in
+      .data(UpdateInterface.serialize(try await interface(context).cancelSchedule()))
+    }
+  }
+
+  /// `POST /api/v2/server/update/schedule`.
+  ///
+  /// Refuses only what cannot be a window at all; whether the window is usable is the
+  /// interface's decision. Finite first: a form body's `"inf"` reads as a number, and an
+  /// infinite date traps when the window is serialized back.
+  private static func scheduleUpdate(
+    _ request: APIRequestContext,
+    context: some SettingsProviding & UpdateInstallerProviding & EventPublishing
+      & UpdateAnnouncing
+  ) async throws -> RouteResult {
+    let values = try request.values()
+    guard let start = values.double("window_start"), let end = values.double("window_end") else {
+      throw BadRequest("`window_start` and `window_end` are both required, as epoch milliseconds")
+    }
+    guard start.isFinite, end.isFinite else {
+      throw BadRequest("`window_start` and `window_end` must be finite epoch milliseconds")
+    }
+    // Before the interval is built: `DateInterval` traps on an end before its start.
+    guard end > start else {
+      throw BadRequest("`window_end` must be later than `window_start`")
+    }
+    let window = DateInterval(
+      start: Date(epochMilliseconds: start), end: Date(epochMilliseconds: end))
+    let status = try await interface(context).schedule(within: window)
+    return .data(UpdateInterface.serialize(status))
   }
 
   /// Built per request over the installer as it is now: the app attaches one after start.

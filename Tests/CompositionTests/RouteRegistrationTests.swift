@@ -38,6 +38,9 @@ struct RouteRegistrationTests {
     // Answers what this server's subscription is. Unconditional on purpose: an unlicensed
     // server must be able to say so, or a client can only discover it by being refused.
     "Subscription",
+    // A client's update page. Unconditional for the same reason: a server that cannot
+    // install says so in `can_install` rather than by being absent.
+    "Server Update",
   ]
 
   /// Group names beyond the always-mounted baseline.

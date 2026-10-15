@@ -51,6 +51,9 @@ extension ServerComposition {
     // answer is the one that lets a client hide a paid feature instead of offering it and
     // then refusing.
     groups.append(AdditiveRoutes.subscription)
+    // Scheduling an update into a window, and the status a client's update page reads.
+    // Answers on every server: one with no installer says so in `can_install`.
+    groups.append(AdditiveRoutes.serverUpdate)
     // A second way to get an avatar the contact payload already carries.
     groups.append(AdditiveRoutes.contactAvatar)
     // Pinning: a helper capability the Node server never had a route for.

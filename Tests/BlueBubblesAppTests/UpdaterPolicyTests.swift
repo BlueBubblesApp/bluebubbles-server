@@ -34,20 +34,27 @@ struct UpdaterPolicyTests {
 
   /// A scheduled relaunch starts the server, so it waits only while the server runs: armed
   /// after a stop, it undid the stop at the install hour. And turning the switch off disarms
-  /// the update already waiting, which used to fire anyway at its hour.
-  @Test("The scheduled relaunch is armed only with a download, a running server and the switch on")
+  /// the update already waiting, which used to fire anyway at its hour, unless a client
+  /// asked for a window: that request is consent of its own.
+  @Test("The scheduled relaunch is armed only with a download, a running server and a reason")
   func scheduledInstallArming() {
-    #expect(
+    func arms(
+      downloaded: Bool = true, running: Bool = true, automatic: Bool = false,
+      requested: Bool = false
+    ) -> Bool {
       UpdaterPolicy.armsScheduledInstall(
-        hasDownloadedUpdate: true, isServerRunning: true, installsAutomatically: true))
-    #expect(
-      !UpdaterPolicy.armsScheduledInstall(
-        hasDownloadedUpdate: true, isServerRunning: false, installsAutomatically: true))
-    #expect(
-      !UpdaterPolicy.armsScheduledInstall(
-        hasDownloadedUpdate: true, isServerRunning: true, installsAutomatically: false))
-    #expect(
-      !UpdaterPolicy.armsScheduledInstall(
-        hasDownloadedUpdate: false, isServerRunning: true, installsAutomatically: true))
+        hasDownloadedUpdate: downloaded, isServerRunning: running,
+        installsAutomatically: automatic, hasRequestedWindow: requested)
+    }
+    #expect(arms(automatic: true))
+    #expect(arms(requested: true))
+    #expect(arms(automatic: true, requested: true))
+    // Nothing to keep: the update installs on quit, as Sparkle does by default.
+    #expect(!arms())
+    // A stopped server is never relaunched into, whoever asked.
+    #expect(!arms(running: false, automatic: true))
+    #expect(!arms(running: false, requested: true))
+    // Nothing downloaded, nothing to relaunch into.
+    #expect(!arms(downloaded: false, automatic: true, requested: true))
   }
 }

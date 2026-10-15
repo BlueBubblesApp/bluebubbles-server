@@ -1,9 +1,9 @@
 //  InstallWindowTests
-//  When an automatic update may relaunch the app.
+//  Whether a scheduled update may relaunch the app at this moment.
 //
-//  The arithmetic is the whole feature: the wrong day means an update that waits a week,
-//  the wrong quiet test means a scheduled message lost in a relaunch. Both are checked on a
-//  pinned calendar so the machine's time zone and the hour the test runs at play no part.
+//  The wrong quiet test means a scheduled message lost in a relaunch. Checked on a pinned
+//  calendar so the machine's time zone and the hour the test runs at play no part. Which
+//  window the relaunch waits for is `InstallScheduleTests`, in `BBUpdatesTests`.
 
 import Foundation
 import Testing
@@ -21,32 +21,6 @@ struct InstallWindowTests {
 
   private func date(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
     calendar.date(from: DateComponents(year: 2026, month: 9, day: day, hour: hour, minute: minute))!
-  }
-
-  @Test("Before the hour today, the opening is today at the top of that hour")
-  func laterToday() {
-    let opening = InstallWindow.nextOpening(hour: 3, after: date(11, 1, 30), calendar: calendar)
-    #expect(opening == date(11, 3))
-  }
-
-  @Test("After the hour today, the opening is tomorrow")
-  func tomorrow() {
-    let opening = InstallWindow.nextOpening(hour: 3, after: date(11, 14, 0), calendar: calendar)
-    #expect(opening == date(12, 3))
-  }
-
-  @Test("Inside the hour already, the opening is now: a 03:20 download does not wait a day")
-  func insideTheHourIsNow() {
-    let now = date(11, 3, 20)
-    #expect(InstallWindow.nextOpening(hour: 3, after: now, calendar: calendar) == now)
-  }
-
-  @Test("An out-of-range hour is clamped rather than trusted")
-  func clamped() {
-    let opening = InstallWindow.nextOpening(hour: 99, after: date(11, 1), calendar: calendar)
-    #expect(calendar.component(.hour, from: opening) == 23)
-    let negative = InstallWindow.nextOpening(hour: -5, after: date(11, 1), calendar: calendar)
-    #expect(calendar.component(.hour, from: negative) == 0)
   }
 
   @Test("Quiet means nothing due within the margin, and overdue counts as due")

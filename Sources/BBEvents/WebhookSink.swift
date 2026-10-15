@@ -314,6 +314,7 @@ public struct NtfyProvider: NotificationProvider {
     case .participantLeft: "Participant left"
     case .incomingFaceTime: "Incoming FaceTime call"
     case .serverUpdate: "Server update available"
+    case .serverUpdateStatusChanged: "Server update status changed"
     case .newServer: "Server address changed"
     case .scheduledMessageError: "Scheduled message failed"
     default: event.name.rawValue.replacingOccurrences(of: "-", with: " ").capitalized
@@ -325,7 +326,7 @@ public struct NtfyProvider: NotificationProvider {
     case .newMessage: "speech_balloon"
     case .messageSendError, .scheduledMessageError: "warning"
     case .incomingFaceTime: "telephone"
-    case .serverUpdate: "arrow_up"
+    case .serverUpdate, .serverUpdateStatusChanged: "arrow_up"
     default: "bell"
     }
   }

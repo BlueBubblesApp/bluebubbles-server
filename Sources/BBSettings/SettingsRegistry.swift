@@ -665,27 +665,56 @@ public enum Settings {
   /// install, which says nothing. See `UpdatesModel.noteVersionChange`.
   public static let lastRunVersion = Setting<String>("last_run_version", default: "")
 
-  /// The hour of the day an automatically downloaded update relaunches the app.
+  /// The hour of the day the automatic install window opens.
   ///
   /// Local time on the Mac, 0 to 23. Sparkle's own behaviour is to install on quit, and a
   /// server that runs all day never quits; this is what makes the toggle above mean what
-  /// it says. `InstallWindow` (in the app) does the arithmetic and holds the relaunch while
-  /// a scheduled message is about to go out. Read by `SparkleUpdater` alone.
+  /// it says. The window runs to `auto_install_end_hour`, and `DailyInstallHours`
+  /// (`BBUpdates`) does the arithmetic so the app that waits for the window and the API
+  /// that reports it agree. The app holds the relaunch while a scheduled message is about
+  /// to go out. Read by `SparkleUpdater` and by `GET /api/v2/server/update`.
+  ///
+  /// The key is older than the window and keeps its name: renaming it would strand the
+  /// hour a person already chose.
   public static let autoInstallHour = Setting<Int>(
     "auto_install_hour", default: 3,
     presentation: .init(
-      label: "Install Updates At",
-      help: "The hour (0 to 23, this Mac's time zone) when a downloaded update is installed "
-        + "and BlueBubbles relaunches. The relaunch waits if a scheduled message is due "
-        + "within fifteen minutes.",
+      label: "Install Updates From",
+      help: "The hour (0 to 23, this Mac's time zone) when the window for installing a "
+        + "downloaded update opens. BlueBubbles relaunches inside the window, and waits if "
+        + "a scheduled message is due within fifteen minutes.",
       section: .updates,
       control: .number(range: 0...23),
       // The hour hangs off the AUTOMATIC install, not off the check: it is the answer to
       // "when does the thing you already agreed to happen", and it is meaningless if
-      // nothing installs unattended. That makes this the one two-link chain in the
-      // registry, and the reason `Settings.blockingRequirement` names the OUTERMOST switch
-      // that is off rather than the nearest: with checks off, telling somebody to turn on
-      // Install Updates Automatically points them at a row that is itself greyed out.
+      // nothing installs unattended. That makes this a two-link chain, and the reason
+      // `Settings.blockingRequirement` names the OUTERMOST switch that is off rather than
+      // the nearest: with checks off, telling somebody to turn on Install Updates
+      // Automatically points them at a row that is itself greyed out.
+      requires: autoInstallUpdates.key
+    ))
+
+  /// The hour of the day the automatic install window closes, exclusive.
+  ///
+  /// Earlier than the opening hour means the window runs past midnight (22 to 5); equal to
+  /// it means the single hour starting there, which is what `auto_install_hour` meant on
+  /// its own. 6 by default, so the default window is 3am to 6am. The END matters in two
+  /// cases: a download that lands at 04:20 installs at once rather than tomorrow, and a
+  /// relaunch held by a scheduled message keeps trying until the window closes.
+  ///
+  /// Only the automatic install reads it. A client scheduling one update through
+  /// `POST /api/v2/server/update/schedule` names its own window, so this does not need to
+  /// be live while the switch is off. Read by `SparkleUpdater` and by
+  /// `GET /api/v2/server/update`.
+  public static let autoInstallEndHour = Setting<Int>(
+    "auto_install_end_hour", default: 6,
+    presentation: .init(
+      label: "Install Updates Until",
+      help: "The hour (0 to 23) when the install window closes. An hour earlier than the "
+        + "opening runs the window past midnight; the same hour is a one-hour window.",
+      section: .updates,
+      control: .number(range: 0...23),
+      // The same two-link chain as the opening hour, for the same reason.
       requires: autoInstallUpdates.key
     ))
   /// Which network interface the HTTP API and socket listen on.
@@ -1242,6 +1271,7 @@ extension Settings {
       checkForUpdates.erased,
       autoInstallUpdates.erased,
       autoInstallHour.erased,
+      autoInstallEndHour.erased,
       receiveBetaUpdates.erased,
       authMode.erased,
       updateFeedURL.erased,

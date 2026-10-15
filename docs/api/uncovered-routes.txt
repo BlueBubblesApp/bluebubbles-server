@@ -11,7 +11,7 @@
 # Regenerating SORTS the file and does not know which entry a "# same" referred to,
 # so write each reason out in full.
 #
-# Every route left here WRITES but one. The v2 reads were recorded against this
+# Every route left here WRITES but two. The v2 reads were recorded against this
 # server on 2026-09-04: a v2 route has no counterpart on the Node server, so the
 # recorder proxies this one, which is how the other v2 fixtures in the corpus were
 # made. "The recorder runs against Node" was the reason given here before, and it
@@ -24,10 +24,15 @@
 # declaration in `ResponseBodies` that says they are not. It leaves this list when a
 # recording from macOS 14 joins one from a later release.
 #
-# 12 of 168 routes.
+# The other is `GET /api/v2/server/update`, which is waiting on a recording rather than
+# unrecordable: it has to be made against a build carrying the route.
+#
+# 15 of 171 routes.
 
 DELETE /api/v2/message/send-later/:guid  # needs a scheduled message to cancel, which means scheduling one first
+DELETE /api/v2/server/update/schedule  # withdraws a schedule, which means scheduling a real update first
 GET /api/v2/chat/:guid/presentation  # every field is release-dependent; one release's recording would publish all seven as required (see above)
+GET /api/v2/server/update  # added after the 2026-09-04 v2 recording; record it against a build carrying the route
 POST /api/v2/message/app  # sends an iMessage app balloon to a real conversation
 POST /api/v2/message/game-pigeon  # sends a Game Pigeon invite to a real conversation
 POST /api/v2/message/poll  # sends a poll to a real conversation
@@ -36,5 +41,6 @@ POST /api/v2/message/poll/:guid/vote  # casts a vote someone can see
 POST /api/v2/message/send-later  # schedules a real message; recording it leaves one queued
 POST /api/v2/message/send-later/:guid/send-now  # releases a scheduled message immediately, so it sends
 POST /api/v2/message/sticker  # places a sticker on someone's message
+POST /api/v2/server/update/schedule  # downloads a real release and arms a relaunch of the recording server
 POST /api/v2/sticker  # needs a live helper to donate into this Mac's real sticker store
 PUT /api/v2/message/send-later/:guid  # needs a scheduled message to edit

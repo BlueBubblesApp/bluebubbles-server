@@ -34,8 +34,9 @@ struct SubscriptionGateTests {
   ///
   /// These are not leftovers. `auth` is how a client authenticates at all; `hydration` is a
   /// payload codec; `alerts` is how the server reports its own health; the contact groups are
-  /// contact data; `webhookEditing` is administration. Gating any of them would either break
-  /// the server's own operation or charge for plumbing.
+  /// contact data; `webhookEditing` is administration; `serverUpdate` keeps the server
+  /// patched, and a tier in front of scheduling an update would only put updates off.
+  /// Gating any of them would either break the server's own operation or charge for plumbing.
   /// `findMy` and `findMySharing` are here rather than above, and each for its own reason.
   /// v1 already reads devices and friends for nothing, so charging for a finer-grained
   /// version of the same call takes something away; and `findMySharing` is `#if DEBUG`, so
@@ -45,7 +46,7 @@ struct SubscriptionGateTests {
     AdditiveRoutes.auth, AdditiveRoutes.hydration, AdditiveRoutes.alerts,
     AdditiveRoutes.contactAvatar, AdditiveRoutes.contactCard,
     AdditiveRoutes.webhookEditing, AdditiveRoutes.security,
-    AdditiveRoutes.findMy, AdditiveRoutes.findMySharing,
+    AdditiveRoutes.findMy, AdditiveRoutes.findMySharing, AdditiveRoutes.serverUpdate,
   ]
 
   // MARK: - The permanent rule

@@ -359,6 +359,43 @@ public protocol UpdateInstalling: Sendable {
   /// answer at all. The outcome says which happened, so the handler can report it rather
   /// than claim success.
   func awaitDownload(timeout: Duration) async -> UpdateDownloadOutcome
+
+  /// Downloads `item` now and holds its relaunch until `window` opens.
+  ///
+  /// `POST /api/v2/server/update/schedule`. A download already on disk keeps its bytes and
+  /// takes the window; one already under way is told where to land. For this update the
+  /// window replaces Install Updates Automatically's hours, because somebody chose it for
+  /// this one. Downloading at once rather than at the window means the window only has to
+  /// hold a relaunch, which takes seconds, rather than a download as well.
+  func scheduleUpdate(
+    to item: AppcastItem, within window: DateInterval
+  ) async -> UpdateScheduleOutcome
+
+  /// Withdraws the window a client asked for, if there is one.
+  ///
+  /// The update stays downloaded. It falls back to the automatic hours when Install
+  /// Updates Automatically is on, and to installing when the app next quits otherwise, so
+  /// cancelling a schedule never throws a download away.
+  func cancelScheduledUpdate() async
+
+  /// The window a client asked for, as it was asked; nil when no client has asked.
+  ///
+  /// Separate from `installState` because the two answer different questions: this is what
+  /// was requested, that is what is happening. While the download is under way the state
+  /// says `downloading`, and a client that scheduled still needs to see its window.
+  var requestedInstallWindow: DateInterval? { get async }
+}
+
+/// What asking for a scheduled install did.
+public enum UpdateScheduleOutcome: Sendable, Equatable {
+  /// The window holds the relaunch, or the download that leads to it.
+  case scheduled
+  /// Somebody at the Mac is in the updater's own window. Their choice stands.
+  case busy
+  /// This installation cannot install without a person at the Mac: the app is somewhere
+  /// this user cannot write, or its bundle forbids installing unattended. A schedule nobody
+  /// can keep is refused rather than accepted.
+  case needsPerson
 }
 
 /// How waiting for an update download ended.

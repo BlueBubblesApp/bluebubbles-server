@@ -40,6 +40,15 @@ struct UpdateWaitTests {
       if delay > .zero { try? await Task.sleep(for: delay) }
       return outcome
     }
+
+    // Scheduling is `UpdateScheduleTests`' subject; this stand-in only has to conform.
+    func scheduleUpdate(
+      to item: AppcastItem, within window: DateInterval
+    ) async -> UpdateScheduleOutcome {
+      .scheduled
+    }
+    func cancelScheduledUpdate() async {}
+    var requestedInstallWindow: DateInterval? { nil }
   }
 
   @Test("A download that lands is reported as landed")

@@ -80,6 +80,9 @@ struct SettingRangeTests {
       Settings.chatDatabaseReaders.rangeViolation(Settings.chatDatabaseReaders.defaultValue)
         == nil)
     #expect(Settings.autoInstallHour.rangeViolation(Settings.autoInstallHour.defaultValue) == nil)
+    #expect(
+      Settings.autoInstallEndHour.rangeViolation(Settings.autoInstallEndHour.defaultValue)
+        == nil)
     #expect(Settings.dbPollInterval.rangeViolation(Settings.dbPollInterval.defaultValue) == nil)
     #expect(Settings.startDelay.rangeViolation(Settings.startDelay.defaultValue) == nil)
   }

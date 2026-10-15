@@ -2,11 +2,13 @@
 //  The app's updater: Sparkle, owned here because installing an update relaunches the
 //  application, and only the application can be relaunched.
 //
-//  Three things reach it. The menu item calls `checkForUpdates`, which runs Sparkle's own
-//  windows. The daily schedule is Sparkle's, switched by `check_for_updates`. And
-//  `POST /server/update/install` reaches it through `UpdateInstalling`: a client asked for
-//  the install and nobody is at the Mac, so that path downloads in the background and takes
-//  the install-and-relaunch handler the moment Sparkle offers it, with no dialog.
+//  Four things reach it. The menu item calls `checkForUpdates`, which runs Sparkle's own
+//  windows. The daily schedule is Sparkle's, switched by `check_for_updates`. And two client
+//  requests reach it through `UpdateInstalling`, with nobody at the Mac, so both download in
+//  the background with no dialog: `POST /server/update/install` takes the install-and-
+//  relaunch handler the moment Sparkle offers it (or at once, when a download is already
+//  waiting for its window), and `POST /api/v2/server/update/schedule` takes it and waits
+//  for the window the client chose.
 //
 //  What a person sees, and where, is decided here rather than left to Sparkle's defaults:
 //
@@ -18,9 +20,14 @@
 //    steals focus at 3pm because a static file changed is the wrong default.
 //  - A remote install says what it is about to do, in the bell and in the sidebar strip,
 //    because the app is about to vanish and relaunch with no window of its own.
-//  - An automatic install relaunches at the hour `auto_install_hour` names, not on quit
-//    (a server never quits) and not after a week's nag: `InstallWindow` decides the moment
-//    and holds it while a scheduled message is about to go out. Same notices as above.
+//  - An automatic install relaunches inside the window `auto_install_hour` to
+//    `auto_install_end_hour` names, not on quit (a server never quits) and not after a
+//    week's nag. A client's window replaces those hours for the update it was asked for.
+//    `InstallSchedule` (`BBUpdates`) decides the moment, so the API reports the same one,
+//    and `InstallWindow` holds it while a scheduled message is about to go out. Same notices
+//    as above.
+//  - Every move of `installState` goes to clients as `server-update-status-changed`, so a
+//    client's update page follows a schedule another client set.
 //  - Every find, whichever path made it, goes to clients as `server-update` through the
 //    server's `UpdateAnnouncer`, once per version.
 //
@@ -59,9 +66,10 @@ final class SparkleUpdater: NSObject {
   /// session ends.
   private(set) var availableVersion: String?
 
-  /// What is happening to an update already found: downloading, waiting for the install
-  /// hour, or relaunching. Reported on `GET /server/update/check` through the installer
-  /// seam; the sidebar strip draws the last stage.
+  /// What is happening to an update already found: downloading, waiting for its window, or
+  /// relaunching. Reported on `GET /server/update/check` and `GET /api/v2/server/update`
+  /// through the installer seam, and to clients as it moves; the sidebar strip draws the
+  /// last stage. Written only through `setInstallState`, which is what announces it.
   private(set) var installState: UpdateInstallState?
 
   /// The version a relaunch is bringing in, from the notice until the process is gone.
@@ -81,12 +89,13 @@ final class SparkleUpdater: NSObject {
   /// the answer is yes: there is nothing to consult.
   @ObservationIgnored var isQuiet: (@MainActor () async -> Bool)?
 
-  /// The scheduled install waiting for its hour, so a second download or a settings change
-  /// replaces it rather than racing it.
+  /// The scheduled install waiting for its window, so a second download, a settings change
+  /// or a client's request replaces it rather than racing it.
   private let scheduledInstall = OwnedTask()
 
   /// The downloaded update and Sparkle's handler for installing it now, kept so the relaunch
-  /// can be re-armed: when the server starts again, and when the hour or the switch moves.
+  /// can be re-armed: when the server starts again, when the hours or the switch move, and
+  /// when a client asks for a window or withdraws one.
   /// Sparkle installs it on quit regardless (`SPUUpdaterDelegate.h`: "In either case Sparkle
   /// will always attempt to install the update when the app terminates"), so disarming the
   /// relaunch never loses the update.
@@ -97,11 +106,21 @@ final class SparkleUpdater: NSObject {
   @ObservationIgnored private var checksAutomatically = false
   @ObservationIgnored private var installsAutomatically = false
   @ObservationIgnored private var installHour = 3
+  @ObservationIgnored private var installEndHour = 6
   @ObservationIgnored private var receivesBetas = false
+
+  /// The window a client asked for through `POST /api/v2/server/update/schedule`, as it
+  /// asked for it. Holds the relaunch instead of the automatic hours, for the update it was
+  /// asked for. Outlives a server stop, like the download it belongs to, and is gone when
+  /// the app relaunches: by then the update it was for is installed.
+  private(set) var requestedInstallWindow: DateInterval?
 
   /// Set by `beginUpdate(to:)` and consumed by the first `willInstallUpdateOnQuit` Sparkle
   /// offers. Cleared on any end to the cycle, so a remote request that finds nothing does
   /// not silently install the NEXT release found by a scheduled check.
+  ///
+  /// With `requestedInstallWindow` set, the handler is taken and held for the window rather
+  /// than run: the client asked for a download now and a relaunch later.
   @ObservationIgnored private var remoteInstallRequested = false
 
   /// Clients blocked in `POST /server/update/install?wait=true`, waiting for the download.
@@ -121,7 +140,8 @@ final class SparkleUpdater: NSObject {
 
   static let watchedKeys: Set<String> = [
     Settings.updateFeedURL.key, Settings.checkForUpdates.key, Settings.autoInstallUpdates.key,
-    Settings.autoInstallHour.key, Settings.receiveBetaUpdates.key,
+    Settings.autoInstallHour.key, Settings.autoInstallEndHour.key,
+    Settings.receiveBetaUpdates.key,
   ]
 
   /// The one system notification this type posts, so it can be withdrawn by identity.
@@ -153,9 +173,9 @@ final class SparkleUpdater: NSObject {
         guard let self else { return }
         await self.readSettings(from: store)
         self.applySettings()
-        // A moved hour applies to the update already waiting, NOW: the waiting task only
+        // A moved window applies to the update already waiting, NOW: the waiting task only
         // re-read it when its sleep ended, up to a day later. Turning the switch off
-        // disarms it.
+        // disarms it, unless a client's window is holding it.
         self.armScheduledInstall()
         // A changed feed or schedule takes effect on the next cycle, not the next launch.
         self.controller?.updater.resetUpdateCycleAfterShortDelay()
@@ -215,6 +235,7 @@ final class SparkleUpdater: NSObject {
     checksAutomatically = await store.get(Settings.checkForUpdates)
     installsAutomatically = await store.get(Settings.autoInstallUpdates)
     installHour = await store.get(Settings.autoInstallHour)
+    installEndHour = await store.get(Settings.autoInstallEndHour)
     receivesBetas = await store.get(Settings.receiveBetaUpdates)
   }
 
@@ -271,19 +292,34 @@ final class SparkleUpdater: NSObject {
 
   private enum InstallReason {
     case clientRequested
+    case clientScheduled
     case scheduled
 
     var sentence: String {
       switch self {
       case .clientRequested: "A client asked for the update."
-      case .scheduled: "Install Updates Automatically is on, and this is the hour it names."
+      case .clientScheduled: "A client scheduled the update for this window."
+      case .scheduled: "Install Updates Automatically is on, and this is the window it names."
       }
     }
+  }
+
+  /// Every write of `installState` goes through here, so every move reaches clients.
+  ///
+  /// The announcer drops a repeat, so the scheduled wait can report its window on every
+  /// wake without telling anyone twice. Detached from a server, there is nobody to tell;
+  /// the next attach re-arms the wait, which reports the state again.
+  private func setInstallState(_ state: UpdateInstallState?) {
+    installState = state
+    Task { [announcer] in await announcer?.announce(installState: state) }
   }
 
   private func announceInstalling(_ item: SUAppcastItem, reason: InstallReason) async {
     let version = item.displayVersionString
     installState = .installing(version: version)
+    // Awaited rather than handed to a task: the relaunch follows, and the event has to be
+    // on the bus before the process that would put it there is gone.
+    await announcer?.announce(installState: .installing(version: version))
     // Durable: it comes back unread after the relaunch, which is the point. Whoever opens
     // the app next finds out why it is on a new version and what decided that.
     await alerts?.raise(
@@ -298,54 +334,73 @@ final class SparkleUpdater: NSObject {
 
   // MARK: The scheduled relaunch
 
-  /// Waits for the install hour, then for quiet, then relaunches.
+  /// Which window holds the relaunch: the client's, when one asked, or the automatic hours.
+  private var installSchedule: InstallSchedule {
+    if let requestedInstallWindow { return .requested(requestedInstallWindow) }
+    return .daily(DailyInstallHours(startHour: installHour, endHour: installEndHour))
+  }
+
+  /// Waits for the window, then for quiet, then relaunches.
   ///
-  /// Runs on the main actor between sleeps, so reading the hour and asking `isQuiet` are
-  /// ordinary calls. The hour is re-read on every wake, so changing the setting while a
+  /// Runs on the main actor between sleeps, so reading the window and asking `isQuiet` are
+  /// ordinary calls. The window is re-read on every wake, so changing the setting while a
   /// download waits moves the relaunch without a second download.
   private func scheduleInstall(of item: SUAppcastItem, handler: @escaping () -> Void) {
     pendingInstall = (item, handler)
     armScheduledInstall()
   }
 
-  /// Starts the wait for the install hour, or stops it.
+  /// Starts the wait for the window, or stops it.
   ///
-  /// Armed only while attached to a running server with Install Updates Automatically on.
-  /// Anything else leaves the update to install on quit, as Sparkle does by default.
+  /// Armed only while attached to a running server, with Install Updates Automatically on
+  /// or a client's window to keep. Anything else leaves the update to install on quit, as
+  /// Sparkle does by default.
   private func armScheduledInstall() {
     scheduledInstall.cancel()
     guard
       UpdaterPolicy.armsScheduledInstall(
         hasDownloadedUpdate: pendingInstall != nil, isServerRunning: store != nil,
-        installsAutomatically: installsAutomatically),
+        installsAutomatically: installsAutomatically,
+        hasRequestedWindow: requestedInstallWindow != nil),
       let (item, handler) = pendingInstall
     else {
-      if case .scheduled = installState { installState = nil }
+      if case .scheduled = installState { setInstallState(nil) }
       return
     }
     let version = item.displayVersionString
     scheduledInstall.run { @MainActor [weak self] in
       while !Task.isCancelled {
         guard let self else { return }
-        let opening = InstallWindow.nextOpening(hour: self.installHour, after: Date())
-        self.installState = .scheduled(version: version, at: opening)
-        let wait = opening.timeIntervalSinceNow
+        let schedule = self.installSchedule
+        let window = schedule.window(containingOrAfter: Date())
+        self.setInstallState(
+          .scheduled(version: version, window: window, origin: schedule.origin))
+        let wait = window.start.timeIntervalSinceNow
         if wait > 0 {
           self.logger.info(
             "Update downloaded; relaunch scheduled",
-            metadata: ["version": "\(version)", "at": "\(opening)"])
+            metadata: [
+              "version": "\(version)", "from": "\(window.start)", "until": "\(window.end)",
+              "by": "\(schedule.origin.wireValue)",
+            ])
           try? await Task.sleep(for: .seconds(wait))
-          continue  // Re-read the hour: it may have moved while this slept.
+          continue  // Re-read the window: it may have moved while this slept.
         }
         if await self.isQuiet?() ?? true {
-          await self.announceInstalling(item, reason: .scheduled)
+          let reason: InstallReason =
+            schedule.origin == .requested ? .clientScheduled : .scheduled
+          await self.announceInstalling(item, reason: reason)
           handler()
           return
         }
         self.logger.debug(
           "Relaunch held; a scheduled message is due soon",
           metadata: ["version": "\(version)"])
-        try? await Task.sleep(for: .seconds(InstallWindow.retryInterval))
+        // No later than the window's end: the next pass then finds the next window rather
+        // than relaunching after the hours somebody chose.
+        let untilClose = window.end.timeIntervalSinceNow
+        try? await Task.sleep(
+          for: .seconds(max(1, min(InstallWindow.retryInterval, untilClose))))
       }
     }
   }
@@ -360,17 +415,44 @@ extension SparkleUpdater: UpdateInstalling {
 
   /// `POST /server/update/install`. The client has already been told which version;
   /// Sparkle re-reads the feed itself, so `item` is what was offered, not what is trusted.
+  ///
+  /// "Now" beats any window. A download already waiting for one installs at once; one still
+  /// under way for a client's window installs when it lands.
   func beginUpdate(to item: AppcastItem) async {
+    settledDownload = nil
+    if let (pendingItem, handler) = pendingInstall {
+      // The bytes are on disk and Sparkle's cycle is parked on the handler, so a fresh check
+      // would find it busy and do nothing: the handler IS the install.
+      requestedInstallWindow = nil
+      settledDownload = .downloaded
+      logger.info(
+        "Installing the downloaded update now; a client asked",
+        metadata: ["version": "\(pendingItem.displayVersionString)"])
+      // On the task that was waiting for the window, which `run` cancels first, and off this
+      // call, so the request that asked is answered before the relaunch begins.
+      scheduledInstall.run { @MainActor [weak self] in
+        await self?.announceInstalling(pendingItem, reason: .clientRequested)
+        handler()
+      }
+      return
+    }
     guard let updater = controller?.updater else { return }
     guard !updater.sessionInProgress else {
+      if remoteInstallRequested {
+        // A client's scheduled download is under way: dropping the window turns it into
+        // this request, and `willInstallUpdateOnQuit` installs it the moment it lands.
+        requestedInstallWindow = nil
+        logger.info("Update already downloading for a client; installing when it lands")
+        return
+      }
       // Someone at the Mac is already in Sparkle's windows. Let them finish.
       logger.info("Update already in progress; not starting another")
       return
     }
     if updater.allowsAutomaticUpdates {
       // Background download, then `willInstallUpdateOnQuit` hands over the relaunch.
+      requestedInstallWindow = nil
       remoteInstallRequested = true
-      settledDownload = nil
       updater.automaticallyDownloadsUpdates = true
       updater.checkForUpdatesInBackground()
     } else {
@@ -396,7 +478,11 @@ extension SparkleUpdater: UpdateInstalling {
     // Nothing is downloading and nothing will: `beginUpdate` found Sparkle busy, or put its
     // window up for whoever is at the Mac. Waiting for a callback that cannot come would
     // hold the request open for the whole deadline and then report a timeout.
-    guard controller?.updater != nil, remoteInstallRequested else { return .notDownloading }
+    // `settledDownload` as well: a download that was already waiting has landed before the
+    // wait began, and that is "downloaded", not "nothing downloading".
+    guard controller?.updater != nil, remoteInstallRequested || settledDownload != nil else {
+      return .notDownloading
+    }
 
     do {
       return try await awaitContinuation(
@@ -412,6 +498,61 @@ extension SparkleUpdater: UpdateInstalling {
       // inside the wait, and nobody is told otherwise.
       return .timedOut
     }
+  }
+
+  /// `POST /api/v2/server/update/schedule`.
+  ///
+  /// Three starting points. A download already waiting takes the window and re-arms. A
+  /// background download already under way (this type's, or the daily one) is told where to
+  /// land. Otherwise a background download starts now, reported as `downloading` at once so
+  /// the answer to the request says something is happening.
+  func scheduleUpdate(
+    to item: AppcastItem, within window: DateInterval
+  ) async -> UpdateScheduleOutcome {
+    if pendingInstall != nil {
+      requestedInstallWindow = window
+      armScheduledInstall()
+      return .scheduled
+    }
+    // The updater never started: nothing here can install unattended.
+    guard let updater = controller?.updater else { return .needsPerson }
+    if updater.sessionInProgress {
+      // A background download reports `downloading` before it lands; a person in Sparkle's
+      // window has a session and no download of ours. Their choice stands.
+      guard case .downloading = installState else { return .busy }
+      requestedInstallWindow = window
+      return .scheduled
+    }
+    // Sparkle will not install silently here (the bundle is not writable by this user, or
+    // `SUAllowsAutomaticUpdates` says no). Its window, which is what an install falls back
+    // to, is no way to keep a schedule nobody is there to see.
+    guard updater.allowsAutomaticUpdates else { return .needsPerson }
+    requestedInstallWindow = window
+    remoteInstallRequested = true
+    settledDownload = nil
+    updater.automaticallyDownloadsUpdates = true
+    updater.checkForUpdatesInBackground()
+    setInstallState(.downloading(version: item.shortVersion))
+    logger.info(
+      "Downloading update for a client's window",
+      metadata: [
+        "version": "\(item.shortVersion)", "from": "\(window.start)", "until": "\(window.end)",
+      ])
+    return .scheduled
+  }
+
+  /// `DELETE /api/v2/server/update/schedule`.
+  ///
+  /// A download still under way stops being a client's request, so it lands like any
+  /// other: held for the automatic hours when that switch is on, installed on quit when it
+  /// is not. Left as a request with no window, it would install the moment it landed,
+  /// which is the opposite of what cancelling a schedule asks for.
+  func cancelScheduledUpdate() async {
+    guard requestedInstallWindow != nil else { return }
+    requestedInstallWindow = nil
+    if let updater = controller?.updater { endRemoteRequest(updater) }
+    logger.info("Client's update window withdrawn")
+    armScheduledInstall()
   }
 
   private func parkDownloadWaiter(_ handle: OnceContinuation<UpdateDownloadOutcome>) {
@@ -441,23 +582,26 @@ extension SparkleUpdater: SPUUpdaterDelegate {
   func updater(
     _ updater: SPUUpdater, willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest
   ) {
-    installState = .downloading(version: item.displayVersionString)
+    setInstallState(.downloading(version: item.displayVersionString))
   }
 
   func updater(
     _ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: any Error
   ) {
-    installState = nil
+    setInstallState(nil)
+    // A window has nothing left to hold. Kept, it would be reported to clients as a
+    // schedule for a download that does not exist.
+    if pendingInstall == nil { requestedInstallWindow = nil }
     finishDownloadWaiters(with: .failed(DiagnosticText.sentence(for: error)))
     logger.warning(
       "Update download failed",
       metadata: ["version": "\(item.displayVersionString)", "error": "\(error)"])
   }
 
-  /// Sparkle has a download ready and would install it on quit. Two callers want it
-  /// sooner, and both take the handler: a client that asked (now), or the schedule (at the
-  /// hour). Returning true stalls Sparkle's cycle until the handler runs, which is the
-  /// point: no week-later nag, no second download.
+  /// Sparkle has a download ready and would install it on quit. Three callers want it
+  /// sooner, and all take the handler: a client that asked (now), a client that chose a
+  /// window, or the automatic hours. Returning true stalls Sparkle's cycle until the handler
+  /// runs, which is the point: no week-later nag, no second download.
   func updater(
     _ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem,
     immediateInstallationBlock immediateInstallHandler: @escaping () -> Void
@@ -468,19 +612,22 @@ extension SparkleUpdater: SPUUpdaterDelegate {
     if remoteInstallRequested {
       remoteInstallRequested = false
       updater.automaticallyDownloadsUpdates = installsAutomatically
-      logger.info(
-        "Installing update and relaunching",
-        metadata: ["version": "\(item.displayVersionString)"])
-      // The notice first, then the relaunch: the alert has to be written before the
-      // process that would write it is gone. `Task` here is main-actor, in order, so the
-      // raise is awaited and the handler runs after it.
-      Task { @MainActor in
-        await announceInstalling(item, reason: .clientRequested)
-        immediateInstallHandler()
+      // A client's window holds it like the automatic hours do, below.
+      if requestedInstallWindow == nil {
+        logger.info(
+          "Installing update and relaunching",
+          metadata: ["version": "\(item.displayVersionString)"])
+        // The notice first, then the relaunch: the alert has to be written before the
+        // process that would write it is gone. `Task` here is main-actor, in order, so the
+        // raise is awaited and the handler runs after it.
+        Task { @MainActor in
+          await announceInstalling(item, reason: .clientRequested)
+          immediateInstallHandler()
+        }
+        return true
       }
-      return true
     }
-    guard installsAutomatically else { return false }
+    guard installsAutomatically || requestedInstallWindow != nil else { return false }
     scheduleInstall(of: item, handler: immediateInstallHandler)
     return true
   }
@@ -492,16 +639,18 @@ extension SparkleUpdater: SPUUpdaterDelegate {
 
   func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
     endRemoteRequest(updater)
+    abandonRequestedWindow()
     finishDownloadWaiters(with: .notDownloading)
     logger.debug("No update found")
   }
 
   func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
     endRemoteRequest(updater)
+    abandonRequestedWindow()
     finishDownloadWaiters(with: .failed(DiagnosticText.sentence(for: error)))
-    // A download that was under way is over; a relaunch waiting for its hour is not,
+    // A download that was under way is over; a relaunch waiting for its window is not,
     // because Sparkle already has that download and the schedule task still holds it.
-    if case .downloading = installState { installState = nil }
+    if case .downloading = installState { setInstallState(nil) }
     logger.warning("Update check ended with an error", metadata: ["error": "\(error)"])
   }
 
@@ -519,6 +668,15 @@ extension SparkleUpdater: SPUUpdaterDelegate {
     guard remoteInstallRequested else { return }
     remoteInstallRequested = false
     updater.automaticallyDownloadsUpdates = installsAutomatically
+  }
+
+  /// A client's window whose download never arrived. Kept, it would be reported as a
+  /// schedule for an update that is not coming; a window over a download already on disk
+  /// still stands.
+  fileprivate func abandonRequestedWindow() {
+    guard pendingInstall == nil, requestedInstallWindow != nil else { return }
+    requestedInstallWindow = nil
+    logger.info("Client's update window dropped; no download arrived for it")
   }
 }
 
@@ -558,7 +716,10 @@ extension SparkleUpdater: @preconcurrency SPUStandardUserDriverDelegate {
     // The session ends when a person dismisses or skips, or an error stops it, or after
     // the scheduled path takes the handler. Only a download that never finished is stale;
     // a scheduled or installing state is still true.
-    if case .downloading = installState { installState = nil }
+    if case .downloading = installState { setInstallState(nil) }
+    // A person in Sparkle's window installed or skipped it themselves; a client's window
+    // has nothing to hold. One of ours still downloading keeps it.
+    if !remoteInstallRequested { abandonRequestedWindow() }
   }
 }
 
