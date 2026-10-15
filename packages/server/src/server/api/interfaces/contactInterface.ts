@@ -64,12 +64,13 @@ export class ContactInterface {
         return records.map((contact: NodeJS.Dict<any>) => {
             // Load the avatar based on the selected extra fields
             let avatar = null;
+            const firstImage = (...images: any[]) => images.find(image => image?.length > 0);
             if (extraProps.includes("avatar")) {
-                avatar = contact?.avatar ?? contact?.contactImage ?? contact.contactImageThumbnail;
+                avatar = firstImage(contact?.avatar, contact?.contactImage, contact?.contactThumbnailImage, contact?.contactImageThumbnail);
             } else if (extraProps.includes("contactImage")) {
-                avatar = contact?.contactImage ?? contact.contactImageThumbnail;
-            } else if (extraProps.includes("contactImageThumbnail")) {
-                avatar = contact?.contactImageThumbnail;
+                avatar = firstImage(contact?.contactImage, contact?.contactThumbnailImage, contact?.contactImageThumbnail);
+            } else if (extraProps.includes("contactThumbnailImage") || extraProps.includes("contactImageThumbnail")) {
+                avatar = firstImage(contact?.contactThumbnailImage, contact?.contactImageThumbnail);
             }
 
             let displayName = contact?.displayName;
