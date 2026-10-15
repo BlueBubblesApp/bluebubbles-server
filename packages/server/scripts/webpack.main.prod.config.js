@@ -10,6 +10,9 @@ module.exports = merge(baseConfig, {
             new TerserPlugin({
                 terserOptions: {
                     keep_classnames: true,
+                    // Decorated TypeORM entities may be emitted as functions.
+                    // Their runtime names must remain distinct for relation sorting.
+                    keep_fnames: true,
                 },
             }),
         ],
