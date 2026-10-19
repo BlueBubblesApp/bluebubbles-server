@@ -6,6 +6,7 @@ export type ServerMetadataResponse = {
     server_version: string;
     private_api: boolean;
     helper_connected: boolean;
+    custom_emoji_reactions: boolean;
     proxy_service: string;
     detected_icloud: string;
     detected_imessage: string;

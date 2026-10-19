@@ -24,6 +24,8 @@ import { Chat } from "@server/databases/imessage/entity/Chat";
 import path from "path";
 import { DBWhereItem } from "@server/databases/imessage/types";
 
+import { requireReactionSupport } from "@server/utils/ReactionUtils";
+
 export class MessageInterface {
     static possibleReactions: string[] = [
         "love",
@@ -430,6 +432,8 @@ export class MessageInterface {
         partIndex = 0
     }: SendReactionParams): Promise<Message> {
         checkPrivateApiStatus();
+
+        requireReactionSupport(reaction, Server().privateApi.customEmojiReactions);
 
         // Rebuild the selected message text to make it what the reaction text
         // would be in the database

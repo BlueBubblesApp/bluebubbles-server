@@ -8,6 +8,8 @@ import { DEFAULT_ATTACHMENT_CONFIG, DEFAULT_MESSAGE_CONFIG } from "./constants";
 import { HandleSerializer } from "./HandleSerializer";
 import type { MessageSerializerMultiParams, MessageSerializerSingleParams } from "./types";
 
+import { serializeReactionType } from "@server/utils/ReactionUtils";
+
 export class MessageSerializer {
     static async serialize({
         message,
@@ -158,11 +160,7 @@ export class MessageSerializer {
             groupActionType: message.groupActionType,
             balloonBundleId: message.balloonBundleId,
             associatedMessageGuid: message.associatedMessageGuid,
-            associatedMessageType: message.associatedMessageEmoji
-                ? (message.associatedMessageType === "3006" || message.associatedMessageType === "-emoji"
-                    ? `-${message.associatedMessageEmoji}`
-                    : message.associatedMessageEmoji)
-                : message.associatedMessageType,
+            associatedMessageType: serializeReactionType(message.associatedMessageType, message.associatedMessageEmoji),
             associatedMessageEmoji: message.associatedMessageEmoji,
             expressiveSendStyleId: message.expressiveSendStyleId,
             threadOriginatorGuid: message.threadOriginatorGuid,

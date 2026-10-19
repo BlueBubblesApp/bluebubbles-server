@@ -4,7 +4,7 @@ import {
     TransactionType
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
-import type { ValidTapback, ValidRemoveTapback } from "@server/types";
+import { requireReactionSupport } from "@server/utils/ReactionUtils";
 import type { TextFormatting } from "@server/api/types";
 import { isMinCatalina, isMinMonterey } from "@server/env";
 
@@ -79,29 +79,14 @@ export class PrivateApiMessage extends PrivateApiAction {
     async react(
         chatGuid: string,
         selectedMessageGuid: string,
-        reactionType: ValidTapback | ValidRemoveTapback,
+        reactionType: string,
         partIndex?: number
     ): Promise<TransactionResult> {
         const action = "send-reaction";
         this.throwForNoMissingFields(action, [chatGuid, selectedMessageGuid, reactionType]);
 
-        const isStandard = [
-            "love", "like", "dislike", "laugh", "emphasize", "question"
-        ].includes((reactionType as string).replace("-", "").toLowerCase());
-
-        const payload: Record<string, any> = {
-            chatGuid,
-            selectedMessageGuid,
-            reactionType,
-            partIndex: partIndex ?? 0
-        };
-
-        if (!isStandard) {
-            const isRemoved = (reactionType as string).startsWith("-");
-            const cleanEmoji = isRemoved ? (reactionType as string).substring(1) : (reactionType as string);
-            payload.reactionType = isRemoved ? "-emoji" : "emoji";
-            payload.reactionEmoji = cleanEmoji;
-        }
+        const parsed = requireReactionSupport(reactionType, this.api.customEmojiReactions);
+        const payload = { chatGuid, selectedMessageGuid, partIndex: partIndex ?? 0, ...parsed };
 
         const request = new TransactionPromise(TransactionType.MESSAGE);
         return this.sendApiMessage(

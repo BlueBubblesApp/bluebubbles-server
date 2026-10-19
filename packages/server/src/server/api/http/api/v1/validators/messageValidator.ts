@@ -13,6 +13,8 @@ import { hasTextFormatting, validateTextFormatting } from "@server/utils/TextFor
 import { ValidateInput } from "./index";
 import { BadRequest } from "../responses/errors";
 
+import { requireReactionSupport } from "@server/utils/ReactionUtils";
+
 export class MessageValidator {
     static countParamRules = {
         chatGuid: "string",
@@ -197,6 +199,11 @@ export class MessageValidator {
 
     static async validateReaction(ctx: RouterContext, next: Next) {
         ValidateInput(ctx.request?.body, MessageValidator.sendReactionRules);
+        try {
+            requireReactionSupport(ctx.request.body.reaction, Server().privateApi?.customEmojiReactions === true);
+        } catch (error) {
+            throw new BadRequest({ error: error instanceof Error ? error.message : String(error) });
+        }
         await next();
     }
 
