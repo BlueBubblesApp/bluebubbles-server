@@ -18,6 +18,7 @@ export class GeneralInterface {
             private_api: Server().repo.getConfig("enable_private_api") as boolean,
             proxy_service: Server().repo.getConfig("proxy_service") as string,
             helper_connected: !!Server().privateApi?.helper,
+            custom_emoji_reactions: Server().privateApi?.customEmojiReactions === true,
             detected_icloud: await FileSystem.getIcloudAccount(),
             detected_imessage: await Server().iMessageRepo.getiMessageAccount(),
             macos_time_sync: await FileSystem.getTimeSync(),

@@ -6,6 +6,7 @@ export type ServerMetadataResponse = {
     server_version: string;
     private_api: boolean;
     helper_connected: boolean;
+    custom_emoji_reactions: boolean;
     proxy_service: string;
     detected_icloud: string;
     detected_imessage: string;
@@ -59,6 +60,7 @@ export type MessageResponse = {
     balloonBundleId: string | null;
     associatedMessageGuid: string | null;
     associatedMessageType: string | null;
+    associatedMessageEmoji?: string | null;
     expressiveSendStyleId: string | null;
     timeExpressiveSendPlayed?: number | null;
     replyToGuid?: string | null;
@@ -124,8 +126,8 @@ export type AttachmentResponse = {
     hasLivePhoto?: boolean;
 };
 
-export type ValidTapback = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question";
-export type ValidRemoveTapback = "-love" | "-like" | "-dislike" | "-laugh" | "-emphasize" | "-question";
+export type ValidTapback = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question" | string;
+export type ValidRemoveTapback = "-love" | "-like" | "-dislike" | "-laugh" | "-emphasize" | "-question" | string;
 export enum ProgressStatus {
     NOT_STARTED = "NOT_STARTED",
     IN_PROGRESS = "IN_PROGRESS",

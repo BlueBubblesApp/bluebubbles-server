@@ -59,6 +59,11 @@ export class PrivateApiService extends Loggable {
         return this.clients.length > 0;
     }
 
+    get customEmojiReactions(): boolean {
+        const helper = this.activeClients["com.apple.MobileSMS"] ?? this.activeClients["com.apple.iChat"];
+        return !!helper && !helper.destroyed && helper.customEmojiReactions === true;
+    }
+
     get message(): PrivateApiMessage {
         return new PrivateApiMessage(this);
     }
@@ -148,7 +153,8 @@ export class PrivateApiService extends Loggable {
         return null;
     }
 
-    registerClient(process: string, socket: Socket) {
+    registerClient(process: string, socket: Socket, capabilities: Record<string, unknown> = {}) {
+        socket.customEmojiReactions = capabilities?.custom_emoji_reactions === true;
         this.activeClients[process] = socket;
         this.emit("client-registered", { process, socket });
     }

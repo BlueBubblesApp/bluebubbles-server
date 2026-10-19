@@ -24,6 +24,8 @@ import { Chat } from "@server/databases/imessage/entity/Chat";
 import path from "path";
 import { DBWhereItem } from "@server/databases/imessage/types";
 
+import { requireReactionSupport } from "@server/utils/ReactionUtils";
+
 export class MessageInterface {
     static possibleReactions: string[] = [
         "love",
@@ -431,11 +433,18 @@ export class MessageInterface {
     }: SendReactionParams): Promise<Message> {
         checkPrivateApiStatus();
 
+        requireReactionSupport(reaction, Server().privateApi.customEmojiReactions);
+
         // Rebuild the selected message text to make it what the reaction text
         // would be in the database
-        const prefix = (reaction as string).startsWith("-")
+        let prefix = (reaction as string).startsWith("-")
             ? negativeReactionTextMap[reaction as string]
             : reactionTextMap[reaction as string];
+        if (!prefix) {
+            const isRemoval = (reaction as string).startsWith("-");
+            const emoji = isRemoval ? (reaction as string).substring(1) : (reaction as string);
+            prefix = isRemoval ? `Removed ${emoji} from` : `Reacted ${emoji} to`;
+        }
 
         // If the message text is just the invisible char, we know it's probably just an attachment
         const text = message.universalText(false) ?? "";

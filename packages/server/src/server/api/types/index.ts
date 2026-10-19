@@ -70,7 +70,7 @@ export type SendAttachmentParams = {
 export type SendReactionParams = {
     chatGuid: string;
     message: Message;
-    reaction: ValidTapback | ValidRemoveTapback;
+    reaction: string;
     tempGuid?: string | null;
     partIndex?: number | null;
 };
@@ -99,4 +99,5 @@ export type TextFormatting = TextFormattingRange[];
 
 export class Socket extends net.Socket {
     id: string;
+    customEmojiReactions = false;
 }
