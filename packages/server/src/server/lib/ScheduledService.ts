@@ -5,7 +5,7 @@ export class ScheduledService extends EventEmitter {
 
     action: () => void;
 
-    handle: NodeJS.Timer;
+    handle: NodeJS.Timeout;
 
     interval: number;
 
