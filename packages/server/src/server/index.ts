@@ -38,7 +38,15 @@ import { runTerminalScript, openSystemPreferences, startMessages } from "@server
 
 import { ActionHandler } from "./api/apple/actions";
 import { insertChatParticipants, isEmpty, isNotEmpty, waitMs } from "./helpers/utils";
-import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinMojave, isMinMonterey, isMinSierra } from "./env";
+import {
+    isMinBigSur,
+    isMinCatalina,
+    isMinHighSierra,
+    isMinMojave,
+    isMinMonterey,
+    isMinSierra,
+    isMinVentura
+} from "./env";
 import { Proxy } from "./services/proxyServices/proxy";
 import { PrivateApiService } from "./api/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
@@ -48,6 +56,8 @@ import { MessageSerializer } from "./api/serializers/MessageSerializer";
 import {
     CHAT_READ_STATUS_CHANGED,
     CHAT_DELETED,
+    MESSAGE_DELETED,
+    MESSAGE_RESTORED,
     GROUP_ICON_CHANGED,
     GROUP_ICON_REMOVED,
     GROUP_NAME_CHANGE,
@@ -74,6 +84,12 @@ import {
     supportsChatStateSnapshot,
     type ChatStateSnapshotResult
 } from "./databases/imessage/snapshot/ChatStateSnapshot";
+import { RecoverableMessagePoller } from "./databases/imessage/pollers/RecoverableMessagePoller";
+import {
+    loadRecoverableMessageSnapshot,
+    supportsRecoverableMessages,
+    type RecoverableMessageSnapshotResult
+} from "./databases/imessage/snapshot/RecoverableMessageSnapshot";
 import { obfuscatedHandle } from "./utils/StringUtils";
 import { AutoStartMethods } from "./databases/server/constants";
 import { MacOsInterface } from "./api/interfaces/macosInterface";
@@ -1188,6 +1204,33 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     /**
+     * Serves every message Apple currently holds in Recently Deleted,
+     * grouped by chat, for a client to reconcile against.
+     *
+     * The live events cover deletions and restorations that happen while a
+     * client is connected. Nothing covers a client that was offline, so the
+     * device keeps showing messages Apple has since deleted. This is the
+     * recovery half: a statement of what is deleted now, not a replay.
+     *
+     * `complete` is what licenses the client to un-hide anything. It is only
+     * true when the whole query succeeded, so a failure cannot be read as
+     * "nothing is deleted" and restore messages the user deleted on Apple.
+     */
+    async getRecoverableMessageSnapshot(): Promise<RecoverableMessageSnapshotResult> {
+        if (!this.iMessageRepo?.db) {
+            throw new Error("iMessage repository is not initialized");
+        }
+
+        const snapshot = await loadRecoverableMessageSnapshot(this.iMessageRepo.db);
+        const total = snapshot.chats.reduce((sum, chat) => sum + chat.deletedMessageGuids.length, 0);
+        this.logger.info(
+            `Served recoverable message snapshot: ${total} deleted messages across ${snapshot.chats.length} chats`
+        );
+
+        return snapshot;
+    }
+
+    /**
      * Emits a notification to to your connected devices over FCM and socket
      *
      * @param type The type of notification
@@ -1358,6 +1401,27 @@ class BlueBubblesServer extends EventEmitter {
                 chatGuid: item.guid,
                 read: item.read
             });
+        });
+
+        // Recently Deleted only exists on Ventura and later. Deleting a single
+        // message leaves both the chat row and the message row in place, so no
+        // other poller can observe it.
+        if (supportsRecoverableMessages(isMinVentura)) {
+            this.iMessageListener.addPoller(new RecoverableMessagePoller(this.iMessageRepo, cache));
+        }
+
+        this.iMessageListener.on(MESSAGE_DELETED, async (item: { chatGuid: string; messageGuid: string }) => {
+            // The poller seeds silently on its first run and only reports
+            // transitions, so this mirrors an Apple-side delete without
+            // re-checking the database. Only the two GUIDs are sent: the client
+            // already holds the message, and this also goes out over FCM.
+            this.logger.info(`Message deleted on Apple [${item.messageGuid}]`);
+            await Server().emitMessage(MESSAGE_DELETED, item);
+        });
+
+        this.iMessageListener.on(MESSAGE_RESTORED, async (item: { chatGuid: string; messageGuid: string }) => {
+            this.logger.info(`Message restored on Apple [${item.messageGuid}]`);
+            await Server().emitMessage(MESSAGE_RESTORED, item);
         });
 
         this.iMessageListener.on(CHAT_DELETED, async (item: { guid: string }) => {
