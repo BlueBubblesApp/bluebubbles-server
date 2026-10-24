@@ -13,17 +13,19 @@ export class WebhookRouter {
         const id = (ctx?.request?.query?.id) ? Number.parseInt(ctx?.request?.query?.id as string) : null;
         const webhooks = await Server().repo.getWebhooks({ url, id });
 
-        // Convert the events to a list (from json array)
         for (const webhook of webhooks) {
+            // Convert the events to a list (from json array)
             webhook.events = JSON.parse(webhook.events);
+            // Never return the stored signing secret over the API
+            delete webhook.signing_secret;
         }
 
         return new Success(ctx, { message: "Successfully fetched webhooks!", data: webhooks }).send();
     }
 
     static async create(ctx: RouterContext, _: Next) {
-        const { url, events } = ctx.request.body;
-        const webhook = await Server().repo.addWebhook(url, events);
+        const { url, events, signing_secret: signingSecret } = ctx.request.body;
+        const webhook = await Server().repo.addWebhook(url, events, signingSecret ?? null);
 
         // Convert the events to a list (from json array)
         webhook.events = JSON.parse(webhook.events);

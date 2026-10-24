@@ -21,7 +21,8 @@ export class WebhookValidator {
 
     static createRules = {
         url: "required|string",
-        events: "required|array"
+        events: "required|array",
+        signing_secret: "string"
     };
 
     static async validateCreateWebhook(ctx: RouterContext, next: Next) {

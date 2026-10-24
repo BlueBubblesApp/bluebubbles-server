@@ -12,6 +12,10 @@ export class Webhook {
     @Column("text", { name: "events", nullable: false })
     events: string;
 
+    // Optional secret used to sign outbound webhook requests (HMAC-SHA256)
+    @Column("text", { name: "signing_secret", nullable: true })
+    signing_secret: string;
+
     @CreateDateColumn()
     created: Date;
 }

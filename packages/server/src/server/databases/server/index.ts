@@ -8,6 +8,7 @@ import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, Schedul
 import { DEFAULT_DB_ITEMS } from "./constants";
 import { ContactTables1654432080899 } from "./migrations/1654432080899-ContactTables";
 import { ScheduledMessageTable1665083072000 } from "./migrations/1665083072000-ScheduledMessageTable";
+import { WebhookSigningSecret1761772200000 } from "./migrations/1761772200000-WebhookSigningSecret";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
 export type ServerConfigChange = { prevConfig: ServerConfig; nextConfig: ServerConfig };
@@ -44,7 +45,11 @@ export class ServerRepository extends EventEmitter {
             type: "better-sqlite3",
             database: dbPath,
             entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, ScheduledMessage],
-            migrations: [ContactTables1654432080899, ScheduledMessageTable1665083072000],
+            migrations: [
+                ContactTables1654432080899,
+                ScheduledMessageTable1665083072000,
+                WebhookSigningSecret1761772200000
+            ],
             migrationsRun: !shouldSync,
             migrationsTableName: "migrations",
             synchronize: shouldSync
@@ -205,14 +210,22 @@ export class ServerRepository extends EventEmitter {
         return await repo.find({ select: fields, relations: ["addresses"] });
     }
 
-    public async addWebhook(url: string, events: Array<{ label: string; value: string }>): Promise<Webhook> {
+    public async addWebhook(
+        url: string,
+        events: Array<{ label: string; value: string }>,
+        signingSecret: string | null = null
+    ): Promise<Webhook> {
         const repo = this.webhooks();
         const item = await repo.findOneBy({ url });
 
         // If the webhook exists, don't re-add it, just return it
         if (item) return item;
 
-        const webhook = repo.create({ url, events: JSON.stringify(events.map(e => e.value)) });
+        const webhook = repo.create({
+            url,
+            events: JSON.stringify(events.map(e => e.value)),
+            signing_secret: signingSecret
+        });
         return await repo.save(webhook);
     }
 
