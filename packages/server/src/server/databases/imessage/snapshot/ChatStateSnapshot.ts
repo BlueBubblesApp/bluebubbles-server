@@ -53,6 +53,12 @@ export function compareDecimalStrings(a: string, b: string): number {
  * Lightweight state used by the live poller. Message work is restricted to
  * Apple's indexed unread candidates; this avoids aggregating the message table
  * while still detecting reads that do not move the chat-level pointer.
+ *
+ * A message only counts as unread when it is also newer than the chat's read
+ * pointer. Messages can advance the pointer without flipping is_read on every
+ * row (observed after reading on an iPhone), and iOS renders its badge from the
+ * pointer, so a row that is older than the pointer is read as far as the user
+ * is concerned. Without this, such a chat reports unread indefinitely.
  */
 export function buildChatTransitionQuery(): string {
     return `
@@ -60,9 +66,11 @@ export function buildChatTransitionQuery(): string {
             SELECT DISTINCT j.chat_id
             FROM message m
             JOIN chat_message_join j ON j.message_id = m.ROWID
+            JOIN chat c ON c.ROWID = j.chat_id
             WHERE m.is_read = 0
                 AND m.is_from_me = 0
                 AND m.item_type = 0
+                AND m.date > COALESCE(c.last_read_message_timestamp, 0)
                 AND (
                     COALESCE(m.associated_message_type, 0) = 0
                     OR (
@@ -172,6 +180,7 @@ export function buildChatSnapshotQuery(): string {
                     WHEN m.is_read = 0
                         AND m.item_type = 0
                         AND m.is_from_me = 0
+                        AND m.date > COALESCE(c.last_read_message_timestamp, 0)
                         AND (
                             COALESCE(m.associated_message_type, 0) = 0
                             OR (
