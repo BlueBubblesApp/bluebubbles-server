@@ -3,6 +3,12 @@ import { FindMyLocationItem } from "./types";
 
 const ROSTER_RELOAD_MS = 30 * 1000;
 
+function isUsableCoordinate(coordinates: unknown): boolean {
+    if (!Array.isArray(coordinates) || coordinates.length < 2) return false;
+    const [lat, lon] = coordinates;
+    return Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0);
+}
+
 export class FindMyFriendsCache {
     cache: Record<string, FindMyLocationItem> = {};
     private readonly aliasToHandle: Record<string, string> = {};
@@ -145,5 +151,14 @@ export class FindMyFriendsCache {
 
     getAll(): FindMyLocationItem[] {
         return Object.entries(this.cache).map(([key, item]) => this.publicItem(key, item));
+    }
+
+    /**
+     * Whether any cached friend has an actual location. Roster placeholders
+     * (friends Apple lists but has no record for) carry [0, 0] and no
+     * timestamp, so a non-empty cache does not mean anything was ever fetched.
+     */
+    hasAnyLocation(): boolean {
+        return Object.values(this.cache).some(item => item.last_updated > 0 && isUsableCoordinate(item.coordinates));
     }
 }
