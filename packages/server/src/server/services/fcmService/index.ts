@@ -10,6 +10,7 @@ import { Loggable } from "@server/lib/logging/Loggable";
 import { AsyncSingleton } from "@server/lib/decorators/AsyncSingletonDecorator";
 import { AsyncRetryer } from "@server/lib/decorators/AsyncRetryerDecorator";
 import { ProxyServices } from "@server/databases/server/constants";
+import { fitFcmDataPayload } from "./FcmPayload";
 
 const AppName = "BlueBubbles";
 
@@ -451,9 +452,15 @@ export class FCMService extends Loggable {
         try {
             if (!this.hasInitialized && !(await this.start())) return null;
 
+            const fitted = fitFcmDataPayload(data);
+            if (!fitted) {
+                this.log.warn("Skipping FCM notification: the message is too large to fit Firebase's 4 KB limit");
+                return { responses: [], successCount: 0, failureCount: 0 };
+            }
+
             // Build out the notification message
             const payload: admin.messaging.MulticastMessage = {
-                data,
+                data: fitted,
                 tokens: devices,
                 android: {
                     priority,
