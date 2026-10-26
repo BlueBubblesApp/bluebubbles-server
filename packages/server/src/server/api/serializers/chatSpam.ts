@@ -10,6 +10,20 @@ export function isChatFilteredAsSpam(properties: NodeJS.Dict<any>[] | null | und
         props =>
             props != null &&
             typeof props === "object" &&
-            (props.SMSCategory === 1 || props.wasDetectedAsSMSSpam === true)
+            (isOne(props.SMSCategory) || isTrue(props.wasDetectedAsSMSSpam))
     );
+}
+
+// Plist decoders are not consistent about scalar types: a boolean may arrive
+// as true, 1, or "1", and an integer as a number, a bigint (for 8-byte ints)
+// or a numeric string. Accept the obvious encodings of each.
+function isOne(value: unknown): boolean {
+    if (typeof value === "bigint") return value === BigInt(1);
+    if (typeof value === "string") return value.trim() === "1";
+    return value === 1;
+}
+
+function isTrue(value: unknown): boolean {
+    if (value === true) return true;
+    return isOne(value) || (typeof value === "string" && value.trim().toLowerCase() === "true");
 }

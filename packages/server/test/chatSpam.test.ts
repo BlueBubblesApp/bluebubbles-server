@@ -32,3 +32,18 @@ test("null, undefined, and empty properties are not spam", () => {
 test("non-dict entries are ignored", () => {
     assert.equal(isChatFilteredAsSpam([null, "x", 1] as any), false);
 });
+
+test("integer-encoded plist booleans and bigint categories are recognised", () => {
+    assert.equal(isChatFilteredAsSpam([{ wasDetectedAsSMSSpam: 1 }]), true);
+    assert.equal(isChatFilteredAsSpam([{ wasDetectedAsSMSSpam: "true" }]), true);
+    assert.equal(isChatFilteredAsSpam([{ SMSCategory: BigInt(1) }]), true);
+    assert.equal(isChatFilteredAsSpam([{ SMSCategory: "1" }]), true);
+});
+
+test("other encodings of not-spam stay not-spam", () => {
+    assert.equal(isChatFilteredAsSpam([{ wasDetectedAsSMSSpam: 0 }]), false);
+    assert.equal(isChatFilteredAsSpam([{ wasDetectedAsSMSSpam: "false" }]), false);
+    assert.equal(isChatFilteredAsSpam([{ SMSCategory: BigInt(0) }]), false);
+    assert.equal(isChatFilteredAsSpam([{ SMSCategory: 2 }]), false);
+    assert.equal(isChatFilteredAsSpam([{ SMSCategory: "10" }]), false);
+});
