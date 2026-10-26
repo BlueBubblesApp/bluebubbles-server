@@ -15,7 +15,7 @@ function database() {
     const db = new DatabaseSync(":memory:");
     db.exec(`
         CREATE TABLE chat (ROWID INTEGER PRIMARY KEY, guid TEXT, is_archived INTEGER DEFAULT 0, last_read_message_timestamp INTEGER);
-        CREATE TABLE message (ROWID INTEGER PRIMARY KEY, date INTEGER, is_read INTEGER, is_from_me INTEGER, item_type INTEGER DEFAULT 0, associated_message_type INTEGER DEFAULT 0);
+        CREATE TABLE message (ROWID INTEGER PRIMARY KEY, date INTEGER, is_read INTEGER, date_read INTEGER DEFAULT 0, is_from_me INTEGER, item_type INTEGER DEFAULT 0, associated_message_type INTEGER DEFAULT 0);
         CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);
     `);
     return db;
@@ -26,10 +26,10 @@ function addChat(db: DatabaseSync, guid: string, pointer: number | null) {
     return Number(info.lastInsertRowid);
 }
 
-function addIncoming(db: DatabaseSync, chatId: number, date: number, isRead: number, assoc = 0) {
+function addIncoming(db: DatabaseSync, chatId: number, date: number, isRead: number, assoc = 0, dateRead = 0) {
     const info = db
-        .prepare("INSERT INTO message (date, is_read, is_from_me, item_type, associated_message_type) VALUES (?, ?, 0, 0, ?)")
-        .run(date, isRead, assoc);
+        .prepare("INSERT INTO message (date, is_read, date_read, is_from_me, item_type, associated_message_type) VALUES (?, ?, ?, 0, 0, ?)")
+        .run(date, isRead, dateRead, assoc);
     db.prepare("INSERT INTO chat_message_join (chat_id, message_id) VALUES (?, ?)").run(chatId, info.lastInsertRowid);
 }
 
@@ -70,4 +70,21 @@ test("a chat with no read pointer keeps is_read semantics", () => {
 
     const snapshot = db.prepare(buildChatSnapshotQuery()).all() as Array<{ unread_count: number }>;
     assert.equal(snapshot[0].unread_count, 1);
+});
+
+/**
+ * Observed on the same server: "Mark as Unread" on an iPhone set is_read back to
+ * 0 but kept date_read, and did not move the chat pointer back. The pointer
+ * rule alone reported the chat read, so the unread mark never reached Android.
+ */
+test("a message marked unread on an Apple device counts even when older than the pointer", () => {
+    const db = database();
+    const chat = addChat(db, "iMessage;+;marked", 1_000);
+    addIncoming(db, chat, 950, 0, 0, 990); // read at 990, then marked unread
+
+    const snapshot = db.prepare(buildChatSnapshotQuery()).all() as Array<{ unread_count: number }>;
+    assert.equal(snapshot[0].unread_count, 1);
+
+    const transition = db.prepare(buildChatTransitionQuery()).all() as Array<{ is_read: number }>;
+    assert.equal(transition[0].is_read, 0);
 });

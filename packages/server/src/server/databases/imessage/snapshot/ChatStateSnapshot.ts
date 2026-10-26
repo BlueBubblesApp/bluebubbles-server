@@ -59,6 +59,10 @@ export function compareDecimalStrings(a: string, b: string): number {
  * row (observed after reading on an iPhone), and iOS renders its badge from the
  * pointer, so a row that is older than the pointer is read as far as the user
  * is concerned. Without this, such a chat reports unread indefinitely.
+ *
+ * The exception is a row that is unread yet keeps a read date: that is "Mark
+ * as Unread". Apple flips is_read back but leaves both date_read and the chat
+ * pointer where they were, so the pointer test alone would hide it.
  */
 export function buildChatTransitionQuery(): string {
     return `
@@ -70,7 +74,7 @@ export function buildChatTransitionQuery(): string {
             WHERE m.is_read = 0
                 AND m.is_from_me = 0
                 AND m.item_type = 0
-                AND m.date > COALESCE(c.last_read_message_timestamp, 0)
+                AND (m.date > COALESCE(c.last_read_message_timestamp, 0) OR m.date_read > 0)
                 AND (
                     COALESCE(m.associated_message_type, 0) = 0
                     OR (
@@ -180,7 +184,7 @@ export function buildChatSnapshotQuery(): string {
                     WHEN m.is_read = 0
                         AND m.item_type = 0
                         AND m.is_from_me = 0
-                        AND m.date > COALESCE(c.last_read_message_timestamp, 0)
+                        AND (m.date > COALESCE(c.last_read_message_timestamp, 0) OR m.date_read > 0)
                         AND (
                             COALESCE(m.associated_message_type, 0) = 0
                             OR (
