@@ -89,7 +89,7 @@ export class FileSystem {
 
     public static resources = path.join(appPath, "appResources");
 
-    public static findMyReverseGeocoder = path.join(FileSystem.resources, "macos", "tools", "findmy-geocoder");
+    public static findMyReverseGeocoder = path.join(FileSystem.resources, "macos", "tools", "findmy-geocoder.js");
 
     public static addressBookFile = `${FileSystem.contactsDir}/AddressBook.vcf`;
 

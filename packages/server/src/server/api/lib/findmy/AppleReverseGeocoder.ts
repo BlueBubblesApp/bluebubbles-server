@@ -100,14 +100,19 @@ export class FindMyAddressLabeler {
     }
 }
 
-/** Runs the packaged CLGeocoder helper once for the whole batch. */
+/**
+ * Runs the packaged CLGeocoder script once for the whole batch, through the
+ * JavaScript for Automation runtime that ships with macOS.
+ */
 export const createAppleGeocodeBatch =
-    (binaryPath: string): GeocodeBatch =>
+    (scriptPath: string): GeocodeBatch =>
     coordinates =>
         new Promise(resolve => {
             const results: Array<AddressLabels | undefined> = [];
-            const child = spawn(binaryPath, [], { stdio: ["pipe", "pipe", "ignore"] });
-            // The helper bounds each lookup itself; this only stops a wedged process. Results
+            const child = spawn("/usr/bin/osascript", ["-l", "JavaScript", scriptPath], {
+                stdio: ["pipe", "pipe", "ignore"]
+            });
+            // The script bounds each lookup itself; this only stops a wedged process. Results
             // streamed before a kill are kept.
             const timeout = setTimeout(() => child.kill("SIGKILL"), PER_COORDINATE_TIMEOUT_MS * coordinates.length);
             const finish = () => {
