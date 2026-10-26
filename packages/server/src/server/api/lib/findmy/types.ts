@@ -133,14 +133,18 @@ interface FindMyLocation {
 
 export type FindMyLocationItem = {
     handle: string | null;
+    /** Other accepted phone/email aliases for the same friend; removed before client emission. */
+    alternate_handles?: string[];
     coordinates: [number, number];
     long_address: string | null;
     short_address: string | null;
     subtitle: string | null;
     title: string | null;
     last_updated: number;
-    is_locating_in_progress: 0 | 1;
+    is_locating_in_progress?: boolean;
     status: "legacy" | "live" | "shallow";
+    /** Position among the user's Find My favorites (lower first); absent when not a favorite. */
+    favorite_order?: number;
 };
 
 export type FindMySafeLocation = {

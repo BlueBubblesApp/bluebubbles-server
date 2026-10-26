@@ -25,8 +25,11 @@ export class MessagesDylibPlugin extends DylibPlugin {
 
     async injectPlugin(_?: () => void): Promise<void> {
         return await super.injectPlugin(async () => {
-            // If we've already cached some locations, we don't need to again
-            if (Server().findMyCache.getAll().length > 0) return;
+            // If we've already cached some locations, we don't need to again.
+            // Roster placeholders alone do not count: the roster is loaded at
+            // startup, so checking for any row at all would skip this refresh
+            // every time and friend locations would only ever update on demand.
+            if (Server().findMyCache.hasAnyLocation()) return;
 
             // Only open the FindMy App if the user wants to
             const openFindMy = Server().repo.getConfig("open_findmy_on_startup") as boolean;
