@@ -8,10 +8,8 @@ export type RecoverableMessageEntry = {
 };
 
 export type RecoverableMessageSnapshotResult = {
-    schemaVersion: 1;
-    chats: { guid: string; deletedMessageGuids: string[] }[];
-    complete: boolean;
-    generatedAt: number;
+    /** `hasMessages` is false when every message in the chat is in Recently Deleted. */
+    chats: { guid: string; hasMessages: boolean; deletedMessageGuids: string[] }[];
 };
 
 export type RecoverableMessageRow = {
@@ -111,33 +109,25 @@ export async function isMessagePresent(db: DataSource, messageGuid: string): Pro
 }
 
 /**
- * Groups the current Recently Deleted set by chat for the catch-up endpoint.
- *
- * `complete` is what licenses the client to act on absence. It is only true
- * when the whole query succeeded, so a failure can never be read as "nothing
- * is deleted" and un-hide every message the user deleted on Apple.
+ * Groups the current Recently Deleted set by chat for a client catching up
+ * after being offline. A chat with no surviving messages was deleted whole.
  */
-export function buildRecoverableMessageSnapshot(
-    entries: RecoverableMessageEntry[],
-    generatedAt: number
-): RecoverableMessageSnapshotResult {
-    const byChat = new Map<string, Set<string>>();
+export function buildRecoverableMessageSnapshot(entries: RecoverableMessageEntry[]): RecoverableMessageSnapshotResult {
+    const byChat = new Map<string, { hasMessages: boolean; guids: Set<string> }>();
     for (const entry of entries) {
-        const existing = byChat.get(entry.chatGuid);
-        if (existing) {
-            existing.add(entry.messageGuid);
-        } else {
-            byChat.set(entry.chatGuid, new Set([entry.messageGuid]));
-        }
+        const chat = byChat.get(entry.chatGuid) ?? { hasMessages: false, guids: new Set<string>() };
+        chat.hasMessages = chat.hasMessages || entry.chatHasMessages;
+        chat.guids.add(entry.messageGuid);
+        byChat.set(entry.chatGuid, chat);
     }
 
     const chats = [...byChat.entries()]
-        .map(([guid, guids]) => ({ guid, deletedMessageGuids: [...guids].sort() }))
+        .map(([guid, chat]) => ({ guid, hasMessages: chat.hasMessages, deletedMessageGuids: [...chat.guids].sort() }))
         .sort((a, b) => (a.guid < b.guid ? -1 : a.guid > b.guid ? 1 : 0));
 
-    return { schemaVersion: 1, chats, complete: true, generatedAt };
+    return { chats };
 }
 
 export async function loadRecoverableMessageSnapshot(db: DataSource): Promise<RecoverableMessageSnapshotResult> {
-    return buildRecoverableMessageSnapshot(await loadRecoverableMessages(db), Date.now());
+    return buildRecoverableMessageSnapshot(await loadRecoverableMessages(db));
 }

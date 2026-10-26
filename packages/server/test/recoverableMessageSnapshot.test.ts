@@ -53,27 +53,19 @@ test("an empty chat GUID is rejected rather than silently grouped", () => {
 
 test("the snapshot groups deleted messages by chat and sorts them", () => {
     const entries: RecoverableMessageEntry[] = [
-        { chatGuid: "chat-b", messageGuid: "m2", chatHasMessages: true },
+        { chatGuid: "chat-b", messageGuid: "m2", chatHasMessages: false },
         { chatGuid: "chat-a", messageGuid: "m3", chatHasMessages: true },
         { chatGuid: "chat-a", messageGuid: "m1", chatHasMessages: true }
     ];
 
-    assert.deepEqual(buildRecoverableMessageSnapshot(entries, 42), {
-        schemaVersion: 1,
-        complete: true,
-        generatedAt: 42,
+    assert.deepEqual(buildRecoverableMessageSnapshot(entries), {
         chats: [
-            { guid: "chat-a", deletedMessageGuids: ["m1", "m3"] },
-            { guid: "chat-b", deletedMessageGuids: ["m2"] }
+            { guid: "chat-a", hasMessages: true, deletedMessageGuids: ["m1", "m3"] },
+            { guid: "chat-b", hasMessages: false, deletedMessageGuids: ["m2"] }
         ]
     });
 });
 
-test("an empty Recently Deleted folder is still a complete snapshot", () => {
-    assert.deepEqual(buildRecoverableMessageSnapshot([], 7), {
-        schemaVersion: 1,
-        complete: true,
-        generatedAt: 7,
-        chats: []
-    });
+test("an empty Recently Deleted folder is an empty snapshot", () => {
+    assert.deepEqual(buildRecoverableMessageSnapshot([]), { chats: [] });
 });

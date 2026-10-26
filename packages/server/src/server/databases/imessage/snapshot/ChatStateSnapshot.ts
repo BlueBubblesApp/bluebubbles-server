@@ -3,24 +3,15 @@ import type { DataSource } from "typeorm";
 export type ChatSnapshotEntry = {
     guid: string;
     read: boolean;
-    isArchived: boolean;
-    messageCount: number;
-    readPointer: string;
 };
 
 export type ChatStateSnapshotResult = {
-    schemaVersion: 3;
     chats: ChatSnapshotEntry[];
-    complete: boolean;
-    generatedAt: number;
 };
 
 export type ChatSnapshotRow = {
     guid: string;
     unread_count: number | null;
-    is_archived: number | null;
-    message_count: number | null;
-    read_pointer: string | null;
 };
 
 export type ChatTransitionEntry = {
@@ -157,28 +148,14 @@ export async function loadChatTransitionState(db: DataSource): Promise<ChatTrans
 }
 
 /**
- * Selects every chat Apple knows about, with its current unread tally and read
- * pointer.
- *
- * This deliberately does NOT reuse `buildChatReadStatesQuery`. That query inner
- * joins `chat_message_join` and `message`, so a chat holding no incoming
- * messages -- an empty thread, or one where the user has only ever sent --
- * produces no row at all. That omission is harmless for read state, because a
- * chat that cannot be unread simply never needs an event. It is destructive
- * here: this snapshot is what the client diffs against to decide what Apple has
- * DELETED, so a silently missing chat would be deleted off the device.
- *
- * The pointer is an ordered transition token only: its absolute value never
- * determines read state. It stays TEXT because Apple timestamps exceed
- * JavaScript's exact-integer range.
+ * The current read state of every chat, for a client catching up after being
+ * offline. Uses the same unread rule as the live poller, so the two never
+ * disagree.
  */
 export function buildChatSnapshotQuery(): string {
     return `
         SELECT
             c.guid AS guid,
-            MAX(COALESCE(c.is_archived, 0)) AS is_archived,
-            COUNT(DISTINCT m.ROWID) AS message_count,
-            CAST(MAX(COALESCE(c.last_read_message_timestamp, 0)) AS TEXT) AS read_pointer,
             SUM(
                 CASE
                     WHEN m.is_read = 0
@@ -214,48 +191,20 @@ export function buildChatSnapshotQuery(): string {
 
 /**
  * A chat appearing twice (Apple can expose the same guid through more than one
- * handle row) collapses to one entry. Unread wins, archive wins, message count
- * takes the maximum, and the greatest exact read pointer wins. Reporting such a
- * chat as read would clear a badge the phone still shows.
+ * handle row) collapses to one entry, and unread wins: reporting such a chat as
+ * read would clear a badge the phone still shows.
  */
 export function parseChatSnapshotRows(rows: ChatSnapshotRow[]): ChatSnapshotEntry[] {
     const byGuid = new Map<string, ChatSnapshotEntry>();
-
     for (const row of rows) {
         if (row?.guid == null) continue;
-        const readPointer = row.read_pointer ?? "0";
-        if (!/^\d+$/.test(readPointer)) {
-            throw new Error(`Invalid read pointer for chat ${row.guid}`);
-        }
-
-        const next: ChatSnapshotEntry = {
-            guid: row.guid,
-            read: Number(row.unread_count ?? 0) === 0,
-            isArchived: Number(row.is_archived ?? 0) !== 0,
-            messageCount: Number(row.message_count ?? 0),
-            readPointer
-        };
-
+        const read = Number(row.unread_count ?? 0) === 0;
         const existing = byGuid.get(row.guid);
-        if (existing) {
-            next.read = existing.read && next.read;
-            next.isArchived = existing.isArchived || next.isArchived;
-            next.messageCount = Math.max(existing.messageCount, next.messageCount);
-            if (compareDecimalStrings(existing.readPointer, next.readPointer) > 0) {
-                next.readPointer = existing.readPointer;
-            }
-        }
-        byGuid.set(row.guid, next);
+        byGuid.set(row.guid, { guid: row.guid, read: existing ? existing.read && read : read });
     }
-
-    const entries: ChatSnapshotEntry[] = [];
-    byGuid.forEach(entry => entries.push(entry));
-    return entries;
+    return [...byGuid.values()];
 }
 
 export async function loadChatStateSnapshot(db: DataSource): Promise<ChatStateSnapshotResult> {
-    const rows = await db.query(buildChatSnapshotQuery());
-    const chats = parseChatSnapshotRows(rows);
-
-    return { schemaVersion: 3, chats, complete: true, generatedAt: Date.now() };
+    return { chats: parseChatSnapshotRows(await db.query(buildChatSnapshotQuery())) };
 }
