@@ -43,7 +43,27 @@ type SecurityExecutor = (file: string, args: readonly string[]) => string | Buff
 const executeSecurity: SecurityExecutor = (file, args) =>
     execFileSync(file, [...args], { encoding: "utf8", timeout: 5000 });
 
+let cachedBeaconStoreKey: Buffer | null = null;
+
+/**
+ * Reads the BeaconStore key from the Keychain once and keeps it for the life
+ * of the process. The lookup shells out synchronously on the main thread (up
+ * to 5 s), and the key does not change while the server runs, so paying that
+ * cost on every refresh, twice per request, was pure waste.
+ */
 export const loadBeaconStoreKey = (exec: SecurityExecutor = executeSecurity): Buffer => {
+    if (cachedBeaconStoreKey && exec === executeSecurity) return cachedBeaconStoreKey;
+    const key = readBeaconStoreKey(exec);
+    if (exec === executeSecurity) cachedBeaconStoreKey = key;
+    return key;
+};
+
+/** Test hook: forget the cached key. */
+export const resetBeaconStoreKeyCache = (): void => {
+    cachedBeaconStoreKey = null;
+};
+
+const readBeaconStoreKey = (exec: SecurityExecutor): Buffer => {
     let value: string;
     try {
         value = exec("/usr/bin/security", ["find-generic-password", "-s", "BeaconStore", "-a", "BeaconStoreKey", "-w"])

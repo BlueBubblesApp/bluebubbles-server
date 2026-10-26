@@ -4,7 +4,13 @@ import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { isMinBigSur, isMinSequoia, isMinSonoma } from "@server/env";
 import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
-import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
+import {
+    quitFindMyFriends,
+    startFindMyFriends,
+    showFindMyFriends,
+    hideFindMyFriends,
+    isFindMyFriendsRunning
+} from "../apple/scripts";
 import { FindMyDevice, FindMyItem, FindMyLocationItem } from "@server/api/lib/findmy/types";
 import { transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
 import {
@@ -140,6 +146,9 @@ export class FindMyInterface {
             // immediately, refresh in the background, then publish changed locations
             // over the socket path the client already listens to.
             if (openFindMyApp) {
+                // Quit afterwards only if Find My was not already open: the server
+                // owner may be using it, and closing it under them is not ours to do.
+                const wasRunning = await this.isFindMyRunning();
                 startBackgroundFindMyRefresh(
                     () => this.refreshLocationsAccessibility(),
                     readDirectLocations,
@@ -151,9 +160,11 @@ export class FindMyInterface {
                         Server().logger.debug("Failed to refresh Find My friends from SecureLocationCache.");
                         Server().logger.debug(String(error));
                     },
-                    async () => {
-                        await FileSystem.executeAppleScript(quitFindMyFriends());
-                    }
+                    wasRunning
+                        ? undefined
+                        : async () => {
+                              await FileSystem.executeAppleScript(quitFindMyFriends());
+                          }
                 );
                 refreshedFindMyApp = true;
             }
@@ -203,6 +214,16 @@ export class FindMyInterface {
         }
 
         return Server().findMyCache.getAll();
+    }
+
+    static async isFindMyRunning(): Promise<boolean> {
+        try {
+            const out = await FileSystem.executeAppleScript(isFindMyFriendsRunning());
+            return String(out).trim().toLowerCase() === "true";
+        } catch (_) {
+            // Unknown is treated as "running" so we err on the side of not quitting.
+            return true;
+        }
     }
 
     static async refreshLocationsAccessibility() {

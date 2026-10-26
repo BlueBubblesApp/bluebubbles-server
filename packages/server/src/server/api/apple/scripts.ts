@@ -135,6 +135,14 @@ export const quitFindMyFriends = () => {
 };
 
 /**
+ * AppleScript that prints "true" when Find My is already running. Used so a
+ * background refresh only quits the app if it was the one to launch it.
+ */
+export const isFindMyFriendsRunning = () => {
+    return `tell application "System Events" to (name of processes) contains "FindMy"`;
+};
+
+/**
  * The AppleScript used to hide the FindMy app
  */
 export const hideFindMyFriends = () => {

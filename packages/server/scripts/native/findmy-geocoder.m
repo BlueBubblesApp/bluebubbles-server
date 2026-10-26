@@ -1,8 +1,15 @@
 // Reverse geocodes coordinates with Apple's on-device CLGeocoder.
 // Input (stdin): one "latitude longitude" pair per line.
 // Output (stdout): one JSON object per resolved line, in input order: {"i", "short", "long"}.
-// Build: clang -fobjc-arc -arch x86_64 -arch arm64 -mmacosx-version-min=12.0 \
-//   -framework Foundation -framework CoreLocation findmy-geocoder.m -o findmy-geocoder
+// Build (reproduces appResources/macos/tools/findmy-geocoder byte-for-byte per
+// architecture; see scripts/native/build-findmy-geocoder.sh for the exact
+// invocation including the lipo step and ad-hoc signature):
+//   clang -Os -fobjc-arc -arch x86_64 -mmacosx-version-min=12.0 \
+//     -framework Foundation -framework CoreLocation findmy-geocoder.m -o findmy-geocoder-x86_64
+//   clang -Os -fobjc-arc -arch arm64  -mmacosx-version-min=12.0 \
+//     -framework Foundation -framework CoreLocation findmy-geocoder.m -o findmy-geocoder-arm64
+//   lipo -create findmy-geocoder-x86_64 findmy-geocoder-arm64 -output findmy-geocoder
+//   codesign -s - findmy-geocoder
 #import <CoreLocation/CoreLocation.h>
 #import <Foundation/Foundation.h>
 
@@ -14,10 +21,13 @@ static NSString *Clean(NSString *value) {
 int main(void) {
     @autoreleasepool {
         CLGeocoder *geocoder = [[CLGeocoder alloc] init];
-        char line[256];
+        char *line = NULL;
+        size_t capacity = 0;
         int index = -1;
 
-        while (fgets(line, sizeof(line), stdin) != NULL) {
+        // getline rather than a fixed buffer: an over-long line would otherwise be
+        // read as two and shift every following result's index by one.
+        while (getline(&line, &capacity, stdin) != -1) {
             index++;
             double latitude, longitude;
             if (sscanf(line, "%lf %lf", &latitude, &longitude) != 2 || !isfinite(latitude) || !isfinite(longitude) ||
