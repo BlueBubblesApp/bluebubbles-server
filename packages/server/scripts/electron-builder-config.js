@@ -47,7 +47,9 @@ module.exports = {
             "NSSystemAdministrationUsageDescription": "BlueBubbles needs access to manage your system",
         },
         "gatekeeperAssess": false,
-        "minimumSystemVersion": "10.11.0",
+        // Electron 25's own floor (its Info.plist says 10.13); Apple Silicon is 11.0 regardless.
+        // Bundled proxies need more: ngrok 11.0, zrok 14.0, cloudflared 15.0.
+        "minimumSystemVersion": "10.13.0",
         "signIgnore": [
             "ngrok$",
             "zrok$",

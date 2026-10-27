@@ -4,6 +4,7 @@ import { isNotEmpty } from "@server/helpers/utils";
 
 // Middleware
 import { AuthMiddleware } from "./middleware/authMiddleware";
+import { BodyMiddleware } from "./middleware/bodyMiddleware";
 
 // Routers
 import { ThemeRouter } from "./routers/themeRouter";
@@ -49,7 +50,8 @@ export class HttpRoutes {
     static defaultResponseTimeout = 5 * 60 * 1000; // 5 minutes
 
     private static get protected() {
-        return [...HttpRoutes.unprotected, AuthMiddleware];
+        // Bodies are only parsed once the client has authenticated
+        return [...HttpRoutes.unprotected, AuthMiddleware, BodyMiddleware];
     }
 
     private static get unprotected() {

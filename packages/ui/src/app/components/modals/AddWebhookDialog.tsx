@@ -7,10 +7,13 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     Button,
+    Checkbox,
     Input,
     FormControl,
     FormErrorMessage,
+    FormHelperText,
     FormLabel,
+    Stack,
     Text
 } from '@chakra-ui/react';
 import { Select as MultiSelect } from 'chakra-react-select';
@@ -20,6 +23,13 @@ import { MultiSelectValue } from '../../types';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { create, update } from '../../slices/WebhooksSlice';
 import { convertMultiSelectValues } from '../../utils/GenericUtils';
+import { WebhookSecurityOptions } from '../../utils/IpcUtils';
+
+const defaultSecurityOptions: WebhookSecurityOptions = {
+    blockPrivateAddresses: false,
+    requireHttps: false,
+    followRedirects: false
+};
 
 
 interface AddWebhookDialogProps {
@@ -47,6 +57,16 @@ export const AddWebhookDialog = ({
     const isUrlInvalid = (urlError ?? '').length > 0;
     const [eventsError, setEventsError] = useState('');
     const isEventsError = (eventsError ?? '').length > 0;
+    const [securityOptions, setSecurityOptions] = useState<WebhookSecurityOptions>(defaultSecurityOptions);
+
+    const setSecurityOption = (key: keyof WebhookSecurityOptions, value: boolean) => {
+        setSecurityOptions(prev => ({ ...prev, [key]: value }));
+    };
+
+    const reset = () => {
+        setUrl('');
+        setSecurityOptions(defaultSecurityOptions);
+    };
 
     useEffect(() => {
         if (!existingId) return;
@@ -55,6 +75,11 @@ export const AddWebhookDialog = ({
         if (webhook) {
             setUrl(webhook.url);
             setSelectedEvents(convertMultiSelectValues(JSON.parse(webhook.events)));
+            setSecurityOptions({
+                blockPrivateAddresses: !!webhook.blockPrivateAddresses,
+                requireHttps: !!webhook.requireHttps,
+                followRedirects: !!webhook.followRedirects
+            });
         }
     }, [existingId]);
 
@@ -104,7 +129,38 @@ export const AddWebhookDialog = ({
                                 <FormErrorMessage>{eventsError}</FormErrorMessage>
                             ) : null}
                         </FormControl>
-                        
+                        <FormControl mt={5}>
+                            <FormLabel>Security</FormLabel>
+                            <Stack spacing={1}>
+                                <Checkbox
+                                    id='blockPrivateAddresses'
+                                    isChecked={securityOptions.blockPrivateAddresses}
+                                    onChange={(e) => setSecurityOption('blockPrivateAddresses', e.target.checked)}
+                                >
+                                    Block local network addresses
+                                </Checkbox>
+                                <Checkbox
+                                    id='requireHttps'
+                                    isChecked={securityOptions.requireHttps}
+                                    onChange={(e) => setSecurityOption('requireHttps', e.target.checked)}
+                                >
+                                    Require HTTPS
+                                </Checkbox>
+                                <Checkbox
+                                    id='followRedirects'
+                                    isChecked={securityOptions.followRedirects}
+                                    onChange={(e) => setSecurityOption('followRedirects', e.target.checked)}
+                                >
+                                    Follow redirects
+                                </Checkbox>
+                            </Stack>
+                            <FormHelperText>
+                                Blocking local network addresses refuses to deliver to localhost, private (LAN),
+                                link-local and other non-public IPs, checked every time an event is sent. Leave it
+                                off if this webhook points at something on your own network. Redirects are only
+                                followed when enabled, and every hop is held to the same rules.
+                            </FormHelperText>
+                        </FormControl>
                     </AlertDialogBody>
 
                     <AlertDialogFooter>
@@ -112,7 +168,7 @@ export const AddWebhookDialog = ({
                             ref={modalRef as React.LegacyRef<HTMLButtonElement> | undefined}
                             onClick={() => {
                                 if (onCancel) onCancel();
-                                setUrl('');
+                                reset();
                                 onClose();
                             }}
                         >
@@ -134,12 +190,17 @@ export const AddWebhookDialog = ({
                                 }
 
                                 if (existingId) {
-                                    dispatch(update({ id: existingId, url, events: selectedEvents }));
+                                    dispatch(update({
+                                        id: existingId,
+                                        url,
+                                        events: selectedEvents,
+                                        options: securityOptions
+                                    }));
                                 } else {
-                                    dispatch(create({ url, events: selectedEvents }));
+                                    dispatch(create({ url, events: selectedEvents, options: securityOptions }));
                                 }
 
-                                setUrl('');
+                                reset();
                                 onClose();
                             }}
                         >

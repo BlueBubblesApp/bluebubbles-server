@@ -7,6 +7,7 @@ import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
+import { buildQueryableColumns, QueryableColumns } from "@server/databases/imessage/helpers/whereClauseValidator";
 import { isNotEmpty } from "@server/helpers/utils";
 import { isMinHighSierra, isMinVentura } from "@server/env";
 import { Loggable } from "@server/lib/logging/Loggable";
@@ -22,6 +23,8 @@ export class MessageRepository extends Loggable {
     dbPath: string;
 
     dbPathWal: string;
+
+    private queryableMessageColumns: QueryableColumns = null;
 
     constructor() {
         super();
@@ -224,6 +227,23 @@ export class MessageRepository extends Loggable {
         query.take(limit);
 
         return await query.getManyAndCount();
+    }
+
+    /**
+     * The columns a client-supplied `where` clause may reference, keyed by the aliases getMessages() joins
+     */
+    getQueryableMessageColumns(): QueryableColumns {
+        if (!this.queryableMessageColumns) {
+            this.queryableMessageColumns = buildQueryableColumns({
+                message: this.db.getMetadata(Message),
+                handle: this.db.getMetadata(Handle),
+                attachment: this.db.getMetadata(Attachment),
+                chat: this.db.getMetadata(Chat),
+                chandle: this.db.getMetadata(Handle)
+            });
+        }
+
+        return this.queryableMessageColumns;
     }
 
     /**

@@ -20,6 +20,7 @@ import { BsChevronDown } from 'react-icons/bs';
 import { AiOutlineInfoCircle, AiOutlinePlus } from 'react-icons/ai';
 import { WebhooksTable } from '../../components/tables/WebhooksTable';
 import { AddWebhookDialog } from '../../components/modals/AddWebhookDialog';
+import { WebhookApiPrivateAddressesField } from '../../components/fields/WebhookApiPrivateAddressesField';
 import { useAppSelector } from '../../hooks';
 
 
@@ -115,6 +116,8 @@ export const ApiLayout = (): JSX.Element => {
                             </MenuList>
                         </Menu>
                     </Box>
+                    <Spacer />
+                    <WebhookApiPrivateAddressesField />
                     <Spacer />
                     <WebhooksTable webhooks={webhooks} />
                 </Stack>

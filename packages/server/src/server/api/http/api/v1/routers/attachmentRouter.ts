@@ -12,6 +12,9 @@ import { FileStream, Success } from "../responses/success";
 import { BadRequest, NotFound, ServerError } from "../responses/errors";
 import { AttachmentSerializer } from "@server/api/serializers/AttachmentSerializer";
 
+// The largest width/height an image can be resized to
+const maxResizeDimension = 4096;
+
 export class AttachmentRouter {
     static async count(ctx: RouterContext, _: Next) {
         const total = await Server().iMessageRepo.getAttachmentCount();
@@ -34,22 +37,26 @@ export class AttachmentRouter {
         const forceDownload = isTruthyBool((force as string) ?? "true");
 
         // Fetch the info for the attachment by GUID
-        const attachment = await Server().iMessageRepo.getAttachment(guid);
+        // Fetch the info for the attachment by GUID
+        let attachment = await Server().iMessageRepo.getAttachment(guid);
         if (!attachment) {
-            const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
-            if (!forceDownload || !papiEnabled) {
-                throw new NotFound({ error: "Attachment does not exist!" });
-            }
+            throw new NotFound({ error: "Attachment does not exist!" });
+        }
 
-            // Try to force download the attachment
+        // If the attachment is known but isn't on disk (e.g. it was purged/offloaded to iCloud),
+        // ask the Private API to download it. This needs the attachment's database row, so it
+        // only applies to attachments that exist (a missing row is a 404 above).
+        let aPath = FileSystem.getRealPath(attachment.filePath);
+        const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
+        if (!fs.existsSync(aPath) && forceDownload && papiEnabled) {
             try {
-                await AttachmentInterface.forceDownload(attachment);
+                attachment = await AttachmentInterface.forceDownload(attachment);
+                aPath = FileSystem.getRealPath(attachment.filePath);
             } catch (ex) {
-                Server().log(`Failed for force download attachment (GUID: ${attachment.guid}): ${String(ex)}`);
+                Server().log(`Failed to force download attachment (GUID: ${guid}): ${String(ex)}`);
             }
         }
 
-        let aPath = FileSystem.getRealPath(attachment.filePath);
         let mimeType = attachment.getMimeType();
         if (!fs.existsSync(aPath)) throw new ServerError({ error: "Attachment does not exist in disk!" });
 
@@ -75,8 +82,14 @@ export class AttachmentRouter {
                 const opts: Partial<Electron.ResizeOptions> = {};
 
                 // Parse opts
-                const parsedWidth = width ? Number.parseInt(width as string, 10) : null;
-                const parsedHeight = height ? Number.parseInt(height as string, 10) : null;
+                // Each size is a new cached file and an up-front allocation, so cap them.
+                // Anything that isn't a positive integer is ignored rather than cached under its own name.
+                const parseDimension = (value: unknown): number | null => {
+                    const parsed = Number.parseInt(value as string, 10);
+                    return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, maxResizeDimension) : null;
+                };
+                const parsedWidth = width ? parseDimension(width) : null;
+                const parsedHeight = height ? parseDimension(height) : null;
 
                 let newName = attachment.transferName;
                 if (quality) {
@@ -155,6 +168,8 @@ export class AttachmentRouter {
         let trueHeight = height ? Number.parseInt(height as string, 10) : null;
         if (!trueHeight || trueHeight <= 0) trueHeight = 320;
         if (!trueWidth || trueWidth <= 0) trueWidth = 480;
+        trueHeight = Math.min(trueHeight, maxResizeDimension);
+        trueWidth = Math.min(trueWidth, maxResizeDimension);
 
         let blurhash: string;
 
@@ -166,7 +181,7 @@ export class AttachmentRouter {
                 quality
             });
         } catch (ex: any) {
-            return new ServerError({
+            throw new ServerError({
                 message: "Failed to get blurhash for attachment!",
                 error: ex?.message ?? String(ex)
             });
