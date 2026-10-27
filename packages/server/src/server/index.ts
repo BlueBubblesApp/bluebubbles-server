@@ -781,9 +781,10 @@ class BlueBubblesServer extends EventEmitter {
             this.relaunch();
         }
 
-        // Start minimized if enabled
+        // Start minimized if enabled.
+        // Headless mode never creates a window, so there may be nothing to minimize.
         const startMinimized = Server().repo.getConfig("start_minimized") as boolean;
-        if (startMinimized) {
+        if (startMinimized && this.window && !this.window.isDestroyed()) {
             this.window.minimize();
         }
 
