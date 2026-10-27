@@ -4,6 +4,7 @@ import vcf from "vcf";
 import { Contact, ContactAddress } from "@server/databases/server/entity";
 import * as base64 from "byte-base64";
 import { deduplicateObjectArray, isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { findByAddress } from "@server/helpers/addressMatching";
 import type { FindOptionsWhere } from "typeorm";
 import { ContactsLib } from "../lib/ContactsLib";
 
@@ -103,36 +104,16 @@ export class ContactInterface {
      */
     static findContact(address: string, { preloadedContacts }: { preloadedContacts?: any[] | null } = {}): any | null {
         const contactList = preloadedContacts ?? ContactsLib.getAllContacts();
-        const alphaNumericRegex = /[^a-zA-Z0-9_]/gi;
-        const addr = address.replace(alphaNumericRegex, "");
 
-        // Build a map where the address is the key and contact dict is the value
-        const cacheMap: NodeJS.Dict<any> = {};
-        for (const c of contactList) {
-            const addresses = [
-                ...(c?.phoneNumbers ?? []).map((e: NodeJS.Dict<any>) => e.address),
-                ...(c?.emailAddresses ?? []).map((e: NodeJS.Dict<any>) => e.address)
-            ].map(e => e.replace(alphaNumericRegex, ""));
-            for (const contactAddr of addresses) {
-                cacheMap[contactAddr] = c;
-            }
-        }
+        // Contacts come either straight from the Contacts API (addresses are strings, emails
+        // are under `emailAddresses`) or from mapContacts (addresses are { address }, emails
+        // are under `emails`), so accept both shapes.
+        const getAddresses = (contact: NodeJS.Dict<any>): string[] =>
+            [...(contact?.phoneNumbers ?? []), ...(contact?.emails ?? []), ...(contact?.emailAddresses ?? [])]
+                .map(e => (typeof e === "string" ? e : e?.address))
+                .filter(e => typeof e === "string");
 
-        // Find a key that matches the last 'x' characters.
-        // First, test the entire string, then slowly remove numbers from the start
-        // until we find a match. If we don't find a match after testing 4 varients, we are done.
-        const choices: number[] = [addr.length, addr.length - 1, addr.length - 2, addr.length - 3];
-        let output: NodeJS.Dict<any> = null;
-        for (const sub of choices) {
-            const ending = addr.substring(addr.length - sub, addr.length);
-            const matches = Object.keys(cacheMap).filter(e => e && e.endsWith(ending));
-            if (matches && matches.length > 0) {
-                output = cacheMap[matches[0]];
-                break;
-            }
-        }
-
-        return output;
+        return findByAddress(address, contactList ?? [], getAddresses);
     }
 
     /**

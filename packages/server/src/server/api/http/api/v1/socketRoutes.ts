@@ -13,7 +13,7 @@ import macosVersion from "macos-version";
 // Internal libraries
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
-import { isEmpty, isNotEmpty, onlyAlphaNumeric, safeTrim } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty, isValidAddress, onlyAlphaNumeric, safeTrim } from "@server/helpers/utils";
 
 // Helpers
 import { ChatResponse, HandleResponse, ServerMetadataResponse } from "@server/types";
@@ -22,6 +22,7 @@ import { ErrorTypes, ResponseFormat, ResponseJson } from "@server/api/http/api/v
 // Entities
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { DBMessageParams } from "@server/databases/imessage/types";
+import { validateWhereClauses, WhereClauseError } from "@server/databases/imessage/helpers/whereClauseValidator";
 import { ActionHandler } from "@server/api/apple/actions";
 import { QueueItem } from "@server/services/queueService";
 import { GeneralInterface } from "@server/api/interfaces/generalInterface";
@@ -45,6 +46,27 @@ import { ProxyServices } from "@server/databases/server/constants";
 
 const unknownError = "Unknown Error. Check server logs!";
 const log = getLogger("SocketRoutes");
+
+// The param that holds the chat GUID, for each event that takes one
+const chatGuidParamKeys: Record<string, string> = {
+    "get-chat": "chatGuid",
+    "get-chat-messages": "identifier",
+    "get-messages": "chatGuid",
+    "get-last-chat-message": "identifier",
+    "get-participants": "identifier",
+    "send-message": "guid",
+    "send-message-chunk": "guid",
+    "rename-group": "identifier",
+    "add-participant": "identifier",
+    "remove-participant": "identifier",
+    "send-reaction": "chatGuid",
+    "toggle-chat-read-status": "chatGuid",
+    "open-chat": "chatGuid",
+    "started-typing": "chatGuid",
+    "stopped-typing": "chatGuid",
+    "mark-chat-read": "chatGuid",
+    "update-typing-status": "chatGuid"
+};
 
 export class SocketRoutes {
     static createRoutes(socket: Socket) {
@@ -71,11 +93,30 @@ export class SocketRoutes {
                 }
             }
 
-            if (callback) callback(resData);
+            // The ack is whatever the client sent last, so it may not be a function
+            if (typeof callback === "function") callback(resData);
             else socket.emit(channel, resData);
 
             if (resData.error) log.debug(resData.error.message);
         };
+
+        /**
+         * Rewrite the chat GUID param to the GUID of the matching chat in the chat.db.
+         * Chats can be prefixed with `any`, `iMessage`, or `SMS` (macOS Tahoe uses `any`),
+         * so a client may send a GUID that differs from the stored one only by its prefix.
+         */
+        socket.use(async ([event, params]: any[], next: (error?: Error) => void) => {
+            const key = chatGuidParamKeys[event];
+            if (key && params && typeof params[key] === "string") {
+                try {
+                    params[key] = await Server().iMessageRepo.resolveChatGuid(params[key]);
+                } catch (ex: any) {
+                    log.debug(`Failed to resolve chat GUID, "${params[key]}": ${ex?.message ?? ex}`);
+                }
+            }
+
+            next();
+        });
 
         /**
          * Return information about the server
@@ -91,6 +132,8 @@ export class SocketRoutes {
         socket.on("save-vcf", async (params, cb): Promise<void> => {
             // Make sure we have VCF data
             if (!params?.vcf) return response(cb, "error", createBadRequestResponse("No VCF data provided!"));
+            if (typeof params.vcf !== "string")
+                return response(cb, "error", createBadRequestResponse("VCF data must be a string!"));
 
             FileSystem.saveVCF(params.vcf);
             return response(cb, "save-vcf", createSuccessResponse(null, "Successfully saved VCF"));
@@ -110,6 +153,8 @@ export class SocketRoutes {
         socket.on("change-proxy-service", async (params, cb): Promise<void> => {
             // Make sure we have a service
             if (!params?.service) return response(cb, "error", createBadRequestResponse("No service name provided!"));
+            if (typeof params.service !== "string")
+                return response(cb, "error", createBadRequestResponse("Service name must be a string!"));
 
             // Make sure the service is one that we can handle'
             const dynDns = onlyAlphaNumeric(ProxyServices.DynamicDNS);
@@ -130,6 +175,8 @@ export class SocketRoutes {
             // If the service is dynamic DNS, make sure we have an address
             if (onlyAlphaNumeric(params.service).toLowerCase() === dynDns && !params?.address)
                 return response(cb, "error", createBadRequestResponse("No Dynamic DNS address provided!"));
+            if (onlyAlphaNumeric(params.service).toLowerCase() === dynDns && typeof params.address !== "string")
+                return response(cb, "error", createBadRequestResponse("Dynamic DNS address must be a string!"));
 
             // Send the response back before restarting
             const res = response(
@@ -138,22 +185,26 @@ export class SocketRoutes {
                 createSuccessResponse(null, "Successfully set new proxy service!")
             );
 
-            // Now, set the new proxy service
+            // Now, set the new proxy service. The proxies are always restarted, even if
+            // saving the config fails, so a bad request can't leave the server unreachable.
             await Server().stopProxyServices();
-            await Server().repo.setConfig("proxy_service", params.service);
+            try {
+                await Server().repo.setConfig("proxy_service", params.service);
 
-            // If it's a dyn dns, set the address
-            if (onlyAlphaNumeric(params.service).toLowerCase() === dynDns) {
-                let addr = params.address;
-                if (!addr.startsWith("http")) {
-                    addr = `http://${addr}`;
+                // If it's a dyn dns, set the address
+                if (onlyAlphaNumeric(params.service).toLowerCase() === dynDns) {
+                    let addr = params.address;
+                    if (!addr.startsWith("http")) {
+                        addr = `http://${addr}`;
+                    }
+
+                    await Server().repo.setConfig("server_address", addr);
                 }
-
-                await Server().repo.setConfig("server_address", addr);
+            } finally {
+                // Restart the proxy services
+                await Server().restartProxyServices();
             }
 
-            // Restart the proxy services
-            await Server().restartProxyServices();
             return res;
         });
 
@@ -161,11 +212,15 @@ export class SocketRoutes {
          * Return information about the server's config
          */
         socket.on("get-server-config", (_, cb): void => {
-            const { config } = Server().repo;
+            // Copy the config so stripping fields doesn't remove them from the live cache
+            const config = { ...Server().repo.config };
 
-            // Strip out some stuff the user doesn't need
-            if ("password" in config) delete config.password;
-            if ("server_address" in config) delete config.server_address;
+            // Strip out some stuff the user doesn't need, and any credentials
+            delete config.password;
+            delete config.server_address;
+            delete config.ngrok_key;
+            delete config.zrok_token;
+            delete config.zrok_reserved_token;
 
             return response(cb, "server-config", createSuccessResponse(config, "Successfully fetched server config"));
         });
@@ -196,7 +251,15 @@ export class SocketRoutes {
          * Handles a server ping
          */
         socket.on("get-logs", async (params, cb): Promise<void> => {
-            const count = params?.count ?? 100;
+            const count = FileSystem.parseLogCount(params?.count);
+            if (count === null) {
+                return response(
+                    cb,
+                    "error",
+                    createBadRequestResponse("Count must be a positive integer")
+                );
+            }
+
             const logs = await FileSystem.getLogs({ count });
             return response(cb, "logs", createSuccessResponse(logs));
         });
@@ -331,7 +394,18 @@ export class SocketRoutes {
                 sort: params?.sort ?? "DESC"
             };
 
-            if (params?.where) dbParams.where = params.where;
+            if (params?.where) {
+                try {
+                    dbParams.where = validateWhereClauses(
+                        params.where,
+                        Server().iMessageRepo.getQueryableMessageColumns()
+                    );
+                } catch (ex: any) {
+                    if (ex instanceof WhereClauseError)
+                        return response(cb, "error", createBadRequestResponse(ex.message));
+                    throw ex;
+                }
+            }
 
             const [messages, _] = await Server().iMessageRepo.getMessages(dbParams);
             const results = await MessageSerializer.serializeList({
@@ -371,7 +445,18 @@ export class SocketRoutes {
             };
 
             // Add any "where" params
-            if (params?.where) dbParams.where = params.where;
+            if (params?.where) {
+                try {
+                    dbParams.where = validateWhereClauses(
+                        params.where,
+                        Server().iMessageRepo.getQueryableMessageColumns()
+                    );
+                } catch (ex: any) {
+                    if (ex instanceof WhereClauseError)
+                        return response(cb, "error", createBadRequestResponse(ex.message));
+                    throw ex;
+                }
+            }
 
             // Get the messages
             const [messages, _] = await Server().iMessageRepo.getMessages(dbParams);
@@ -410,8 +495,11 @@ export class SocketRoutes {
             let start = params?.start ?? 0;
             if (!Number.isInteger(start) || start < 0) start = 0;
 
-            // Pull out the chunk size, falling back to 1024
+            // Pull out the chunk size, falling back to 1024. It's allocated up-front,
+            // so it must be a positive integer (and FileSystem caps how large it can be).
             const chunkSize = params?.chunkSize ?? 1024;
+            if (!Number.isInteger(chunkSize) || chunkSize < 1)
+                return response(cb, "error", createBadRequestResponse("Chunk size must be a positive integer"));
             const compress = params?.compress ?? false;
 
             // Get the corresponding attachment
@@ -522,6 +610,14 @@ export class SocketRoutes {
             // Make sure that if we have an attachment, there is also a guid and name
             if (params?.attachment && (!params.attachmentName || !params.attachmentGuid))
                 return response(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
+
+            // The attachment name is used as the file name on disk, so it can't be a path
+            if (params?.attachment && !FileSystem.isSafeFileName(params.attachmentName))
+                return response(
+                    cb,
+                    "error",
+                    createBadRequestResponse("Attachment name must be a plain file name, not a path")
+                );
 
             if (typeof tempGuid === "number") {
                 tempGuid = String(tempGuid);
@@ -644,6 +740,18 @@ export class SocketRoutes {
             const attachmentData = params?.attachmentData;
             const hasMore = params?.hasMore;
 
+            // The attachment GUID and name are used as the folder and file names on disk, so they can't be paths
+            if (attachmentGuid && !FileSystem.isSafeFileName(attachmentGuid))
+                return response(cb, "error", createBadRequestResponse("Invalid attachment GUID provided"));
+            if (params?.attachmentName && !FileSystem.isSafeFileName(params.attachmentName))
+                return response(
+                    cb,
+                    "error",
+                    createBadRequestResponse("Attachment name must be a plain file name, not a path")
+                );
+            if (attachmentGuid && !(Number.isInteger(Number(attachmentChunkStart)) && attachmentChunkStart >= 0))
+                return response(cb, "error", createBadRequestResponse("Invalid attachment chunk start provided"));
+
             // Save the attachment chunk if there is an attachment
             if (attachmentGuid)
                 FileSystem.saveAttachmentChunk(
@@ -717,13 +825,27 @@ export class SocketRoutes {
                 return response(cb, "error", createBadRequestResponse("Participant list must be an array"));
             }
 
+            // Participants and the service are built into AppleScript, so only accept plain values
+            if (!participants.every(isValidAddress)) {
+                return response(
+                    cb,
+                    "error",
+                    createBadRequestResponse("Each participant must be a phone number or email address")
+                );
+            }
+
+            const service = params?.service ?? "iMessage";
+            if (!["iMessage", "SMS"].includes(service)) {
+                return response(cb, "error", createBadRequestResponse("Service must be one of: iMessage, SMS"));
+            }
+
             let chatGuid;
 
             try {
                 // First, try to create the chat using our "normal" method
                 chatGuid = await ActionHandler.createUniversalChat(
                     participants,
-                    params?.service ?? "iMessage",
+                    service,
                     params?.message,
                     params?.tempGuid
                 );
@@ -735,7 +857,7 @@ export class SocketRoutes {
                     try {
                         chatGuid = await ActionHandler.createSingleChat(
                             participants[0],
-                            params?.service ?? "iMessage",
+                            service,
                             params?.message,
                             params?.tempGuid
                         );
@@ -820,6 +942,12 @@ export class SocketRoutes {
                 return response(cb, "error", createBadRequestResponse("No chat identifier provided"));
             if (!params?.address)
                 return response(cb, "error", createBadRequestResponse("No participant address specified"));
+            if (!isValidAddress(params.address))
+                return response(
+                    cb,
+                    "error",
+                    createBadRequestResponse("Participant must be a phone number or email address")
+                );
 
             try {
                 const result = await ActionHandler.addParticipant(params.identifier, params.address);
@@ -844,6 +972,12 @@ export class SocketRoutes {
                 return response(cb, "error", createBadRequestResponse("No chat identifier provided"));
             if (!params?.address)
                 return response(cb, "error", createBadRequestResponse("No participant address specified"));
+            if (!isValidAddress(params.address))
+                return response(
+                    cb,
+                    "error",
+                    createBadRequestResponse("Participant must be a phone number or email address")
+                );
 
             try {
                 const result = await ActionHandler.removeParticipant(params.identifier, params.address);

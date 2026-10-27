@@ -3,6 +3,7 @@ import { Next } from "koa";
 
 import { ValidateInput } from "./index";
 import { BadRequest } from "../responses/errors";
+import { isValidAddress } from "@server/helpers/utils";
 
 export class ChatValidator {
     static getMessagesRules = {
@@ -51,7 +52,13 @@ export class ChatValidator {
     };
 
     static async validateCreate(ctx: RouterContext, next: Next) {
-        ValidateInput(ctx?.request?.body, ChatValidator.createRules);
+        const { addresses } = ValidateInput(ctx?.request?.body, ChatValidator.createRules);
+
+        // Addresses are built into AppleScript and chat GUIDs, so only accept plain values
+        if (!addresses.every(isValidAddress)) {
+            throw new BadRequest({ error: "Each address must be a phone number or email address" });
+        }
+
         await next();
     }
 
@@ -60,7 +67,11 @@ export class ChatValidator {
     };
 
     static async validateToggleParticipant(ctx: RouterContext, next: Next) {
-        ValidateInput(ctx?.request?.body, ChatValidator.toggleParticipantRules);
+        const { address } = ValidateInput(ctx?.request?.body, ChatValidator.toggleParticipantRules);
+        if (!isValidAddress(address)) {
+            throw new BadRequest({ error: "Address must be a phone number or email address" });
+        }
+
         await next();
     }
 

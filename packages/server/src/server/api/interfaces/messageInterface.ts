@@ -153,7 +153,7 @@ export class MessageInterface {
 
         // Since we convert mp3s to cafs we need to correct the name for the awaiter
         let aName = attachmentName;
-        if (aName !== null && aName.endsWith(".mp3") && isAudioMessage) {
+        if (aName !== null && aName.toLowerCase().endsWith(".mp3") && isAudioMessage) {
             aName = `${aName.substring(0, aName.length - 4)}.caf`;
         }
 
@@ -274,14 +274,8 @@ export class MessageInterface {
     }: SendAttachmentPrivateApiParams): Promise<Message> {
         checkPrivateApiStatus();
 
-        if (filePath.endsWith(".mp3") && isAudioMessage) {
-            try {
-                const newPath = `${filePath.substring(0, filePath.length - 4)}.caf`;
-                await FileSystem.convertMp3ToCaf(filePath, newPath);
-                filePath = newPath;
-            } catch (ex) {
-                Server().log("Failed to convert MP3 to CAF!", "warn");
-            }
+        if (isAudioMessage) {
+            filePath = await FileSystem.prepareVoiceMemo(filePath);
         }
 
         const result = await Server().privateApi.attachment.send({
@@ -544,7 +538,7 @@ export class MessageInterface {
         for (let i = 0; i < parts.length; i++) {
             if (parts[i].attachment) {
                 const baseDir = FileSystem.getAttachmentDirectory("private-api");
-                const currentPath = path.join(baseDir, parts[i].attachment);
+                const currentPath = FileSystem.resolveWithin(baseDir, parts[i].attachment);
                 const newPath = FileSystem.copyAttachment(currentPath, parts[i].name, "private-api");
                 parts[i].filePath = newPath;
             }

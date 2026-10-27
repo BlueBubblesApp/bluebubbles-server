@@ -456,7 +456,11 @@ export class ScheduledMessagesService extends Loggable {
         // Send the message
         try {
             if (scheduledMessage.type === ScheduledMessageType.SEND_MESSAGE) {
-                await MessageInterface.sendMessageSync({ ...(scheduledMessage.payload as SendMessageParams) });
+                // The chat GUID may have been stored with a different prefix than the chat now has
+                // (e.g. `iMessage;-;` before upgrading to macOS Tahoe, which uses `any;-;`)
+                const payload = { ...(scheduledMessage.payload as SendMessageParams) };
+                payload.chatGuid = await Server().iMessageRepo.resolveChatGuid(payload.chatGuid);
+                await MessageInterface.sendMessageSync(payload);
             }
 
             scheduledMessage.sentAt = new Date();

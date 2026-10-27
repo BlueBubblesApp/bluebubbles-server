@@ -8,7 +8,7 @@ import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import * as admin from "firebase-admin";
 import { google, Auth } from "googleapis";
-import { generateRandomString } from "@server/utils/CryptoUtils";
+import { generateProjectId } from "@server/utils/CryptoUtils";
 import { getObjectAsString, isEmpty, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { ProgressStatus } from "@server/types";
 import { FCMService } from "../fcmService";
@@ -57,6 +57,18 @@ export class OauthService extends Loggable {
     private contactScopes = [
         "https://www.googleapis.com/auth/contacts.readonly"
     ]
+
+    /**
+     * APIs the project needs, enabled in one batch. Enabling one that is already on is a no-op.
+     * iam.googleapis.com is what minting the Admin SDK key needs; it used to be left off.
+     */
+    private requiredServices = [
+        "cloudapis.googleapis.com",
+        "cloudresourcemanager.googleapis.com",
+        "iam.googleapis.com",
+        "firebase.googleapis.com",
+        "firestore.googleapis.com"
+    ];
 
     get callbackUrl(): string {
         return `http://localhost:${this.port}/oauth/callback`;
@@ -113,32 +125,39 @@ export class OauthService extends Loggable {
             this.setStatus(ProgressStatus.IN_PROGRESS);
 
             this.log.info(`Creating Google Cloud project, "${this.projectName}"...`);
-            const project = await this.createGoogleCloudProject();
+            const project = await this.runStep("creating the Google Cloud project", () =>
+                this.createGoogleCloudProject()
+            );
             const projectId = project?.projectId;
             if (!projectId) {
                 throw new Error(`Project "${this.projectName}" was not found! Please restart the setup process.`);
             }
 
-            // Enable the required APIs
-            await this.enableCloudApis(projectId);
-            await this.enableCloudResourceManager(projectId);
-            await this.enableFirebaseManagementApi(projectId);
-            await this.enableFirestoreApi(projectId);
+            await this.runStep("enabling the required APIs", () => this.enableRequiredServices(projectId));
 
             this.log.info(`Adding Firebase to Google Cloud Project`);
-            await this.addFirebase(projectId);
+            await this.runStep("adding Firebase", () => this.addFirebase(projectId));
 
             this.log.info(`Waiting for Service Account to generate (this may take some time)...`);
-            const serviceAccountJson = await this.getServiceAccount(projectId);
+            const serviceAccountJson = await this.runStep("generating credentials", () =>
+                this.getServiceAccount(projectId)
+            );
 
             this.log.info(`Creating Firestore...`);
-            await this.createDatabase(projectId);
+            await this.runStep("creating the database", () => this.createDatabase(projectId));
 
             this.log.info(`Creating Android Configuration...`);
-            await this.createAndroidApp(projectId);
+            const appName = await this.runStep("registering the app", () => this.createAndroidApp(projectId));
 
             this.log.info(`Generating Google Services JSON (this may take some time)...`);
-            const servicesJson = await this.getGoogleServicesJson(projectId);
+            const servicesJson = await this.runStep("fetching the client configuration", () =>
+                this.getGoogleServicesJson(appName)
+            );
+
+            // Before the configurations are saved, so the server never starts
+            // against a project whose rules were not applied.
+            this.log.info(`Creating Firestore Security Rules...`);
+            await this.runStep("applying security rules", () => this.createSecurityRules(projectId));
 
             // Check if the current firebase server config is different from the previous.
             // If it is, we should log a warning and clear the devices.
@@ -155,10 +174,6 @@ export class OauthService extends Loggable {
             // Save the configurations
             FileSystem.saveFCMServer(serviceAccountJson);
             FileSystem.saveFCMClient(servicesJson);
-
-            // Set the security rules for the project.
-            this.log.info(`Creating Firestore Security Rules...`);
-            await this.createSecurityRules(projectId);
 
             this.log.info(`Revoking OAuth token, to prevent further use...`);
             try {
@@ -202,6 +217,24 @@ export class OauthService extends Loggable {
         } finally {
             // Shutdown the service
             await this.stop();
+        }
+    }
+
+    /**
+     * Runs one project creation step, naming it in the log if it fails.
+     * Without this, a failure surfaces as a bare HTTP error and working out
+     * which step was in progress means reading its URL.
+     *
+     * @param step What the step is doing, for the log
+     * @param body The step itself
+     * @returns Whatever the step returns
+     */
+    private async runStep<T>(step: string, body: () => Promise<T>): Promise<T> {
+        try {
+            return await body();
+        } catch (ex: any) {
+            this.log.error(`Project setup failed while ${step}: ${this.describeError(ex)}`);
+            throw ex;
         }
     }
 
@@ -340,7 +373,7 @@ export class OauthService extends Loggable {
         // Helper function to create a new project
         const createProj = async () => {
             const postUrl = `https://cloudresourcemanager.googleapis.com/v1/projects`;
-            projectId = `${this.projectName.toLowerCase()}-${generateRandomString(4)}`;
+            projectId = generateProjectId(this.projectName);
             const data = { name: this.projectName, projectId };
             this.log.info(`Creating project with name, "${this.projectName}", under project ID, "${projectId}"`);
             const createRes = await this.tryUntilNoError("POST", postUrl, data, 3, 5000);
@@ -393,42 +426,17 @@ export class OauthService extends Loggable {
         return (projectData.projects ?? []).find((p: any) => p.projectId === projectId);
     }
 
-    async enableCloudApis(projectId: string) {
-        this.log.info(`Enabling Cloud APIs`);
-        await this.enableService(projectId, "cloudapis.googleapis.com");
-    }
-
-    async enableFirebaseManagementApi(projectId: string) {
-        this.log.info(`Enabling Firebase Management APIs`);
-        await this.enableService(projectId, "firebase.googleapis.com");
-    }
-
-    async enableFirestoreApi(projectId: string) {
-        this.log.info(`Enabling Firestore APIs`);
-        await this.enableService(projectId, "firestore.googleapis.com");
-    }
-
-    async enableCloudResourceManager(projectId: string) {
-        this.log.info(`Enabling Cloud Resource Manager APIs`);
-        await this.enableService(projectId, "cloudresourcemanager.googleapis.com");
-    }
-
-    async enableIdentityApi(projectId: string) {
-        this.log.info(`Enabling IAM APIs`);
-        await this.enableService(projectId, "iam.googleapis.com");
-    }
-
-    async enableService(projectId: string, service: string) {
-        const postUrl = `https://serviceusage.googleapis.com/v1/projects/${projectId}/services/${service}:enable`;
-        const createRes = await this.tryUntilNoError("POST", postUrl, {}, 5, 5000);
-
-        // If the operation is already done, return
-        const operationName = createRes.name;
-        if (operationName.endsWith("DONE_OPERATION")) return;
-
-        // Wait for the operation to complete
-        const operationUrl = `https://serviceusage.googleapis.com/v1/${operationName}`;
-        return await this.waitForData("GET", operationUrl, null, "done", 30, 5000);
+    /**
+     * Enables every required API in one call.
+     * One batch returns a single operation, rather than a POST and a polling loop per service.
+     *
+     * @param projectId The project ID
+     */
+    async enableRequiredServices(projectId: string) {
+        this.log.info(`Enabling the required Google Cloud APIs: ${this.requiredServices.join(", ")}`);
+        const url = `https://serviceusage.googleapis.com/v1/projects/${projectId}/services:batchEnable`;
+        const operation = await this.tryUntilNoError("POST", url, { serviceIds: this.requiredServices }, 5, 5000);
+        await this.awaitOperation(operation, "https://serviceusage.googleapis.com/v1", "enabling the required APIs");
     }
 
     /**
@@ -441,8 +449,8 @@ export class OauthService extends Loggable {
         try {
             // Try for at least 2 minutes (8 attempts with 15 second delay)
             const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}:addFirebase`;
-            const res = await this.tryUntilNoError("POST", url, {}, 8, 15000);
-            await this.waitForData("GET", `https://firebase.googleapis.com/v1beta1/${res.name}`, null, "name");
+            const operation = await this.tryUntilNoError("POST", url, {}, 8, 15000);
+            await this.awaitOperation(operation, "https://firebase.googleapis.com/v1beta1", "adding Firebase");
             await waitMs(5000); // Wait 5 seconds to ensure Firebase is ready
         } catch (ex: any) {
             if (ex.response?.data?.error?.code === 409) {
@@ -485,53 +493,107 @@ export class OauthService extends Loggable {
         try {
             const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases?databaseId=${dbName}`;
             const data = { type: "FIRESTORE_NATIVE", locationId: "nam5" };
-            await this.sendRequest("POST", url, data);
-
-            // Wait for the DB to be created
-            await this.waitForData(
-                "GET",
-                `https://firestore.googleapis.com/v1/projects/${projectId}/databases`,
-                null,
-                "databases"
-            );
+            const res = await this.sendRequest("POST", url, data);
+            await this.awaitOperation(res.data, "https://firestore.googleapis.com/v1", "creating Firestore");
         } catch (ex: any) {
-            if (ex.response?.data?.error?.code === 409) {
+            const error = ex.response?.data?.error;
+            if (error?.code === 409 || error?.status === "ALREADY_EXISTS") {
                 this.log.info(`Firestore already exists!`);
-            } else {
-                throw ex;
+                return;
             }
+
+            // Google will not create a database on a project with no billing account. Matched on
+            // the message, because it arrives as PERMISSION_DENIED, FAILED_PRECONDITION or a plain
+            // 400 depending on the account, and Google's own wording does not say what to do.
+            const message = String(error?.message ?? ex?.message ?? "");
+            if (message.toLowerCase().includes("billing")) {
+                throw new Error(
+                    `Google requires a billing account on project ${projectId} before it will create a ` +
+                        `Firestore database. Enable billing on that project, then run setup again; it will ` +
+                        `continue with the same project. Cloud Messaging is free and this server's database ` +
+                        `usage is negligible.`
+                );
+            }
+
+            throw ex;
         }
     }
 
     /**
-     * Creates an Android app configuration for the Google Cloud Project
+     * Creates an Android app configuration for the Google Cloud Project,
+     * or finds the one that already exists for our package name.
      *
      * @param projectId The project ID
+     * @returns The app's resource name (projects/{project}/androidApps/{appId})
      * @throws An HTTP error if the error code is not 409
      */
-    async createAndroidApp(projectId: string) {
+    async createAndroidApp(projectId: string): Promise<string> {
+        // Checked first: registering a second app for the same package name creates a duplicate
+        // whose google-services.json may not be the one clients are using.
+        const existing = await this.findAndroidApp(projectId);
+        if (existing) {
+            this.log.info(`Android Configuration already exists!`);
+            return existing;
+        }
+
         try {
             const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps`;
             const data = { displayName: this.projectName, packageName: this.packageName };
-            const createRes = await this.tryUntilNoError("POST", url, data, 3, 10000);
-            if (!createRes?.data?.name) {
-                throw new Error(`Failed to provision Android App: ${getObjectAsString(createRes)}`);
-            }
+            const res = await this.tryUntilNoError("POST", url, data, 3, 10000);
 
-            // Wait for the app to be created
-            const operationName = createRes.data.name;
-            const operationUrl = `https://firebase.googleapis.com/v1beta1/${operationName}`;
-            const operationResult = await this.waitForData("GET", operationUrl, null, "done", 60, 5000);
-            if (operationResult.error) {
-                throw new Error(`Failed to create Android App: ${getObjectAsString(operationResult.error)}`);
-            }
+            // Checked before polling: when Google answers with the created app rather than an
+            // operation, polling the app's own URL as an operation would only time out.
+            const immediate = this.androidAppName(res);
+            if (immediate) return immediate;
+
+            const operation = await this.awaitOperation(
+                res,
+                "https://firebase.googleapis.com/v1beta1",
+                "registering the app"
+            );
+            const created = this.androidAppName(operation);
+            if (created) return created;
         } catch (ex: any) {
-            if (ex.response?.data?.error?.code === 409) {
-                this.log.info(`Android Configuration already exists!`);
-            } else {
-                throw ex;
-            }
+            if (ex.response?.data?.error?.code !== 409) throw ex;
+            this.log.info(`Android Configuration already exists!`);
         }
+
+        const appName = await this.findAndroidApp(projectId);
+        if (!appName) throw new Error(`Could not find the Android app for package name ${this.packageName}`);
+        return appName;
+    }
+
+    /**
+     * Finds the project's Android app for our package name
+     *
+     * @param projectId The project ID
+     * @returns The app's resource name, or null if there is none (or the listing failed)
+     */
+    private async findAndroidApp(projectId: string): Promise<string> {
+        try {
+            const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps`;
+            const res = await this.sendRequest("GET", url);
+            return (res.data?.apps ?? []).find((app: any) => app.packageName === this.packageName)?.name ?? null;
+        } catch (ex: any) {
+            // Not fatal: attempting the registration explains a real problem better than aborting here
+            this.log.debug(`Could not read the project's existing apps: ${this.describeError(ex)}`);
+            return null;
+        }
+    }
+
+    /**
+     * The projects/{project}/androidApps/{appId} resource name, wherever it is in a payload.
+     * Guarded on the path, because an operation's own name is operations/...
+     *
+     * @param payload An app, or a finished operation wrapping one
+     * @returns The resource name, or null
+     */
+    private androidAppName(payload: any): string {
+        for (const name of [payload?.response?.name, payload?.name]) {
+            if (typeof name === "string" && name.includes("/androidApps/")) return name;
+        }
+
+        return null;
     }
 
     /**
@@ -555,86 +617,184 @@ export class OauthService extends Loggable {
     }
 
     /**
-     * Gets the Service Account ID from the Google Cloud Project
+     * Finds the project's Firebase Admin service account.
+     *
+     * Matched on the display name or the email prefix: Google appends a suffix to the address
+     * (firebase-adminsdk-a1b2c@ historically, firebase-adminsdk-fbsvc@ on newer projects), and
+     * the display name could change. The account is created by addFirebase, but not instantly.
      *
      * @param projectId The project ID
-     * @returns The service account ID
+     * @returns The account's unique ID (or email) and email, or null if it never appeared
      */
-    async getFirebaseServiceAccountId(projectId: string): Promise<string> {
+    async getFirebaseServiceAccount(projectId: string): Promise<{ id: string; email: string }> {
         const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts`;
+        let lastError: string = null;
 
-        try {
-            // Max wait time: 5 minutes (60 attempts with 5 second delay)
-            const response = await this.waitForData("GET", url, null, "accounts", 60, 5000);
-            const firebaseServiceAccounts = response.accounts;
-            const firebaseServiceAccountId = firebaseServiceAccounts.find(
-                (element: any) => element.displayName === "firebase-adminsdk"
-            )?.uniqueId;
-            return firebaseServiceAccountId;
-        } catch {
-            return null;
+        // Max wait time: 5 minutes (60 attempts with 5 second delay)
+        for (let attempt = 0; attempt < 60; attempt++) {
+            try {
+                const res = await this.sendRequest("GET", url);
+                const match = (res.data?.accounts ?? []).find(
+                    (account: any) =>
+                        account.displayName === "firebase-adminsdk" || account.email?.startsWith("firebase-adminsdk")
+                );
+
+                const id = match?.uniqueId ?? match?.email;
+                if (id) return { id, email: match.email };
+            } catch (ex: any) {
+                // Retried rather than fatal: the IAM API was enabled moments ago
+                // and can briefly refuse calls while that propagates.
+                lastError = this.describeError(ex);
+            }
+
+            await waitMs(5000);
         }
+
+        this.log.debug(`The Firebase Admin service account never appeared. Last error: ${lastError ?? "none"}`);
+        return null;
     }
 
     /**
-     * Gets the Service Account private key from the Google Cloud Project
+     * Mints a new key for the project's Firebase Admin service account.
+     *
+     * Additive: existing keys stay valid, so another server using this project keeps working.
+     * This used to delete every user-managed key first, which broke any other server holding one,
+     * and left the project with no usable key at all if the mint then failed.
      *
      * @param projectId The project ID
-     * @returns The service account private key JSON string
+     * @returns The service account private key JSON
      */
     async getServiceAccount(projectId: string) {
-        const accountId: string = await this.getFirebaseServiceAccountId(projectId);
-        if (!accountId) {
-            throw new Error("Failed to get Firebase Service Account! Please ensure that the project was created!");
+        const account = await this.getFirebaseServiceAccount(projectId);
+        if (!account) {
+            throw new Error(
+                "The project's Firebase Admin service account did not appear. " +
+                    "This is usually temporary; try again in a few minutes."
+            );
         }
 
-        await waitMs(5000);
+        const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts/${account.id}/keys`;
+        const data = { privateKeyType: "TYPE_GOOGLE_CREDENTIALS_FILE" };
 
-        // eslint-disable-next-line max-len
-        const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts/${accountId}/keys`;
+        // Retried only while Google refuses in a way that means "not yet". Every successful POST
+        // creates a live private key, and Google allows ten per account, so nothing retries once
+        // a key has been returned.
+        let lastRefusal: any = null;
+        for (let attempt = 1; attempt <= 12; attempt++) {
+            let response: AxiosResponse<any, any>;
+            try {
+                response = await this.sendRequest("POST", url, data);
+            } catch (ex: any) {
+                if (!this.isNotReadyYet(ex)) {
+                    if (ex.response?.status === 400) {
+                        throw new Error(
+                            `Google refused to create a service account key: ${this.describeError(ex)}. ` +
+                                `If ${account.email ?? "the firebase-adminsdk account"} already has 10 keys, ` +
+                                `delete unused ones in the Google Cloud console (IAM & Admin > Service Accounts), ` +
+                                `then run setup again.`
+                        );
+                    }
 
-        // Get the existing keys, deleting all the user managed keys
-        const getRes = await this.sendRequest("GET", url);
-        const existingKeys = getRes.data.keys ?? [];
-        const userManagedKeys = existingKeys.filter((key: any) => key.keyType === "USER_MANAGED");
+                    throw ex;
+                }
 
-        let removed = 0;
-        for (const key of userManagedKeys) {
-            const deleteUrl = `https://iam.googleapis.com/v1/${key.name}`;
-            await this.sendRequest("DELETE", deleteUrl);
-            removed += 1;
+                lastRefusal = ex;
+                this.log.debug(
+                    `The service account is not ready yet; waiting (attempt ${attempt}): ${this.describeError(ex)}`
+                );
+                await waitMs(5000);
+                continue;
+            }
+
+            const privateKeyData = Buffer.from(response.data.privateKeyData, "base64").toString("utf-8");
+            return JSON.parse(privateKeyData);
         }
 
-        if (removed > 0) {
-            this.log.info(`Removed ${removed} existing ServiceAccount key(s)`);
-            await waitMs(5000); // Wait 5 seconds for the keys to be removed
-            this.log.info(`Creating new Service Account key...`);
-        }
+        throw lastRefusal ?? new Error("Failed to create a service account key!");
+    }
 
-        const response = await this.sendRequest("POST", url);
-        const b64Key = response.data.privateKeyData;
-        const privateKeyData = Buffer.from(b64Key, "base64").toString("utf-8");
-        return JSON.parse(privateKeyData);
+    /**
+     * Whether a refused request may be asked again: Google has not done anything,
+     * and the refusal is one that changes with time (propagation, rate limits, outages).
+     * A 400 is not: it is the key limit or a malformed request, and waiting fixes neither.
+     *
+     * @param ex The error from sendRequest
+     */
+    private isNotReadyYet(ex: any): boolean {
+        if (!axios.isAxiosError(ex)) return false;
+
+        // No response at all: the connection, not a refusal
+        const status = ex.response?.status;
+        if (status == null) return true;
+        return [403, 404, 409, 429].includes(status) || status >= 500;
+    }
+
+    /**
+     * Describes an error, using Google's own message when there is one
+     *
+     * @param ex The error
+     */
+    private describeError(ex: any): string {
+        const error = ex?.response?.data?.error;
+        if (error?.message) return `(${error.code ?? ex.response.status}) ${error.message}`;
+        return ex?.message ?? String(ex);
     }
 
     /**
      * Gets the Google Services JSON from the Google Cloud Project (Android Config)
      *
-     * @param projectId The project ID
+     * @param appName The app's resource name (projects/{project}/androidApps/{appId})
      * @returns The Google Services JSON string
      */
-    async getGoogleServicesJson(projectId: string) {
-        const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps`;
-        const appsRes = await this.sendRequest("GET", url);
-        const appId = (appsRes.data.apps ?? []).find((app: any) => app.packageName === this.packageName).appId;
-        if (!appId) throw new Error(`Could not find appId for package name ${this.packageName}`);
-
-        // eslint-disable-next-line max-len
-        const cfgUrl = `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps/${appId}/config`;
+    async getGoogleServicesJson(appName: string) {
+        const cfgUrl = `https://firebase.googleapis.com/v1beta1/${appName}/config`;
         const cfgRes = await this.sendRequest("GET", cfgUrl);
         const b64Config = cfgRes.data.configFileContents;
         const config = Buffer.from(b64Config, "base64").toString("utf-8");
         return JSON.parse(config);
+    }
+
+    /**
+     * Polls a long-running operation until it finishes.
+     *
+     * Operations are polled on the service that issued them: serviceusage operations live under
+     * serviceusage.googleapis.com, Firebase's under firebase.googleapis.com, and so on. The interval
+     * escalates from 500ms to 3s, since most of these finish within a second or two.
+     *
+     * @param operation The operation a call returned
+     * @param host The API base the operation belongs to
+     * @param step What the operation is doing, for errors
+     * @param timeoutMs How long to wait before giving up
+     * @returns The finished operation, or null if there was nothing to wait for
+     */
+    async awaitOperation(operation: any, host: string, step: string, timeoutMs = 180000): Promise<any> {
+        if (operation?.done === true) return operation;
+
+        // Service Usage answers an already-enabled API with this sentinel instead of a real operation
+        const name: string = operation?.name;
+        if (!name || name.endsWith("DONE_OPERATION")) return null;
+
+        const deadline = Date.now() + timeoutMs;
+        let delay = 500;
+        while (Date.now() < deadline) {
+            await waitMs(delay);
+            const res = await this.sendRequest("GET", `${host}/${name}`);
+            if (res.data?.done === true) {
+                if (res.data.error) {
+                    const reason = res.data.error.message ?? getObjectAsString(res.data.error);
+                    throw new Error(`Google could not finish ${step}: ${reason}`);
+                }
+
+                return res.data;
+            }
+
+            delay = Math.min(delay + 500, 3000);
+        }
+
+        throw new Error(
+            `Google did not finish ${step} in time. The project may still be created; ` +
+                `check the Firebase console before trying again.`
+        );
     }
 
     /**

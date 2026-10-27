@@ -103,10 +103,6 @@ export class ProcessSpawner extends Loggable {
         super();
         
         this.command = command;
-        if (this.command.includes(" ")) {
-            this.command = `"${this.command}"`;
-        }
-
         this.args = args;
         this.options = options;
         this.verbose = verbose;
@@ -130,7 +126,22 @@ export class ProcessSpawner extends Loggable {
     async execute(): Promise<ProcessSpawner> {
         return new Promise((resolve: (spawner: ProcessSpawner) => void, reject: (err: ProcessSpawnerError) => void) => {
             try {
-                this.process = spawn(this.command, this.quoteArgs(this.args), { ...this.options, shell: true });
+                // Never run through a shell: arguments are passed to the program verbatim,
+                // so nothing in them (config values, tokens, paths) can be interpreted as a command
+                this.process = spawn(this.command, this.args, { ...this.options, shell: false });
+
+                // Without a shell, a program that can't be started (e.g. ENOENT) emits "error"
+                // instead of exiting with 127. An unhandled "error" event would crash the server.
+                this.process.on("error", (err: Error) => {
+                    this.handleLog(`Process failed to start: ${err?.message ?? String(err)}`);
+                    reject({
+                        message: err?.message ?? String(err),
+                        output: this.output,
+                        process: this.process,
+                        wasForceQuit: false
+                    });
+                });
+
                 this.process.stdout.on("data", chunk => this.handleOutput(chunk, "stdout"));
                 this.process.stderr.on("data", chunk => {
                     this.handleOutput(chunk, "stderr");
@@ -220,15 +231,6 @@ export class ProcessSpawner extends Loggable {
         }
     }
 
-    private quoteArgs(args: string[]): string[] {
-        return args.map(arg => {
-            if (arg.includes(" ")) {
-                return `"${arg.replace(/"/g, '\\"')}"`;
-            } else {
-                return arg;
-            }
-        });
-    }
 
     static async executeCommand(
         command: string,

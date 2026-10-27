@@ -65,7 +65,7 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
             <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
                 <Select
                     id='proxy_service'
-                    maxWidth="16em"
+                    maxWidth="21em"
                     mr={3}
                     value={proxyService}
                     onChange={(e) => {
@@ -92,9 +92,10 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
                         }
                     }}
                 >
-                    <option value='cloudflare'>Cloudflare (Recommended)</option>
-                    <option value='zrok'>Zrok</option>
-                    <option value='ngrok'>Ngrok</option>
+                    {/* Minimums are the bundled binaries' own (LC_BUILD_VERSION minos) */}
+                    <option value='cloudflare'>Cloudflare (Recommended, macOS 15+)</option>
+                    <option value='zrok'>Zrok (macOS 14+)</option>
+                    <option value='ngrok'>Ngrok (macOS 11+)</option>
                     <option value='dynamic-dns'>Dynamic DNS / Custom URL</option>
                     <option value='lan-url'>LAN URL</option>
                 </Select>

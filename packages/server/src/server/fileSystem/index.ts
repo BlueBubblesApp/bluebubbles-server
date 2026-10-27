@@ -7,7 +7,6 @@ import { app } from "electron";
 import { sync } from "read-chunk";
 import { Server } from "@server";
 import {
-    escapeDoubleQuote,
     concatUint8Arrays,
     parseMetadataString,
     isNotEmpty,
@@ -28,7 +27,7 @@ import {
     ImageMetadata,
     ImageMetadataKeys
 } from "./types";
-import { uuidv4 } from "@firebase/util";
+import { v4 as uuidv4 } from "uuid";
 
 const FindProcess = require("find-process");
 const { rimrafSync } = require("rimraf");
@@ -160,8 +159,27 @@ export class FileSystem {
         }
     }
 
+    /**
+     * Reduces a value to a single path component, so it can't point outside of the
+     * directory it's joined onto. Attachment GUIDs and transfer names come from the
+     * sender's device, so they're never trusted as paths.
+     *
+     * @param value The value to reduce
+     * @param fallback What to use when nothing safe is left
+     */
+    static toPathComponent(value: string, fallback: string): string {
+        const name = path.basename(String(value ?? "").replace(/\0/g, ""));
+        if (name.length === 0 || name === "." || name === "..") return fallback;
+        return name;
+    }
+
+    private static attachmentCacheDirFor(attachment: Attachment) {
+        const guid = FileSystem.toPathComponent(attachment.originalGuid ?? attachment.guid, "unknown");
+        return path.join(FileSystem.attachmentCacheDir, guid);
+    }
+
     static cachedAttachmentPath(attachment: Attachment, name: string) {
-        return path.join(FileSystem.attachmentCacheDir, attachment.originalGuid ?? attachment.guid, name);
+        return path.join(FileSystem.attachmentCacheDirFor(attachment), FileSystem.toPathComponent(name, "attachment"));
     }
 
     static cachedAttachmentExists(attachment: Attachment, name: string) {
@@ -170,12 +188,55 @@ export class FileSystem {
     }
 
     static saveCachedAttachment(attachment: Attachment, name: string, data: Buffer) {
-        const basePath = path.join(FileSystem.attachmentCacheDir, attachment.originalGuid ?? attachment.guid);
+        const basePath = FileSystem.attachmentCacheDirFor(attachment);
         if (!fs.existsSync(basePath)) {
             fs.mkdirSync(basePath, { recursive: true });
         }
 
-        fs.writeFileSync(path.join(basePath, name), data);
+        fs.writeFileSync(FileSystem.cachedAttachmentPath(attachment, name), data);
+    }
+
+    /**
+     * Checks that a client-supplied name is a single, plain path component.
+     * Anything containing a path separator, a null byte, or that is "." / ".."
+     * could be used to escape the directory it is joined onto.
+     *
+     * @param name The name to check
+     */
+    static isSafeFileName(name: any): boolean {
+        if (typeof name !== "string" || isEmpty(name)) return false;
+        if (name === "." || name === "..") return false;
+        return !/[/\\\0]/.test(name);
+    }
+
+    /**
+     * Returns the name if it is safe to use as a file/folder name, otherwise throws
+     *
+     * @param name The name to check
+     */
+    static sanitizeFileName(name: any): string {
+        if (!FileSystem.isSafeFileName(name)) {
+            throw new Error(`Invalid file name: "${name}"`);
+        }
+
+        return name;
+    }
+
+    /**
+     * Resolves path segments against a base directory, and throws if the
+     * resulting path would land outside of that directory.
+     *
+     * @param baseDir The directory the path must stay within
+     * @param segments The path segments to resolve
+     */
+    static resolveWithin(baseDir: string, ...segments: string[]): string {
+        const base = path.resolve(baseDir);
+        const resolved = path.resolve(base, ...segments);
+        if (resolved !== base && !resolved.startsWith(base + path.sep)) {
+            throw new Error(`Invalid path: "${path.join(...segments)}" is outside of the allowed directory`);
+        }
+
+        return resolved;
     }
 
     /**
@@ -185,9 +246,9 @@ export class FileSystem {
      * @param buffer The attachment bytes (buffer)
      */
     static saveAttachment(name: string, buffer: Uint8Array): string {
-        let newFile = FileSystem.getAttachmentDirectory(null);
-        if (!fs.existsSync(newFile)) fs.mkdirSync(newFile, { recursive: true });
-        newFile = path.join(newFile, name);
+        const dir = FileSystem.getAttachmentDirectory(null);
+        const newFile = FileSystem.resolveWithin(dir, FileSystem.sanitizeFileName(name));
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(newFile, buffer);
         return newFile;
     }
@@ -210,11 +271,11 @@ export class FileSystem {
         // Generate a random folder to put it in. This is so we don't have file name overlap
         const guid = uuidv4();
         const dir = FileSystem.getAttachmentDirectory(method);
+        const newPath = FileSystem.resolveWithin(dir, guid, FileSystem.sanitizeFileName(name));
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-        let newPath = path.join(dir, guid);
-        if (!fs.existsSync(newPath)) fs.mkdirSync(newPath, { recursive: true });
-        newPath = path.join(newPath, name);
+        const parent = path.dirname(newPath);
+        if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
 
         if (newPath !== originalPath) {
             fs.copyFileSync(originalPath, newPath);
@@ -287,9 +348,41 @@ export class FileSystem {
      * @param buffer The attachment chunk bytes (buffer)
      */
     static saveAttachmentChunk(guid: string, chunkNumber: number, buffer: Uint8Array): void {
-        const parent = path.join(FileSystem.attachmentsDir, guid);
+        const index = Number(chunkNumber);
+        if (!Number.isInteger(index) || index < 0) throw new Error(`Invalid chunk number: "${chunkNumber}"`);
+
+        const parent = FileSystem.getChunkDirectory(guid);
         if (!fs.existsSync(parent)) fs.mkdirSync(parent);
-        fs.writeFileSync(path.join(parent, `${chunkNumber}.chunk`), buffer);
+        fs.writeFileSync(path.join(parent, `${index}.chunk`), buffer);
+    }
+
+    /**
+     * Returns the directory that holds the chunks for an attachment.
+     *
+     * The GUID comes from the client and every chunk function writes, reads, or
+     * recursively deletes this directory, so it must be a single plain path
+     * component that stays inside the attachments directory.
+     *
+     * @param guid Unique identifier for the attachment
+     */
+    private static getChunkDirectory(guid: string): string {
+        return FileSystem.resolveWithin(FileSystem.attachmentsDir, FileSystem.sanitizeFileName(guid));
+    }
+
+    static readonly maxLogLines = 10000;
+
+    /**
+     * Parses a client-supplied log line count. Returns the default when the value is
+     * absent, null when it is not a positive integer, and caps it at maxLogLines.
+     */
+    static parseLogCount(value: any, defaultCount = 100): number | null {
+        if (value === undefined || value === null || value === "") return defaultCount;
+        if (typeof value !== "number" && typeof value !== "string") return null;
+        if (typeof value === "string" && !/^\d+$/.test(value.trim())) return null;
+
+        const count = Number(value);
+        if (!Number.isInteger(count) || count < 1) return null;
+        return Math.min(count, FileSystem.maxLogLines);
     }
 
     static getLogs({ count = 100 }): Promise<string> {
@@ -300,8 +393,24 @@ export class FileSystem {
         });
     }
 
-    private static readLastLines({ filePath, count = 100 }: { filePath: string; count?: number }): Promise<string> {
-        return FileSystem.execShellCommand(`tail -n ${count} ${filePath}`);
+    private static async readLastLines({
+        filePath,
+        count = 100
+    }: {
+        filePath: string;
+        count?: number;
+    }): Promise<string> {
+        const lines = FileSystem.parseLogCount(count);
+        if (lines === null) {
+            throw new Error("Invalid log line count: must be a positive integer");
+        }
+
+        // Read the file directly rather than shelling out to `tail`, so the client-supplied
+        // count never reaches a command line. The log is rotated at 1MB, so this stays small.
+        const content = await fs.promises.readFile(filePath, "utf8");
+        const all = content.split("\n");
+        if (all.length > 0 && all[all.length - 1] === "") all.pop();
+        return all.length > 0 ? `${all.slice(-lines).join("\n")}\n` : "";
     }
 
     /**
@@ -310,7 +419,15 @@ export class FileSystem {
      * @param guid Unique identifier for the attachment
      */
     static deleteChunks(guid: string): void {
-        const dir = path.join(FileSystem.attachmentsDir, guid);
+        let dir: string;
+        try {
+            dir = FileSystem.getChunkDirectory(guid);
+        } catch {
+            // Never recursively delete anything outside of the attachments directory.
+            // This runs from the queue's cleanup timer, where a throw would be uncaught.
+            return;
+        }
+
         if (fs.existsSync(dir)) rimrafSync(dir);
     }
 
@@ -321,19 +438,20 @@ export class FileSystem {
      */
     static buildAttachmentChunks(guid: string, name: string): string {
         let chunks = new Uint8Array(0);
+        const dir = FileSystem.getChunkDirectory(guid);
+        const outFile = FileSystem.resolveWithin(dir, FileSystem.sanitizeFileName(name));
 
-        // Get the files in ascending order
-        const files = fs.readdirSync(path.join(FileSystem.attachmentsDir, guid));
+        // Get the chunk files in ascending order (only the ones we wrote)
+        const files = fs.readdirSync(dir).filter(file => /^\d+\.chunk$/.test(file));
         files.sort((a, b) => Number(a.split(".")[0]) - Number(b.split(".")[0]));
 
         // Read the files and append to chunks
         for (const file of files) {
-            const fileData = fs.readFileSync(path.join(FileSystem.attachmentsDir, guid, file));
+            const fileData = fs.readFileSync(path.join(dir, file));
             chunks = concatUint8Arrays(chunks, Uint8Array.from(fileData));
         }
 
         // Write the final file to disk
-        const outFile = path.join(FileSystem.attachmentsDir, guid, name);
         fs.writeFileSync(outFile, chunks);
 
         return outFile;
@@ -345,6 +463,11 @@ export class FileSystem {
      * @param vcf The VCF data to save
      */
     static saveVCF(vcf: string): void {
+        // Validate before deleting anything, so bad input can't leave the contacts file missing
+        if (typeof vcf !== "string") {
+            throw new Error("VCF data must be a string");
+        }
+
         // Delete the file if it exists
         if (fs.existsSync(FileSystem.contactsFile)) {
             fs.unlinkSync(FileSystem.contactsFile);
@@ -444,14 +567,26 @@ export class FileSystem {
         }
     }
 
+    static readonly maxFileChunkSize = 16 * 1024 * 1024; // 16MB
+
     static readFileChunk(filePath: string, start: number, chunkSize = 1024): Uint8Array {
+        // The size is allocated up-front, so it must be bounded
+        if (!Number.isInteger(chunkSize) || chunkSize < 1) {
+            throw new Error("Invalid chunk size: must be a positive integer");
+        }
+        if (!Number.isInteger(start) || start < 0) {
+            throw new Error("Invalid chunk start: must be a non-negative integer");
+        }
+
+        const size = Math.min(chunkSize, FileSystem.maxFileChunkSize);
+
         // Get the file size
         const stats = fs.statSync(filePath);
         let fStart = start;
 
         // Make sure the start are not bigger than the size
         if (fStart > stats.size) fStart = stats.size;
-        return Uint8Array.from(sync(filePath, fStart, chunkSize));
+        return Uint8Array.from(sync(filePath, fStart, size));
     }
 
     /**
@@ -481,16 +616,34 @@ export class FileSystem {
         });
     }
 
+    /**
+     * Asynchronously executes a program with an argument list (no shell)
+     */
+    static async execFileCommand(file: string, args: string[]): Promise<string> {
+        const { execFile } = child_process;
+        return new Promise((resolve, reject) => {
+            execFile(file, args, (error, stdout, stderr) => {
+                if (error) {
+                    reject(error);
+                }
+
+                resolve(stdout || stderr);
+            });
+        });
+    }
+
     static async executeAppleScript(cmd: string) {
         if (isEmpty(cmd)) return null;
 
-        let parts = cmd.split("\n");
-        parts = parts
-            .map(i => safeTrim(escapeDoubleQuote(i)))
+        // Each line is its own argument to osascript, never a shell string,
+        // so nothing in the script can be interpreted by /bin/sh
+        const args = cmd
+            .split("\n")
+            .map(i => safeTrim(i))
             .filter(i => isNotEmpty(i))
-            .map(i => `"${i}"`);
+            .flatMap(i => ["-e", i]);
 
-        return FileSystem.execShellCommand(`osascript -e ${parts.join(" -e ")}`);
+        return FileSystem.execFileCommand("/usr/bin/osascript", args);
     }
 
     /**
@@ -527,29 +680,121 @@ export class FileSystem {
 
     static async convertCafToMp3(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
-        const output = await FileSystem.execShellCommand(
-            `/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`
-        );
-        if (isNotEmpty(output) && output.includes("Error:")) {
-            throw Error(`Failed to convert audio to MP3: ${output}`);
+
+        // Converted files are cached by path, so a truncated output would be served forever.
+        // afconvert happily "succeeds" on a CAF that is still being written, so convert into
+        // a temporary file and only publish it if the source did not change underneath us.
+        const tmpPath = `${outputPath}.partial`;
+        const before = fs.statSync(oldPath);
+        try {
+            // Attachment file names come from whoever sent the message, so they must
+            // never pass through a shell (where $(...) and backticks would execute)
+            const output = await FileSystem.execFileCommand("/usr/bin/afconvert", [
+                "-f",
+                "m4af",
+                "-d",
+                "aac",
+                oldPath,
+                tmpPath
+            ]);
+            if (isNotEmpty(output) && output.includes("Error:")) {
+                throw Error(`Failed to convert audio to MP3: ${output}`);
+            }
+
+            const after = fs.statSync(oldPath);
+            if (after.size !== before.size || after.mtimeMs !== before.mtimeMs) {
+                throw Error("Failed to convert audio to MP3: the source file changed during conversion");
+            }
+
+            fs.renameSync(tmpPath, outputPath);
+        } finally {
+            if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
         }
     }
 
-    static async convertMp3ToCaf(originalPath: string, outputPath: string): Promise<void> {
-        const oldPath = FileSystem.getRealPath(originalPath);
-        const output = await FileSystem.execShellCommand(
-            `/usr/bin/afconvert -f caff -d LEI16@44100 -c 1 "${oldPath}" "${outputPath}"`
-        );
-        if (isNotEmpty(output) && output.includes("Error:")) {
-            throw Error(`Failed to convert audio to CAF: ${output}`);
+    static async isOpusCaf(filePath: string): Promise<boolean> {
+        try {
+            const output = await FileSystem.execFileCommand("/usr/bin/afinfo", [FileSystem.getRealPath(filePath)]);
+            return /Data format:.*\bopus\b/i.test(output ?? "");
+        } catch {
+            return false;
         }
+    }
+
+    /**
+     * Messages only renders a native voice memo (waveform + real duration) for the format it
+     * records itself: Opus, 24 kHz, mono, in a CAF container. A PCM CAF shows a 0s bubble.
+     * Older macOS releases may lack the Opus encoder, so fall back to the previous PCM recipe.
+     */
+    static async convertToVoiceMemoCaf(originalPath: string, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(originalPath);
+        const recipes = [
+            ["-d", "opus@24000", "-c", "1"],
+            ["-d", "LEI16@44100", "-c", "1"]
+        ];
+
+        let lastError: any = null;
+        for (const recipe of recipes) {
+            try {
+                const output = await FileSystem.execFileCommand("/usr/bin/afconvert", [
+                    "-f",
+                    "caff",
+                    ...recipe,
+                    oldPath,
+                    outputPath
+                ]);
+                if (isNotEmpty(output) && output.includes("Error:")) {
+                    throw Error(output);
+                }
+
+                return;
+            } catch (ex: any) {
+                lastError = ex;
+                if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+            }
+        }
+
+        throw Error(`Failed to convert audio to CAF: ${lastError?.message ?? lastError}`);
+    }
+
+    /**
+     * Prepares a file that is about to be sent as an audio message. MP3s are transcoded to a
+     * CAF next to the original (the message awaiter expects the `.caf` name); CAFs that are
+     * not already Opus are re-encoded in place, keeping their name. Never throws: on failure
+     * the original path is returned and the file is sent as-is.
+     */
+    static async prepareVoiceMemo(filePath: string): Promise<string> {
+        const ext = path.extname(filePath).toLowerCase();
+
+        try {
+            if (ext === ".mp3") {
+                const newPath = `${filePath.substring(0, filePath.length - 4)}.caf`;
+                await FileSystem.convertToVoiceMemoCaf(filePath, newPath);
+                return newPath;
+            }
+
+            if (ext === ".caf" && !(await FileSystem.isOpusCaf(filePath))) {
+                const tmpPath = path.join(path.dirname(filePath), `${uuidv4()}.caf`);
+                await FileSystem.convertToVoiceMemoCaf(filePath, tmpPath);
+                fs.renameSync(tmpPath, filePath);
+            }
+        } catch (ex: any) {
+            Server().log(`Failed to prepare voice memo, sending the original file: ${ex?.message ?? ex}`, "warn");
+        }
+
+        return filePath;
     }
 
     static async convertToJpg(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
-        const output = await FileSystem.execShellCommand(
-            `/usr/bin/sips --setProperty "format" "jpeg" "${oldPath}" --out "${outputPath}"`
-        );
+        const output = await FileSystem.execFileCommand("/usr/bin/sips", [
+            "--setProperty",
+            "format",
+            "jpeg",
+            oldPath,
+            "--out",
+            outputPath
+        ]);
         if (isNotEmpty(output) && output.includes("Error:")) {
             throw Error(`Failed to convert image to JPEG: ${output}`);
         }
@@ -571,7 +816,9 @@ export class FileSystem {
 
     static async getFileMetadata(filePath: string): Promise<{ [key: string]: string }> {
         try {
-            return parseMetadataString(await FileSystem.execShellCommand(`mdls "${FileSystem.getRealPath(filePath)}"`));
+            return parseMetadataString(
+                await FileSystem.execFileCommand("/usr/bin/mdls", [FileSystem.getRealPath(filePath)])
+            );
         } catch (ex: any) {
             return null;
         }
@@ -712,7 +959,7 @@ export class FileSystem {
     }
 
     static async killProcess(name: string): Promise<void> {
-        await FileSystem.execShellCommand(`killall "${name}"`);
+        await FileSystem.execFileCommand("/usr/bin/killall", [name]);
     }
 
     static async processIsRunning(name: string): Promise<boolean> {
@@ -789,6 +1036,7 @@ export class FileSystem {
         const pyPath = path.join(FileSystem.resources, "macos", "tools", "lock_screen_immediately.py");
         if (!fs.existsSync(pyPath)) throw Error("Lock screen script not found!");
 
-        await FileSystem.execShellCommand(`python ${pyPath}`);
+        // No shell, so a resources path containing spaces still resolves to one argument
+        await FileSystem.execFileCommand("python", [pyPath]);
     }
 }

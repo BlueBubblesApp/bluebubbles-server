@@ -4,6 +4,12 @@ import { Next } from "koa";
 import { ValidateInput } from "./index";
 import { BadRequest } from "../responses/errors";
 import { webhookEventOptions } from "@server/api/http/constants";
+import { Server } from "@server";
+import {
+    validateWebhookUrl,
+    WebhookSecurityOptions,
+    WebhookUrlError
+} from "@server/services/webhookService/addressGuard";
 
 export class WebhookValidator {
 
@@ -19,6 +25,35 @@ export class WebhookValidator {
         await next();
     }
 
+    /**
+     * Resolves the security options for a webhook registered through the API.
+     * Unless the server allows it, API-registered webhooks may not reach local network addresses,
+     * since anyone holding the server password could otherwise use the server to reach the LAN.
+     */
+    static getSecurityOptions(body: NodeJS.Dict<any>): WebhookSecurityOptions {
+        for (const key of ["blockPrivateAddresses", "requireHttps", "followRedirects"]) {
+            if (body[key] != null && typeof body[key] !== "boolean") {
+                throw new BadRequest({ error: `Webhook option "${key}" must be a boolean!` });
+            }
+        }
+
+        const allowPrivate = !!Server().repo.getConfig("webhook_api_allow_private_addresses");
+        const blockPrivateAddresses = body.blockPrivateAddresses ?? !allowPrivate;
+        if (!blockPrivateAddresses && !allowPrivate) {
+            throw new BadRequest({
+                error:
+                    "Webhooks registered through the API cannot target local network addresses unless " +
+                    "\"Allow API webhooks to reach local network addresses\" is enabled in the server's API settings!"
+            });
+        }
+
+        return {
+            blockPrivateAddresses,
+            requireHttps: body.requireHttps ?? false,
+            followRedirects: body.followRedirects ?? false
+        };
+    }
+
     static createRules = {
         url: "required|string",
         events: "required|array"
@@ -30,8 +65,14 @@ export class WebhookValidator {
         const { url, events } = ctx.request.body;
         if (url.length === 0) {
             throw new BadRequest({ error: "Webhook URL is required!" });
-        } else if (!url.startsWith('http')) {
-            throw new BadRequest({ error: "Webhook URL must include an HTTP scheme!" });
+        }
+
+        const options = WebhookValidator.getSecurityOptions(ctx.request.body);
+        try {
+            await validateWebhookUrl(url, options);
+        } catch (ex: any) {
+            if (ex instanceof WebhookUrlError) throw new BadRequest({ error: ex.message });
+            throw ex;
         }
 
         // Ensure that the events are valid
@@ -53,6 +94,7 @@ export class WebhookValidator {
 
         // Update the events
         ctx.request.body.events = validatedEvents;
+        ctx.request.body.options = options;
 
         await next();
     }

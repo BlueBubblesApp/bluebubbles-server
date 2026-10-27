@@ -7,8 +7,9 @@ import { Server } from "@server";
 import { isEmpty } from "@server/helpers/utils";
 import { FileSystem } from "@server/fileSystem";
 import { MessageInterface } from "@server/api/interfaces/messageInterface";
+import { validateWhereClauses, WhereClauseError } from "@server/databases/imessage/helpers/whereClauseValidator";
 
-import { ValidateInput } from "./index";
+import { ValidateChatGuid, ValidateInput } from "./index";
 import { BadRequest } from "../responses/errors";
 
 export class MessageValidator {
@@ -63,6 +64,15 @@ export class MessageValidator {
 
     static async validateQuery(ctx: RouterContext, next: Next) {
         ValidateInput(ctx?.request?.body, MessageValidator.queryBodyRules);
+
+        // Each statement is a raw SQL fragment, so it has to match the supported grammar
+        try {
+            validateWhereClauses(ctx.request.body?.where, Server().iMessageRepo.getQueryableMessageColumns());
+        } catch (ex: any) {
+            if (ex instanceof WhereClauseError) throw new BadRequest({ error: ex.message });
+            throw ex;
+        }
+
         await next();
     }
 
@@ -132,10 +142,15 @@ export class MessageValidator {
 
     static async validateAttachment(ctx: RouterContext, next: Next) {
         const { files } = ctx.request;
-        const { tempGuid, method, isAudioMessage, effectId, subject, selectedMessageGuid } = ValidateInput(
-            ctx.request?.body,
-            MessageValidator.sendAttachmentRules
-        );
+        const { chatGuid, tempGuid, name, method, isAudioMessage, effectId, subject, selectedMessageGuid } =
+            ValidateInput(ctx.request?.body, MessageValidator.sendAttachmentRules);
+        ValidateChatGuid(chatGuid);
+
+        // The name is used as the file name on disk, so it can't be a path
+        if (!FileSystem.isSafeFileName(name)) {
+            throw new BadRequest({ error: "Attachment name must be a plain file name, not a path" });
+        }
+
         let saniMethod = method ?? "apple-script";
         if (effectId || subject || selectedMessageGuid || ctx.request.body.attributedBody) {
             saniMethod = "private-api";
@@ -238,7 +253,22 @@ export class MessageValidator {
             if (part.attachment && !part.name)
                 throw new BadRequest({ error: "Each attachment must have a name" });
             if (part.attachment) {
-                const aPath = path.join(FileSystem.getAttachmentDirectory("private-api"), part.attachment);
+                if (!FileSystem.isSafeFileName(part.name))
+                    throw new BadRequest({ error: "Each attachment name must be a plain file name, not a path" });
+
+                // The attachment is the "<uuid>/<filename>" path returned by the upload endpoint,
+                // so it must resolve to a file within the attachments directory.
+                let aPath: string;
+                try {
+                    if (typeof part.attachment !== "string") throw new Error("Attachment must be a string");
+                    aPath = FileSystem.resolveWithin(
+                        FileSystem.getAttachmentDirectory("private-api"),
+                        part.attachment
+                    );
+                } catch {
+                    throw new BadRequest({ error: `Attachment '${part.attachment}' is not a valid upload path` });
+                }
+
                 if (!fs.existsSync(aPath)) {
                     throw new BadRequest({ error: `Attachment '${part.attachment}' does not exist` });
                 }
