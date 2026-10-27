@@ -25,6 +25,7 @@ import { MacOsRouter } from "./routers/macosRouter";
 import { iCloudRouter } from "./routers/icloudRouter";
 import { FaceTimeRouter } from "./routers/facetimeRouter";
 import { PrivateApiMiddleware } from "./middleware/privateApiMiddleware";
+import { ChatGuidMiddleware } from "./middleware/chatGuidMiddleware";
 import { HttpDefinition, HttpMethod, HttpRoute, HttpRouteGroup, KoaMiddleware } from "../../types";
 import { SettingsValidator } from "./validators/settingsValidator";
 import { MessageValidator } from "./validators/messageValidator";
@@ -793,6 +794,8 @@ export class HttpRoutes {
             ...(route?.middleware ?? group.middleware ?? []),
             this.TimeoutMiddleware(reqTimeout, resTimeout),
             ...(route.validators ?? []),
+            // Only the chat routes use the `:guid` param for a chat GUID
+            ChatGuidMiddleware(group.prefix === "chat"),
             route.controller
         ];
     }

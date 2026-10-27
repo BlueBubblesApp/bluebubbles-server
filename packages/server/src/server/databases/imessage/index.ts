@@ -3,6 +3,7 @@ import { Brackets, DataSource, SelectQueryBuilder } from "typeorm";
 
 import { DBMessageParams, ChatParams, HandleParams, DBWhereItem } from "@server/databases/imessage/types";
 import { convertDateTo2001Time } from "@server/databases/imessage/helpers/dateUtil";
+import { getChatGuidCandidates } from "@server/databases/imessage/helpers/chatGuid";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
@@ -56,6 +57,31 @@ export class MessageRepository extends Loggable {
             .orderBy("chat.ROWID", "DESC");
         const chat = await query.getOne();
         return chat ? chat.accountLogin.split(':').at(-1) : null;
+    }
+
+    /**
+     * Resolves a chat GUID to the GUID of the matching chat in the DB.
+     *
+     * On macOS Tahoe (26) and newer, chat GUIDs are prefixed with `any` rather than
+     * the service (`iMessage`/`SMS`). This lets a client keep using either format:
+     * an exact match always wins, otherwise the first variant that exists is returned.
+     * If no chat matches, the original GUID is returned unchanged.
+     *
+     * @param chatGuid The chat GUID to resolve
+     */
+    async resolveChatGuid(chatGuid: string): Promise<string> {
+        const candidates = getChatGuidCandidates(chatGuid);
+        if (candidates.length <= 1) return chatGuid;
+
+        const rows: { guid: string }[] = await this.db
+            .getRepository(Chat)
+            .createQueryBuilder("chat")
+            .select("chat.guid", "guid")
+            .where("chat.guid IN (:...candidates)", { candidates })
+            .getRawMany();
+
+        const existing = new Set(rows.map(row => row.guid));
+        return candidates.find(candidate => existing.has(candidate)) ?? chatGuid;
     }
 
     /**
