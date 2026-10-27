@@ -28,7 +28,7 @@ import {
     ImageMetadata,
     ImageMetadataKeys
 } from "./types";
-import { uuidv4 } from "@firebase/util";
+import { v4 as uuidv4 } from "uuid";
 
 const FindProcess = require("find-process");
 const { rimrafSync } = require("rimraf");
