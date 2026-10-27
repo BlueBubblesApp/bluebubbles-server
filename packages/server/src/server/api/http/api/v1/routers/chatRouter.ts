@@ -329,7 +329,7 @@ export class ChatRouter {
 
     static async stopTyping(ctx: RouterContext, _: Next): Promise<void> {
         const { guid } = ctx.params;
-        await ChatInterface.startTyping(guid);
+        await ChatInterface.stopTyping(guid);
         return new Success(ctx, { message: `Successfully stopped typing!` }).send();
     }
 

@@ -538,7 +538,7 @@ export class MessageInterface {
         for (let i = 0; i < parts.length; i++) {
             if (parts[i].attachment) {
                 const baseDir = FileSystem.getAttachmentDirectory("private-api");
-                const currentPath = path.join(baseDir, parts[i].attachment);
+                const currentPath = FileSystem.resolveWithin(baseDir, parts[i].attachment);
                 const newPath = FileSystem.copyAttachment(currentPath, parts[i].name, "private-api");
                 parts[i].filePath = newPath;
             }

@@ -13,10 +13,12 @@ import { NSAttributedString, Unarchiver } from "node-typedstream";
 
 
 export const getConversionPath = (attachment: Attachment, extension: string): string => {
-    const guid = attachment.originalGuid ?? attachment.guid;
+    // The GUID and transfer name come from the sender, so they can only ever be a single
+    // path component; otherwise the converted file could be written outside of convertDir
+    const guid = FileSystem.toPathComponent(attachment.originalGuid ?? attachment.guid, "unknown");
     const newDir = `${FileSystem.convertDir}/${guid}`;
     if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
-    const newName = isEmpty(attachment.transferName) ? guid : attachment.transferName;
+    const newName = isEmpty(attachment.transferName) ? guid : FileSystem.toPathComponent(attachment.transferName, guid);
 
     // If the path already has the extension, return it
     let newPath = `${newDir}/${newName}`;
