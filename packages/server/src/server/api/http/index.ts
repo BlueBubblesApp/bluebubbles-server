@@ -26,6 +26,7 @@ import { ScheduledService } from "../../lib/ScheduledService";
 import { Loggable } from "../../lib/logging/Loggable";
 import { ProxyServices } from "@server/databases/server/constants";
 import { ProcessSpawner } from "@server/lib/ProcessSpawner";
+import { AuthThrottle, resolveClientAddress } from "./authThrottle";
 
 /**
  * This service class handles all routing for incoming socket
@@ -59,8 +60,23 @@ export class HttpService extends Loggable {
                 query = Object.fromEntries(new URL(req.url ?? "", "http://localhost").searchParams.entries());
             }
 
-            const authorized = checkServerPassword(getSocketPassword(query)) === "ok";
-            if (!authorized) this.log.info(`Rejecting client connection. Authentication failed.`);
+            // Refuse blocked clients before looking at the password, so a blocked
+            // client learns nothing about its guesses
+            const clientAddress = resolveClientAddress(req.socket.remoteAddress, req.headers["x-forwarded-for"]);
+            if (this.authThrottle.retryAt(clientAddress) > 0) {
+                this.log.debug(`Rejecting client connection from blocked address ${clientAddress}.`);
+                callback("Too many failed authentication attempts", false);
+                return;
+            }
+
+            const pass = getSocketPassword(query);
+            const result = checkServerPassword(pass);
+            const authorized = result === "ok";
+            if (!authorized) {
+                this.log.info(`Rejecting client connection (IP: ${clientAddress}). Authentication failed.`);
+                if (result === "invalid") this.recordAuthFailure(clientAddress, String(pass).trim());
+            }
+
             callback(authorized ? null : "Authentication failed", authorized);
         }
     };
@@ -73,8 +89,13 @@ export class HttpService extends Loggable {
 
     portCheckerService: ScheduledService;
 
+    authThrottle: AuthThrottle;
+
     initialize() {
         this.httpOpts = {};
+
+        // Re-created on every (re)initialize, so restarting the server clears all blocks
+        this.authThrottle = new AuthThrottle();
 
         // Configure certificates
         try {
@@ -148,6 +169,32 @@ export class HttpService extends Loggable {
     }
 
     /**
+     * Records a wrong password and raises a warning (which lands in the
+     * notification drawer) naming the address when it gets that client blocked.
+     */
+    recordAuthFailure(address: string | null, credential: string) {
+        const { blockAlert, globalAlert } = this.authThrottle.recordFailure(address, credential);
+        if (blockAlert) {
+            const until = new Date(blockAlert.retryAt).toLocaleString();
+            Server().log(
+                `Blocked client ${blockAlert.address} after ${blockAlert.failures} different incorrect passwords ` +
+                    `in the last ${blockAlert.rule.label}. Authentication from this address is refused until ${until}. ` +
+                    `If this is one of your own devices, restart the server to clear the block.`,
+                "warn"
+            );
+        }
+
+        if (globalAlert) {
+            Server().log(
+                `${globalAlert.failures} different incorrect passwords have been tried against the server in the ` +
+                    `last ${this.authThrottle.globalRuleLabel}. Someone may be trying to guess your password; ` +
+                    `consider changing it to a long, random one.`,
+                "warn"
+            );
+        }
+    }
+
+    /**
      * Checks to see if another process is listening on the socket port.
      */
     async checkIfPortInUse(port: number) {
@@ -197,6 +244,10 @@ export class HttpService extends Loggable {
                 socket.disconnect(true);
                 return;
             }
+
+            this.authThrottle.recordSuccess(
+                resolveClientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"])
+            );
 
             this.log.info(
                 `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`
