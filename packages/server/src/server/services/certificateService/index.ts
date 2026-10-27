@@ -107,7 +107,8 @@ export class CertificateService extends Loggable {
 
         if (
             prevConfig.password === nextConfig.password &&
-            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() !== onlyAlphaNumeric(ProxyServices.DynamicDNS) &&
+            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() !==
+                onlyAlphaNumeric(ProxyServices.DynamicDNS) &&
             onlyAlphaNumeric(prevConfig.proxy_service as string).toLowerCase() !==
                 onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase()
         )
@@ -120,7 +121,8 @@ export class CertificateService extends Loggable {
         } else if (
             onlyAlphaNumeric(prevConfig.proxy_service as string).toLowerCase() !==
                 onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() &&
-            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() === onlyAlphaNumeric(ProxyServices.DynamicDNS)
+            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() ===
+                onlyAlphaNumeric(ProxyServices.DynamicDNS)
         ) {
             log.info("Proxy service changed to Dynamic DNS. Refreshing certificate");
             CertificateService.refreshCertificate();

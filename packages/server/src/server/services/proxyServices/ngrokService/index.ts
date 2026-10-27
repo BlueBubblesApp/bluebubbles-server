@@ -2,11 +2,10 @@ import { isEmpty, safeTrim } from "@server/helpers/utils";
 import path from "path";
 import fs from "fs";
 import { Server } from "@server";
-import { FileSystem } from "@server/fileSystem";
+import { FileSystem, userHomeDir } from "@server/fileSystem";
 import { connect, disconnect, kill, authtoken, Ngrok, upgradeConfig } from "ngrok";
 import { Proxy } from "../proxy";
 import { app } from "electron";
-import { userHomeDir } from "@server/fileSystem";
 
 // const sevenHours = 1000 * 60 * 60 * 7;  // This is the old ngrok timeout
 const oneHour45 = 1000 * 60 * (60 + 45); // This is the new ngrok timeout
@@ -15,7 +14,13 @@ export class NgrokService extends Proxy {
     tag = "NgrokService";
 
     static get daemonDir() {
-        return path.join(FileSystem.resources, "macos", "daemons", "ngrok", (process.arch === "arm64") ? "arm64" : "x86");
+        return path.join(
+            FileSystem.resources,
+            "macos",
+            "daemons",
+            "ngrok",
+            (process.arch === "arm64") ? "arm64" : "x86"
+        );
     }
 
     constructor() {

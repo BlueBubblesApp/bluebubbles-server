@@ -12,7 +12,14 @@ export class ZrokManager extends Loggable {
     tag = "ZrokManager";
 
     static get daemonPath() {
-        return path.join(FileSystem.resources, "macos", "daemons", "zrok", (process.arch === "arm64") ? "arm64" : "x86", "zrok");
+        return path.join(
+            FileSystem.resources,
+            "macos",
+            "daemons",
+            "zrok",
+            (process.arch === "arm64") ? "arm64" : "x86",
+            "zrok"
+        );
     }
 
     proc: ChildProcess;
@@ -48,25 +55,21 @@ export class ZrokManager extends Loggable {
         const reservedTunnel = (Server().repo.getConfig("zrok_reserve_tunnel") as boolean) ?? false;
         const tunnelToken = await ZrokManager.reserve(null);
 
-        return new Promise(async (resolve, reject) => {
-            // Didn't use zx here because I couldn't figure out how to pipe the stdout
-            // properly, without taking over the terminal outputs.
-            // Conditionally change the command based on if we are reserving a tunnel or not
-            const commndFlags = [
-                "share",
-                ...(reservedTunnel ? ["reserved", "--headless"] : ["public", "--backend-mode", "proxy", "--headless"]),
-                ...(reservedTunnel ? [tunnelToken] : [`0.0.0.0:${port}`])
-            ];
+        // Didn't use zx here because I couldn't figure out how to pipe the stdout
+        // properly, without taking over the terminal outputs.
+        // Conditionally change the command based on if we are reserving a tunnel or not
+        const commndFlags = [
+            "share",
+            ...(reservedTunnel ? ["reserved", "--headless"] : ["public", "--backend-mode", "proxy", "--headless"]),
+            ...(reservedTunnel ? [tunnelToken] : [`0.0.0.0:${port}`])
+        ];
 
-            if (this.proc && !this.proc?.killed) {
-                this.log.debug("Zrok Tunnel already running. Stopping...");
-                await this.stop();
-            }
+        if (this.proc && !this.proc?.killed) {
+            this.log.debug("Zrok Tunnel already running. Stopping...");
+            await this.stop();
+        }
 
-            this.proc = spawn(ZrokManager.daemonPath, commndFlags);
-            this.proc.stdout.on("data", chunk => this.handleData(chunk));
-            this.proc.stderr.on("data", chunk => this.handleData(chunk));
-
+        const connectPromise = new Promise<string>((resolve, reject) => {
             this.on("new-url", url => resolve(url));
             this.on("error", err => reject(err));
 
@@ -74,6 +77,12 @@ export class ZrokManager extends Loggable {
                 reject(new Error("Failed to connect to Zrok after 2 minutes..."));
             }, 1000 * 60 * 2); // 2 minutes
         });
+
+        this.proc = spawn(ZrokManager.daemonPath, commndFlags);
+        this.proc.stdout.on("data", chunk => this.handleData(chunk));
+        this.proc.stderr.on("data", chunk => this.handleData(chunk));
+
+        return connectPromise;
     }
 
     async stop() {
@@ -192,7 +201,10 @@ export class ZrokManager extends Loggable {
 
             // If there is an existing token, release it
             if (isNotEmpty(existingToken)) {
-                logger.info(`Releasing existing Zrok share (${existingToken}) because we no longer want to use a reserved tunnel.`);
+                logger.info(
+                    `Releasing existing Zrok share (${existingToken}) because we no longer want to use ` +
+                        `a reserved tunnel.`
+                );
                 await this.safeRelease(existingToken);
             }
 
@@ -208,7 +220,11 @@ export class ZrokManager extends Loggable {
                 await ZrokManager.safeRelease(existingToken, { clearToken: true });
             // If the tokens match, but the name doesn't match the token (which will be the name),
             // then release the existing tunnel
-            } else if (existingToken === reservedToken && isNotEmpty(reservedName) && reservedName !== existingToken) {
+            } else if (
+                existingToken === reservedToken &&
+                isNotEmpty(reservedName) &&
+                reservedName !== existingToken
+            ) {
                 logger.info(`Releasing existing Zrok share (${existingToken}) because the reserved name has changed.`);
                 await ZrokManager.safeRelease(existingToken, { clearToken: true });
             // If we have an existing token and the name hasn't changed, return the existing token
@@ -228,7 +244,12 @@ export class ZrokManager extends Loggable {
             }
 
             logger.info(`Reserving new tunnel with flags: ${flags.join(" ")}`);
-            const output = await ProcessSpawner.executeCommand(this.daemonPath, ["reserve", "public", ...flags], {}, "ZrokManager");
+            const output = await ProcessSpawner.executeCommand(
+                this.daemonPath,
+                ["reserve", "public", ...flags],
+                {},
+                "ZrokManager"
+            );
             const urlMatches = output.match(ZrokManager.proxyUrlRegex);
             if (isEmpty(urlMatches)) {
                 logger.info(`Failed to reserve Zrok tunnel! Unable to find URL in output. Output: ${output}`);
