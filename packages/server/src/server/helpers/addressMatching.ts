@@ -89,16 +89,31 @@ export const findByAddress = <T>(
     address: string,
     candidates: T[],
     getAddresses: (candidate: T) => string[]
-): T | null => {
-    const target = normalizeAddress(address);
-    if (!target) return null;
+): T | null => findInAddressIndex(address, buildAddressIndex(candidates, getAddresses));
 
-    const normalized = candidates.map(candidate => ({
+export type AddressIndex<T> = Array<{ candidate: T; addresses: NormalizedAddress[] }>;
+
+/**
+ * Normalizes every candidate's addresses once, so a list that is searched
+ * repeatedly (e.g. the contact list) isn't re-normalized on every lookup.
+ *
+ * @param candidates The list of candidates to index
+ * @param getAddresses Returns the addresses belonging to a candidate
+ */
+export const buildAddressIndex = <T>(candidates: T[], getAddresses: (candidate: T) => string[]): AddressIndex<T> =>
+    candidates.map(candidate => ({
         candidate,
         addresses: getAddresses(candidate)
             .map(normalizeAddress)
             .filter((e): e is NormalizedAddress => e !== null)
     }));
+
+/**
+ * Same as findByAddress, over a list indexed with buildAddressIndex
+ */
+export const findInAddressIndex = <T>(address: string, normalized: AddressIndex<T>): T | null => {
+    const target = normalizeAddress(address);
+    if (!target) return null;
 
     for (const exactOnly of [true, false]) {
         const match = normalized.find(e => e.addresses.some(addr => addressesMatch(target, addr, exactOnly)));
