@@ -1,10 +1,10 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { store } from '../store';
 import { MultiSelectValue } from '../types';
-import { createWebhook, deleteWebhook, updateWebhook } from '../utils/IpcUtils';
+import { createWebhook, deleteWebhook, getWebhooks, updateWebhook, WebhookSecurityOptions } from '../utils/IpcUtils';
 import { showErrorToast, showSuccessToast } from '../utils/ToastUtils';
 
-export interface WebhookItem {
+export interface WebhookItem extends WebhookSecurityOptions {
     id: number;
     url: string;
     events: string;
@@ -29,7 +29,14 @@ export const WebhooksSlice = createSlice({
                 if (!exists) state.webhooks.push(i);
             }
         },
-        create: (state, action: PayloadAction<{ url: string, events: Array<MultiSelectValue> }>) => {
+        setAll: (state, action: PayloadAction<Array<WebhookItem>>) => {
+            state.webhooks = action.payload;
+        },
+        create: (state, action: PayloadAction<{
+            url: string,
+            events: Array<MultiSelectValue>,
+            options: WebhookSecurityOptions
+        }>) => {
             const exists = state.webhooks.find(e => e.url === action.payload.url);
             if (exists) {
                 return showErrorToast({
@@ -53,7 +60,12 @@ export const WebhooksSlice = createSlice({
                 });
             });
         },
-        update: (state, action: PayloadAction<{ id: number, url: string, events: Array<MultiSelectValue> }>) => {
+        update: (state, action: PayloadAction<{
+            id: number,
+            url: string,
+            events: Array<MultiSelectValue>,
+            options: WebhookSecurityOptions
+        }>) => {
             const existingIndex = state.webhooks.findIndex(e => e.id === action.payload.id);
             if (existingIndex === -1) {
                 return showErrorToast({
@@ -64,16 +76,19 @@ export const WebhooksSlice = createSlice({
             }
 
             // Update it in the state
-            state.webhooks = state.webhooks.map(e => (e.id === action.payload.id) ?
-                { ...e, url: action.payload.url, events: JSON.stringify(action.payload.events.map(i => {
-                    return i.value;
-                })) } : e);
+            state.webhooks = state.webhooks.map(e => (e.id === action.payload.id) ? {
+                ...e,
+                ...action.payload.options,
+                url: action.payload.url,
+                events: JSON.stringify(action.payload.events.map(i => i.value))
+            } : e);
 
             // Send the update to the backend
             updateWebhook({
                 id: action.payload.id,
                 url: action.payload.url,
-                events: action.payload.events
+                events: action.payload.events,
+                options: action.payload.options
             }).then(() => {
                 showSuccessToast({
                     id: 'webhooks',
@@ -85,6 +100,9 @@ export const WebhooksSlice = createSlice({
                     duration: 5000,
                     description: `Failed to update webhook! Error: ${e}`
                 });
+
+                // The optimistic update above was rejected, so reload what is actually saved
+                getWebhooks().then((items: Array<WebhookItem>) => store.dispatch(setAll(items)));
             });
         },
         remove: (state, action: PayloadAction<number>) => {
@@ -115,6 +133,6 @@ export const WebhooksSlice = createSlice({
 });
 
 // Action creators are generated for each case reducer function
-export const { create, remove, update, addAll } = WebhooksSlice.actions;
+export const { create, remove, update, addAll, setAll } = WebhooksSlice.actions;
 
 export default WebhooksSlice.reducer;

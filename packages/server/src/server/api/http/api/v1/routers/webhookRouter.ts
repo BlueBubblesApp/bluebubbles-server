@@ -22,8 +22,8 @@ export class WebhookRouter {
     }
 
     static async create(ctx: RouterContext, _: Next) {
-        const { url, events } = ctx.request.body;
-        const webhook = await Server().repo.addWebhook(url, events);
+        const { url, events, options } = ctx.request.body;
+        const webhook = await Server().repo.addWebhook(url, events, options);
 
         // Convert the events to a list (from json array)
         webhook.events = JSON.parse(webhook.events);

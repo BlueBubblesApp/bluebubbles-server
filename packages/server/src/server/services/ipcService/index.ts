@@ -26,6 +26,9 @@ import {
 import { Loggable, getLogger } from "@server/lib/logging/Loggable";
 import { ZrokManager } from "@server/managers/zrokManager";
 import { ProxyServices } from "@server/databases/server/constants";
+import { Webhook } from "@server/databases/server/entity";
+import { getWebhookSecurityOptions } from "@server/services/webhookService";
+import { validateWebhookUrl } from "@server/services/webhookService/addressGuard";
 
 export class IPCService extends Loggable {
     tag = "IPCService";
@@ -148,15 +151,23 @@ export class IPCService extends Loggable {
             return FileSystem.getFCMClient();
         });
 
+        const serializeWebhook = (e: Webhook) => ({
+            id: e.id,
+            url: e.url,
+            events: e.events,
+            created: e.created,
+            ...getWebhookSecurityOptions(e)
+        });
+
         ipcMain.handle("get-webhooks", async (event, args) => {
             const res = await Server().repo.getWebhooks();
-            return res.map(e => ({ id: e.id, url: e.url, events: e.events, created: e.created }));
+            return res.map(serializeWebhook);
         });
 
         ipcMain.handle("create-webhook", async (event, payload) => {
-            const res = await Server().repo.addWebhook(payload.url, payload.events);
-            const output = { id: res.id, url: res.url, events: res.events, created: res.created };
-            return output;
+            await validateWebhookUrl(payload.url, payload.options ?? {});
+            const res = await Server().repo.addWebhook(payload.url, payload.events, payload.options ?? {});
+            return serializeWebhook(res);
         });
 
         ipcMain.handle("delete-webhook", async (event, args) => {
@@ -164,7 +175,21 @@ export class IPCService extends Loggable {
         });
 
         ipcMain.handle("update-webhook", async (event, args) => {
-            return await Server().repo.updateWebhook({ id: args.id, url: args?.url, events: args?.events });
+            const [existing] = await Server().repo.getWebhooks({ id: args.id });
+            if (existing) {
+                await validateWebhookUrl(args?.url || existing.url, {
+                    ...getWebhookSecurityOptions(existing),
+                    ...(args?.options ?? {})
+                });
+            }
+
+            const res = await Server().repo.updateWebhook({
+                id: args.id,
+                url: args?.url,
+                events: args?.events,
+                options: args?.options
+            });
+            return serializeWebhook(res);
         });
 
         ipcMain.handle("contact-permission-status", async (event, _) => {
