@@ -8,6 +8,7 @@ import { Success } from "../responses/success";
 import { AlertsInterface } from "@server/api/interfaces/alertsInterface";
 import { isEmpty, isTruthyBool } from "@server/helpers/utils";
 import { BadRequest } from "../responses/errors";
+import { parseWithQuery } from "../utils";
 import { autoUpdater } from "electron-updater";
 import { SERVER_UPDATE_DOWNLOADING } from "@server/events";
 
@@ -60,13 +61,9 @@ export class ServerRouter {
     }
 
     static async getLogs(ctx: RouterContext, _: Next) {
-        const countParam = ctx.request.query?.count ?? "100";
-        let count;
-
-        try {
-            count = Number.parseInt(countParam as string, 10);
-        } catch (ex: any) {
-            count = 100;
+        const count = FileSystem.parseLogCount(ctx.request.query?.count);
+        if (count === null) {
+            throw new BadRequest({ error: "Count must be a positive integer" });
         }
 
         const logs = await FileSystem.getLogs({ count });
@@ -78,7 +75,8 @@ export class ServerRouter {
 
         const params: any = {};
         if (only) {
-            params.only = (only as string).split(",");
+            // Repeated params (?only=a&only=b) arrive as an array
+            params.only = parseWithQuery(only, false);
         }
 
         return new Success(ctx, { data: await ServerInterface.getDatabaseTotals(params) }).send();
@@ -89,7 +87,8 @@ export class ServerRouter {
 
         const params: any = {};
         if (only) {
-            params.only = (only as string).split(",");
+            // Repeated params (?only=a&only=b) arrive as an array
+            params.only = parseWithQuery(only, false);
         }
 
         return new Success(ctx, { data: await ServerInterface.getMediaTotals(params) }).send();
@@ -100,7 +99,8 @@ export class ServerRouter {
 
         const params: any = {};
         if (only) {
-            params.only = (only as string).split(",");
+            // Repeated params (?only=a&only=b) arrive as an array
+            params.only = parseWithQuery(only, false);
         }
 
         return new Success(ctx, { data: await await ServerInterface.getMediaTotalsByChat(params) }).send();

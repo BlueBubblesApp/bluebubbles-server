@@ -56,4 +56,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     landing_page_path: () => "",
     open_findmy_on_startup: () => 1,
     auto_lock_mac: () => 0,
+    // When disabled, webhooks registered through the REST API may not target local network addresses
+    webhook_api_allow_private_addresses: () => 0,
 };

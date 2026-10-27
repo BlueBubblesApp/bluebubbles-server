@@ -30,6 +30,21 @@ export class ScheduledMessageValidator {
             throw new BadRequest({ error: `Missing required payload fields: ${missing.join(", ")}` });
         }
 
+        // The payload is stored and later sent as-is, so it's validated like a normal send
+        if (typeof payload.chatGuid !== "string" || typeof payload.message !== "string") {
+            throw new BadRequest({ error: "Payload chatGuid and message must be strings" });
+        }
+
+        const methodOpts = ["apple-script", "private-api"];
+        if (!methodOpts.includes(payload.method)) {
+            throw new BadRequest({ error: `Payload method must be one of: ${methodOpts.join(", ")}` });
+        }
+
+        const scheduleTypeOpts = Object.values(ScheduledMessageScheduleType) as string[];
+        if (schedule.type && !scheduleTypeOpts.includes(schedule.type)) {
+            throw new BadRequest({ error: `Schedule type must be one of: ${scheduleTypeOpts.join(", ")}` });
+        }
+
         if (typeof scheduledFor !== "number") {
             throw new BadRequest({ error: "scheduledFor must be a number" });
         }

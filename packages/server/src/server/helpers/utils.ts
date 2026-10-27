@@ -219,26 +219,17 @@ export const toBoolean = (input: string) => {
 };
 
 /**
- * Re
- *
- * @param input String to sanitize
- */
-export const escapeDoubleQuote = (input: string) => {
-    return input.replace(/"/g, '\\"'); // Replace double quote with escaped double quote
-};
-
-/**
- * Escape an Apple Script line of code (expression)
+ * Escape a value for use inside an AppleScript string literal ("...").
+ * Scripts are passed straight to osascript (no shell), so only AppleScript's
+ * own string escapes apply.
  *
  * @param input String to sanitize
  */
 export const escapeOsaExp = (input: string) => {
-    return input
-        .replace(/\\/g, "\\\\\\\\") // Replace backslash with 4 backslashes (yes, this is on purpose)
-        .replace(/"/g, '\\\\"') // Replace double quote with escaped double quote (2 backslashes)
-        .replace(/\$/g, "\\$") // Replace $ with escaped $ (1 backslash)
-        .replace(/`/g, "\\`") // Replace ` with escaped ` (1 backslashes)
-        .replace(/\r?\n/g, "\\n"); // Replace returns with explicit new line character
+    return (input ?? "")
+        .replace(/\\/g, "\\\\") // Replace backslash with an escaped backslash
+        .replace(/"/g, '\\"') // Replace double quote with an escaped double quote
+        .replace(/\r\n|\r|\n/g, "\\n"); // Replace returns with explicit new line character
 };
 
 /**
@@ -262,6 +253,22 @@ export const sanitizeStr = (val: string) => {
     return safeTrim(output);
 };
 
+/**
+ * Checks that a client-supplied address (phone number or email) is a plain,
+ * reasonably sized string. Addresses end up in AppleScript and chat GUIDs,
+ * so quotes, backslashes, and control characters are never valid.
+ *
+ * @param val The address to check
+ */
+export const isValidAddress = (val: unknown): boolean => {
+    if (typeof val !== "string") return false;
+    const trimmed = val.trim();
+    if (trimmed.length === 0 || trimmed.length > 256) return false;
+
+    // eslint-disable-next-line no-control-regex
+    return !/["\\\u0000-\u001f\u007f]/.test(val);
+};
+
 export const slugifyAddress = (val: string) => {
     if (!val) return val;
 
@@ -269,7 +276,9 @@ export const slugifyAddress = (val: string) => {
     let slugRegex = /[^\d+]+/g; // Strip all non-digits (except +)
     if (val.includes("@")) {
         // If it's an email, change the regex
-        slugRegex = /[^\w@.-_]+/g; // Strip non-alphanumeric except @, ., _, and -
+        // Strip non-alphanumeric except @, ., _, and -. The hyphen must come last: in the
+        // middle (".-_") it is a character range that also lets through \ ; < > / = ? [ ] ^
+        slugRegex = /[^\w@.-]+/g;
     }
 
     return safeTrim(

@@ -3,7 +3,6 @@ import { Server as SocketServer, ServerOptions } from "socket.io";
 
 // HTTP libraries
 import KoaApp from "koa";
-import koaBody from "koa-body";
 import koaJson from "koa-json";
 import KoaRouter from "koa-router";
 import koaCors from "koa-cors";
@@ -13,7 +12,7 @@ import * as fs from "fs";
 
 // Internal libraries
 import { Server } from "@server";
-import { isNotEmpty, onlyAlphaNumeric, safeTrim } from "@server/helpers/utils";
+import { isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
 import { EventCache } from "@server/eventCache";
 import { CertificateService } from "@server/services/certificateService";
 
@@ -21,6 +20,7 @@ import { HttpRoutes as HttpRoutesV1 } from "./api/v1/httpRoutes";
 import { SocketRoutes as SocketRoutesV1 } from "./api/v1/socketRoutes";
 import { ErrorMiddleware } from "./api/v1/middleware/errorMiddleware";
 import { createServerErrorResponse } from "./api/v1/responses";
+import { checkServerPassword, getSocketPassword } from "./passwordAuth";
 import { HELLO_WORLD } from "@server/events";
 import { ScheduledService } from "../../lib/ScheduledService";
 import { Loggable } from "../../lib/logging/Loggable";
@@ -48,7 +48,21 @@ export class HttpService extends Loggable {
         // 100 MB. 1000 == 1kb. 1000 * 1000 == 1mb
         maxHttpBufferSize: 1000 * 1000 * 100,
         allowEIO3: true,
-        transports: ["websocket", "polling"]
+        transports: ["websocket", "polling"],
+
+        // Reject a new session before engine.io accepts any of its payloads (up to maxHttpBufferSize
+        // each), so an unauthenticated client can't make the server buffer data. engine.io only calls
+        // this for a session's first request, and passes the same query that becomes socket.handshake.query.
+        allowRequest: (req, callback) => {
+            let query = (req as any)._query as Record<string, unknown>;
+            if (!query) {
+                query = Object.fromEntries(new URL(req.url ?? "", "http://localhost").searchParams.entries());
+            }
+
+            const authorized = checkServerPassword(getSocketPassword(query)) === "ok";
+            if (!authorized) this.log.info(`Rejecting client connection. Authentication failed.`);
+            callback(authorized ? null : "Authentication failed", authorized);
+        }
     };
 
     httpOpts: any;
@@ -112,23 +126,10 @@ export class HttpService extends Loggable {
         // This allows us to properly pull the IP from the request
         this.koaApp.proxy = true;
 
-        // This is used here so that we can catch errors in KoaBody as well
+        // Catch any errors that escape the route-level middleware
         this.koaApp.use(ErrorMiddleware);
 
-        // Increase size limits from the default 1mb
-        this.koaApp.use(
-            koaBody({
-                jsonLimit: "100mb",
-                textLimit: "100mb",
-                formLimit: "1024mb",
-                multipart: true,
-                parsedMethods: ["POST", "PUT", "PATCH", "DELETE"],
-                formidable: {
-                    // 1GB (1024 b * 1024 kb * 1024 mb)
-                    maxFileSize: 1024 * 1024 * 1024 // Defaults to 200mb
-                }
-            })
-        );
+        // Request bodies are parsed per-route, after authentication (see BodyMiddleware)
 
         // Don't show it "pretty" by default, but only if there is a `pretty` param
         this.koaApp.use(
@@ -152,13 +153,11 @@ export class HttpService extends Loggable {
     async checkIfPortInUse(port: number) {
         try {
             // Check if there are any listening services
+            // lsof exits non-zero (and we land in the catch) when nothing is listening
             const output = await ProcessSpawner.executeCommand('lsof', [
                 '-nP',
-                '-iTCP',
-                '-sTCP:LISTEN',
-                '|',
-                'grep',
-                `${port}`
+                `-iTCP:${Number(port)}`,
+                '-sTCP:LISTEN'
             ], {}, "PortChecker");
             if (output.includes(`:${port} (LISTEN)`)) return true;
         } catch {
@@ -190,37 +189,44 @@ export class HttpService extends Loggable {
                 this.log.info(`Client disconnected (Total Clients: ${this.socketServer.sockets.sockets.size})`);
             });
 
-            let pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
-            const cfgPass = String((await Server().repo.getConfig("password")) as string);
-
-            // Decode the param incase it contains URL encoded characters
-            pass = decodeURI(pass as string);
-
-            // Basic authentication
-            if (safeTrim(pass) === safeTrim(cfgPass)) {
-                this.log.info(
-                    `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`
-                );
-            } else {
-                socket.disconnect();
+            // Basic authentication. allowRequest already rejected bad passwords at the handshake;
+            // this re-check covers a password change since then. An unset server password never
+            // authenticates anyone, and a rejected client must never get any event handlers registered.
+            if (checkServerPassword(getSocketPassword(socket.handshake.query)) !== "ok") {
                 this.log.info(`Closing client connection. Authentication failed.`);
+                socket.disconnect(true);
+                return;
             }
 
+            this.log.info(
+                `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`
+            );
+
             /**
-             * Error handling middleware for all Socket.IO requests.
+             * Error handling for all Socket.IO event handlers.
              * If there are any errors in a socket event, they will be handled here.
              *
-             * A console message will be printed, and a socket error will be emitted
+             * Socket.IO middleware (`socket.use`) runs before the handler and can't see
+             * errors thrown by async handlers, so each handler is wrapped instead. A console
+             * message will be printed, and the error is sent to the client's ack callback
+             * (or emitted as an "exception" when there isn't one), so a bad request is always
+             * answered rather than becoming an unhandled rejection.
              */
-            socket.use(async (_: any, next: (error?: Error) => void) => {
-                try {
-                    await next();
-                } catch (ex: any) {
-                    this.log.error(`Socket server error! ${ex.message}`);
-                    socket.emit("exception", createServerErrorResponse(ex?.message ?? ex));
-                    next(ex);
-                }
-            });
+            const registerHandler = socket.on.bind(socket);
+            socket.on = ((event: string, listener: (...args: any[]) => any) =>
+                registerHandler(event, async (...args: any[]) => {
+                    try {
+                        await listener(...args);
+                    } catch (ex: any) {
+                        const message = ex?.message ?? String(ex);
+                        this.log.error(`Socket server error in "${event}"! ${message}`);
+
+                        const res = createServerErrorResponse(message);
+                        const ack = args[args.length - 1];
+                        if (typeof ack === "function") ack(res);
+                        else socket.emit("exception", res);
+                    }
+                })) as any;
 
             // Pass to method to handle the socket events
             SocketRoutesV1.createRoutes(socket);

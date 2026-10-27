@@ -1,5 +1,6 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
+import { FileSystem } from "@server/fileSystem";
 
 import { ValidateInput } from "./index";
 import { BadRequest } from "../responses/errors";
@@ -34,6 +35,11 @@ export class AttachmentValidator {
         const attachment = files?.attachment as unknown as File;
         if (!attachment || attachment.size === 0) {
             throw new BadRequest({ error: "Attachment not provided or was empty!" });
+        }
+
+        // The upload's file name is used as the file name on disk, so it can't be a path
+        if (!FileSystem.isSafeFileName(attachment.name)) {
+            throw new BadRequest({ error: "Attachment file name must be a plain file name, not a path" });
         }
 
         await next();
