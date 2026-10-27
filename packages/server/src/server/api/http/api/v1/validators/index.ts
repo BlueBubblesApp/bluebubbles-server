@@ -29,6 +29,27 @@ export const ValidateInput = <T>(data: T, rules: NodeJS.Dict<string>): T => {
     return data;
 };
 
+// Chat GUIDs are `<service>;-;<address>` or `<service>;+;<chat id>`. These are the service prefixes
+const chatGuidServices = ["imessage", "sms", "rcs", "any"];
+
+/**
+ * Rejects a chat GUID that is nothing but a service name (e.g. "iMessage").
+ * That is never a valid chat or address; it is what is left when a client cuts the
+ * value off at the first ";". curl's `-F` does exactly that, because it treats ";" as
+ * the start of a field parameter (such as `;type=`), so the value never reaches the server.
+ */
+export const ValidateChatGuid = (chatGuid: string) => {
+    if (typeof chatGuid !== "string") return;
+    if (!chatGuidServices.includes(chatGuid.trim().toLowerCase())) return;
+
+    throw new BadRequest({
+        error:
+            `Invalid chat GUID: "${chatGuid}". A chat GUID looks like "iMessage;-;<address>". ` +
+            `If you are using curl, send the field with --form-string (or wrap the value in double ` +
+            `quotes) so that curl does not cut it off at the first ";"`
+    });
+};
+
 export const ValidateJSON = (data: any, errorPrefix?: string) => {
     const errStr = errorPrefix ? `${errorPrefix} data` : "Data";
     if (!data) {

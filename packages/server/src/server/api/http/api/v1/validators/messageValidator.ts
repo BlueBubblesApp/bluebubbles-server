@@ -8,7 +8,7 @@ import { isEmpty } from "@server/helpers/utils";
 import { FileSystem } from "@server/fileSystem";
 import { MessageInterface } from "@server/api/interfaces/messageInterface";
 
-import { ValidateInput } from "./index";
+import { ValidateChatGuid, ValidateInput } from "./index";
 import { BadRequest } from "../responses/errors";
 
 export class MessageValidator {
@@ -132,10 +132,11 @@ export class MessageValidator {
 
     static async validateAttachment(ctx: RouterContext, next: Next) {
         const { files } = ctx.request;
-        const { tempGuid, method, isAudioMessage, effectId, subject, selectedMessageGuid } = ValidateInput(
+        const { chatGuid, tempGuid, method, isAudioMessage, effectId, subject, selectedMessageGuid } = ValidateInput(
             ctx.request?.body,
             MessageValidator.sendAttachmentRules
         );
+        ValidateChatGuid(chatGuid);
         let saniMethod = method ?? "apple-script";
         if (effectId || subject || selectedMessageGuid || ctx.request.body.attributedBody) {
             saniMethod = "private-api";
