@@ -4,12 +4,24 @@ const ForkTsCheckerWebpackPlugin = require("fork-ts-checker-webpack-plugin");
 const nodeExternals = require("webpack-node-externals");
 const baseConfig = require("./webpack.base.config");
 
+// node-fetch 3 is ESM-only, and Electron 25 can't load ESM from app.asar at runtime, so it (and its
+// ESM dependencies) are bundled instead. See src/server/lib/gaxiosFetch.ts.
+const allowlist = [
+    /^node-fetch(\/|$)/,
+    /^fetch-blob(\/|$)/,
+    /^formdata-polyfill(\/|$)/,
+    /^data-uri-to-buffer(\/|$)/,
+    /^web-streams-polyfill(\/|$)/,
+    /^node-domexception(\/|$)/
+];
+
 module.exports = merge(baseConfig, {
     target: "electron-main",
     externals: [
-        nodeExternals(),
+        nodeExternals({ allowlist }),
         nodeExternals({
             modulesDir: path.resolve(__dirname, '../../../node_modules'),
+            allowlist
         }),
     ],
     entry: {

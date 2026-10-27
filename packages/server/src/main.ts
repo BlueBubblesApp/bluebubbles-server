@@ -1,4 +1,6 @@
 import "reflect-metadata";
+// Must run before anything loads firebase-admin or googleapis.
+import "@server/lib/gaxiosFetch";
 import "@server/env";
 
 import { app, nativeTheme } from "electron";
