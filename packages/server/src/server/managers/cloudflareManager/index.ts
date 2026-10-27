@@ -126,18 +126,33 @@ export class CloudflareManager extends Loggable {
             return "Failed to connect to Cloudflare's servers! Please make sure your Mac is up to date";
         } else if (data.includes('failed to request quick Tunnel: ')) {
             return data.split('failed to request quick Tunnel: ')[1];
+        } else if (data.includes('quick tunnel provisioning failed with status 429')) {
+            this.backOffFromProvisioning();
+            return 'Cloudflare is rate limiting your requests. Waiting 1 hour...';
+        } else if (data.includes('quick tunnel provisioning failed')) {
+            // Newer cloudflared releases report any other rejected provisioning request this way
+            // (non-2xx status, or a 2xx carrying errors). Back off rather than letting the
+            // spawner restart the daemon straight into the same failure.
+            const reason = data.split('quick tunnel provisioning failed')[1].replace(/^\s*(with\s+)?:?\s*/, '').trim();
+            this.backOffFromProvisioning();
+            return `Cloudflare failed to create a tunnel${isNotEmpty(reason) ? ` (${reason})` : ''}. Waiting 1 hour...`;
         } else if (data.includes('failed to unmarshal quick Tunnel')) {
-            this.isRateLimited = true;
-            this.stop();
-            waitMs(1000 * 60 * 60).then(() => {
-                this.isRateLimited = false;
-                this.start();
-            });
-    
+            // Older cloudflared releases reported a rate limit (a non-JSON 429) this way
+            this.backOffFromProvisioning();
             return 'Cloudflare is rate limiting your requests. Waiting 1 hour...';
         }
 
         return null;
+    }
+
+    private backOffFromProvisioning() {
+        if (this.isRateLimited) return;
+        this.isRateLimited = true;
+        this.stop();
+        waitMs(1000 * 60 * 60).then(() => {
+            this.isRateLimited = false;
+            this.start();
+        });
     }
 
     private detectNewUrl(data: string) {

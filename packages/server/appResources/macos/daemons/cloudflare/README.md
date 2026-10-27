@@ -6,7 +6,7 @@ The `.md5` files within this directory contain a single string that is correlate
 
 ## Clourflared
 
-This is the official cloudflare daemon:
+This is the official cloudflare daemon, version `2026.10.4`:
 
 - (x86; amd64) downloaded from: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz
 - (arm64 - Apple Silicon) downloaded from: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64.tgz

@@ -1,3 +1,5 @@
 protocol: quic
 no-autoupdate: true
 retries: 6
+# cloudflared 2026.4.0 changed the default from 4 to auto; keep the IPv4-only behaviour
+edge-ip-version: "4"

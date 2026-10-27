@@ -38,7 +38,7 @@ import { runTerminalScript, openSystemPreferences, startMessages } from "@server
 
 import { ActionHandler } from "./api/apple/actions";
 import { insertChatParticipants, isEmpty, isNotEmpty, waitMs } from "./helpers/utils";
-import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinMojave, isMinMonterey, isMinSierra } from "./env";
+import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinMojave, isMinMonterey } from "./env";
 import { Proxy } from "./services/proxyServices/proxy";
 import { PrivateApiService } from "./api/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
@@ -824,13 +824,6 @@ class BlueBubblesServer extends EventEmitter {
         if (!this.region) {
             this.logger.debug("No region detected, defaulting to US...");
             this.region = "US";
-        }
-
-        // If the user is on el capitan, we need to force cloudflare
-        const proxyService = this.repo.getConfig("proxy_service") as string;
-        if (!isMinSierra && proxyService === "Ngrok") {
-            this.logger.info("El Capitan detected. Forcing Cloudflare Proxy");
-            await this.repo.setConfig("proxy_service", "Cloudflare");
         }
 
         // If the user is using tcp, force back to http
