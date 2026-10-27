@@ -45,8 +45,11 @@ const BLOCKED_IPV4_RANGES: Array<[string, number]> = [
 
 const BLOCKED_IPV6_RANGES: Array<[string, number]> = [
     ["::", 96], // Unspecified, loopback and IPv4-compatible
+    ["::ffff:0:0:0", 96], // IPv4-translated (RFC 2765)
+    ["64:ff9b:1::", 48], // Local-use NAT64 (RFC 8215)
     ["fc00::", 7], // Unique local
     ["fe80::", 10], // Link-local
+    ["fec0::", 10], // Site-local (deprecated, still routable on some networks)
     ["ff00::", 8] // Multicast
 ];
 

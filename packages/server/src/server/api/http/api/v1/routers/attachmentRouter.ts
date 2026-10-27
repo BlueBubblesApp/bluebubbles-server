@@ -37,7 +37,6 @@ export class AttachmentRouter {
         const forceDownload = isTruthyBool((force as string) ?? "true");
 
         // Fetch the info for the attachment by GUID
-        // Fetch the info for the attachment by GUID
         let attachment = await Server().iMessageRepo.getAttachment(guid);
         if (!attachment) {
             throw new NotFound({ error: "Attachment does not exist!" });

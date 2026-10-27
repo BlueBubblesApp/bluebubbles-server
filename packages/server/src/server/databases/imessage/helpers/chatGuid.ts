@@ -15,6 +15,10 @@ const chatGuidPattern = /^([^;]+)(;[-+];.+)$/;
  * Gets every variant of a chat GUID that could refer to the same chat,
  * ordered by preference. The GUID that was passed in is always first.
  *
+ * Only maps between `any` and a service prefix, never from one service to another:
+ * `iMessage;-;x` and `SMS;-;x` are different chats, and resolving one to the other
+ * would send over a service the client did not ask for.
+ *
  * Returns only the original GUID if it isn't in the `<service>;<-|+>;<identifier>` format.
  *
  * @param guid The chat GUID to get the variants for
@@ -27,6 +31,11 @@ export const getChatGuidCandidates = (guid: string): string[] => {
 
     const [, prefix, remainder] = match;
     if (!chatGuidServicePrefixes.includes(prefix)) return [guid];
+
+    if (prefix !== "any") {
+        const anyGuid = `any${remainder}`;
+        return anyGuid === guid ? [guid] : [guid, anyGuid];
+    }
 
     const candidates = [guid];
     for (const servicePrefix of chatGuidServicePrefixes) {

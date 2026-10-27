@@ -41,7 +41,8 @@ type Token = { type: TokenType; value: string };
 
 // Order matters: the first pattern that matches at the current position wins
 const TOKEN_PATTERNS: [TokenType | null, RegExp][] = [
-    [null, /^\s+/],
+    // SQLite's whitespace only. JS \s also matches Unicode spaces, which SQLite reads as identifier characters.
+    [null, /^[ \t\n\f\r]+/],
     // No escaped quotes, and no colons (TypeORM substitutes `:name` even inside string literals)
     ["string", /^'[^':]*'/],
     ["number", /^-?\d+(\.\d+)?(?![A-Za-z0-9_.])/],
@@ -294,7 +295,9 @@ export const validateWhereClauses = (where: unknown, columns: QueryableColumns):
         const label = `where[${index}]`;
         if (!isPlainObject(item)) throw new WhereClauseError(`${label} must be an object`);
 
-        const { statement, args: itemArgs } = item;
+        const { statement } = item;
+        // Some JSON encoders (e.g. PHP's) write an empty map as [], which older servers accepted
+        const itemArgs = Array.isArray(item.args) && item.args.length === 0 ? null : item.args;
         if (typeof statement !== "string") throw new WhereClauseError(`${label}.statement must be a string`);
         if (statement.length > MAX_STATEMENT_LENGTH) {
             throw new WhereClauseError(`${label}.statement cannot be longer than ${MAX_STATEMENT_LENGTH} characters`);

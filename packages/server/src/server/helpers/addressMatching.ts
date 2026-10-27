@@ -37,7 +37,9 @@ export const normalizeAddress = (address: string): NormalizedAddress | null => {
         return { kind: "other", value: trimmed };
     }
 
-    const digits = trimmed.replace(/\D/g, "");
+    // "+44 (0)7700 900123": the bracketed 0 is the national trunk prefix, which is never dialled
+    // after a country code, so drop it before the digits are compared
+    const digits = trimmed.replace(/\(\s*0\s*\)/g, "").replace(/\D/g, "");
     if (digits.length === 0) return null;
     return { kind: "phone", value: digits };
 };

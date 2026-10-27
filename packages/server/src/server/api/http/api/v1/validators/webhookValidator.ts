@@ -69,7 +69,10 @@ export class WebhookValidator {
 
         const options = WebhookValidator.getSecurityOptions(ctx.request.body);
         try {
-            await validateWebhookUrl(url, options);
+            // Re-registering an existing URL returns the stored webhook unchanged (see addWebhook), so integrations
+            // that register a LAN webhook on every start keep working after upgrade. New URLs are always checked.
+            const existing = await Server().repo.webhooks().findOneBy({ url });
+            if (!existing) await validateWebhookUrl(url, options);
         } catch (ex: any) {
             if (ex instanceof WebhookUrlError) throw new BadRequest({ error: ex.message });
             throw ex;
