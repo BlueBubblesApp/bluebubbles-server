@@ -56,10 +56,10 @@ export class GeneralInterface {
                 available: true,
                 current: app.getVersion(),
                 metadata: {
-                    version: Server().updater.updateInfo.updateInfo.version,
-                    release_date: Server().updater.updateInfo.updateInfo.releaseDate,
-                    release_name: Server().updater.updateInfo.updateInfo.releaseName,
-                    release_notes: Server().updater.updateInfo.updateInfo.releaseNotes
+                    version: Server().updater.updateInfo.version,
+                    release_date: Server().updater.updateInfo.releaseDate,
+                    release_name: Server().updater.updateInfo.releaseName,
+                    release_notes: Server().updater.updateInfo.releaseNotes
                 }
             };
 

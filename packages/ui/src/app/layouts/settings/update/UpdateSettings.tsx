@@ -6,6 +6,7 @@ import {
     Spacer
 } from '@chakra-ui/react';
 import { CheckForUpdatesField } from '../../../components/fields/CheckForUpdatesField';
+import { AutoInstallUpdatesField } from '../../../components/fields/AutoInstallUpdatesField';
 
 
 export const UpdateSettings = (): JSX.Element => {
@@ -16,6 +17,8 @@ export const UpdateSettings = (): JSX.Element => {
                 <Divider orientation='horizontal' />
                 <Spacer />
                 <CheckForUpdatesField />
+                <Spacer />
+                <AutoInstallUpdatesField />
             </Stack>
         </section>
     );

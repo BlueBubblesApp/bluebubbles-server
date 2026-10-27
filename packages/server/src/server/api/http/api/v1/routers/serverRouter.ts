@@ -9,8 +9,6 @@ import { AlertsInterface } from "@server/api/interfaces/alertsInterface";
 import { isEmpty, isTruthyBool } from "@server/helpers/utils";
 import { BadRequest } from "../responses/errors";
 import { parseWithQuery } from "../utils";
-import { autoUpdater } from "electron-updater";
-import { SERVER_UPDATE_DOWNLOADING } from "@server/events";
 
 export class ServerRouter {
     static async getInfo(ctx: RouterContext, _: Next) {
@@ -31,10 +29,17 @@ export class ServerRouter {
             throw new BadRequest({ message: "No update available!", error: "NO_UPDATE_AVAILABLE" });
         }
 
-        // Once the update is downloaded, it should be installed automatically.
+        // Releases without update metadata would only open a browser on the server's Mac
+        if (!Server().updater.updateInfo?.canAutoInstall) {
+            throw new BadRequest({
+                message: `Update v${updateMetadata.metadata.version} must be installed manually!`,
+                error: "UPDATE_REQUIRES_MANUAL_INSTALL"
+            });
+        }
+
+        // Once the update is downloaded, it's installed and the app relaunches.
         // Ref: updateService/index.ts
-        Server().emitMessage(SERVER_UPDATE_DOWNLOADING, null);
-        const waiter = autoUpdater.downloadUpdate();
+        const waiter = Server().updater.installUpdate();
         if (wait) {
             Server().log("Waiting for update to download...", "debug");
             await waiter;

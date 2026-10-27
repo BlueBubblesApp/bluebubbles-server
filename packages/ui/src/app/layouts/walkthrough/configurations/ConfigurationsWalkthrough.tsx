@@ -7,6 +7,7 @@ import {
 import { AutoStartMethodField } from '../../../components/fields/AutoStartMethodField';
 import { AutoCaffeinateField } from '../../../components/fields/AutoCaffeinateField';
 import { CheckForUpdatesField } from '../../../components/fields/CheckForUpdatesField';
+import { AutoInstallUpdatesField } from '../../../components/fields/AutoInstallUpdatesField';
 import { UseOledDarkModeField } from '../../../components/fields/OledDarkThemeField';
 import { OpenFindMyOnStartupField } from 'app/components/fields/OpenFindMyOnStartupField';
 
@@ -30,6 +31,8 @@ export const ConfigurationsWalkthrough = (): JSX.Element => {
                 <Text fontSize='3xl' mt={5}>Update Settings</Text>
                 <Box my={3} />
                 <CheckForUpdatesField />
+                <Box my={3} />
+                <AutoInstallUpdatesField />
                 <Text fontSize='3xl' mt={5}>Theme Settings</Text>
                 <Box my={3} />
                 <UseOledDarkModeField />

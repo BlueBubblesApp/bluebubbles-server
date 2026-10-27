@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, systemPreferences, shell } from "electron";
+import { app, dialog, ipcMain, systemPreferences } from "electron";
 import { askForAccessibilityAccess, askForFullDiskAccess } from "node-mac-permissions";
 import process from "process";
 
@@ -487,11 +487,7 @@ export class IPCService extends Loggable {
         });
 
         ipcMain.handle("install-update", async (_, __) => {
-            if (!Server().updater.hasUpdate) {
-                return Server().log("No update available to install!", "debug");
-            }
-
-            shell.openExternal(Server().updater.updateInfo.html_url, { activate: true });
+            await Server().updater?.installUpdate();
         });
     }
 }

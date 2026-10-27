@@ -25,9 +25,18 @@ module.exports = {
                 "vPrefixedTagName": true
             }
         ],
+        // The DMG is for first installs. electron-updater installs from the zip on macOS, and building
+        // it is what writes latest-mac.yml (plus the zip blockmaps) for the GitHub release.
         "target": [
             {
                 "target": "dmg",
+                "arch": [
+                    "x64",
+                    "arm64"
+                ],
+            },
+            {
+                "target": "zip",
                 "arch": [
                     "x64",
                     "arm64"
@@ -38,7 +47,12 @@ module.exports = {
         "icon": "../../icons/macos/dock-icon.png",
         "darkModeSupport": true,
         "hardenedRuntime": true,
-        "notarize": false,
+        // Credentials come from the environment: APPLE_KEYCHAIN_PROFILE (a `notarytool store-credentials`
+        // profile, which carries the team ID) or APPLE_API_KEY + APPLE_API_KEY_ID + APPLE_API_ISSUER.
+        // Don't switch this to { teamId }: @electron/notarize 2.2.1 treats teamId as a password
+        // credential and rejects it alongside a keychain profile or API key. With no credentials set,
+        // electron-builder skips notarization with a warning and the build still signs.
+        "notarize": true,
         "entitlements": "./scripts/entitlements.mac.plist",
         "entitlementsInherit": "./scripts/entitlements.mac.plist",
         "extendInfo": {
