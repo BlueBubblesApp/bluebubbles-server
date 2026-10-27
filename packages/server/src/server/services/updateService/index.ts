@@ -51,7 +51,22 @@ export class UpdateService extends Loggable {
         }
 
         // Downloads are started by installUpdate(), either from the user or the auto-install setting
-        autoUpdater.logger = this.log;
+        autoUpdater.logger = {
+            info: (message?: any) => this.log.info(String(message)),
+            // Before every macOS download, electron-updater runs `sysctl sysctl.proc_translated` to detect
+            // Rosetta. Intel Macs don't have that key, so it always fails there and electron-updater warns,
+            // which surfaces as a notification, then correctly carries on as not translated.
+            warn: (message?: any) => {
+                const text = String(message);
+                if (text.includes("sysctl.proc_translated")) {
+                    this.log.debug(text);
+                } else {
+                    this.log.warn(text);
+                }
+            },
+            error: (message?: any) => this.log.error(String(message)),
+            debug: (message: string) => this.log.debug(message)
+        };
         autoUpdater.autoDownload = false;
         autoUpdater.autoInstallOnAppQuit = false;
 
