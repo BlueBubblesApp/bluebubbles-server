@@ -43,14 +43,8 @@ export class ActionHandler {
         let messageScript: string;
 
         let theAttachment = attachment;
-        if (theAttachment !== null && theAttachment.endsWith(".mp3") && isAudioMessage) {
-            try {
-                const newPath = `${theAttachment.substring(0, theAttachment.length - 4)}.caf`;
-                await FileSystem.convertMp3ToCaf(theAttachment, newPath);
-                theAttachment = newPath;
-            } catch (ex) {
-                log.warn("Failed to convert MP3 to CAF!");
-            }
+        if (theAttachment !== null && isAudioMessage) {
+            theAttachment = await FileSystem.prepareVoiceMemo(theAttachment);
         }
 
         // Start the message send workflow

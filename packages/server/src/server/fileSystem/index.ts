@@ -527,22 +527,95 @@ export class FileSystem {
 
     static async convertCafToMp3(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
-        const output = await FileSystem.execShellCommand(
-            `/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`
-        );
-        if (isNotEmpty(output) && output.includes("Error:")) {
-            throw Error(`Failed to convert audio to MP3: ${output}`);
+
+        // Converted files are cached by path, so a truncated output would be served forever.
+        // afconvert happily "succeeds" on a CAF that is still being written, so convert into
+        // a temporary file and only publish it if the source did not change underneath us.
+        const tmpPath = `${outputPath}.partial`;
+        const before = fs.statSync(oldPath);
+        try {
+            const output = await FileSystem.execShellCommand(
+                `/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${tmpPath}"`
+            );
+            if (isNotEmpty(output) && output.includes("Error:")) {
+                throw Error(`Failed to convert audio to MP3: ${output}`);
+            }
+
+            const after = fs.statSync(oldPath);
+            if (after.size !== before.size || after.mtimeMs !== before.mtimeMs) {
+                throw Error("Failed to convert audio to MP3: the source file changed during conversion");
+            }
+
+            fs.renameSync(tmpPath, outputPath);
+        } finally {
+            if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
         }
     }
 
-    static async convertMp3ToCaf(originalPath: string, outputPath: string): Promise<void> {
-        const oldPath = FileSystem.getRealPath(originalPath);
-        const output = await FileSystem.execShellCommand(
-            `/usr/bin/afconvert -f caff -d LEI16@44100 -c 1 "${oldPath}" "${outputPath}"`
-        );
-        if (isNotEmpty(output) && output.includes("Error:")) {
-            throw Error(`Failed to convert audio to CAF: ${output}`);
+    static async isOpusCaf(filePath: string): Promise<boolean> {
+        try {
+            const output = await FileSystem.execShellCommand(`/usr/bin/afinfo "${FileSystem.getRealPath(filePath)}"`);
+            return /Data format:.*\bopus\b/i.test(output ?? "");
+        } catch {
+            return false;
         }
+    }
+
+    /**
+     * Messages only renders a native voice memo (waveform + real duration) for the format it
+     * records itself: Opus, 24 kHz, mono, in a CAF container. A PCM CAF shows a 0s bubble.
+     * Older macOS releases may lack the Opus encoder, so fall back to the previous PCM recipe.
+     */
+    static async convertToVoiceMemoCaf(originalPath: string, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(originalPath);
+        const recipes = ["-d opus@24000 -c 1", "-d LEI16@44100 -c 1"];
+
+        let lastError: any = null;
+        for (const recipe of recipes) {
+            try {
+                const output = await FileSystem.execShellCommand(
+                    `/usr/bin/afconvert -f caff ${recipe} "${oldPath}" "${outputPath}"`
+                );
+                if (isNotEmpty(output) && output.includes("Error:")) {
+                    throw Error(output);
+                }
+
+                return;
+            } catch (ex: any) {
+                lastError = ex;
+                if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+            }
+        }
+
+        throw Error(`Failed to convert audio to CAF: ${lastError?.message ?? lastError}`);
+    }
+
+    /**
+     * Prepares a file that is about to be sent as an audio message. MP3s are transcoded to a
+     * CAF next to the original (the message awaiter expects the `.caf` name); CAFs that are
+     * not already Opus are re-encoded in place, keeping their name. Never throws: on failure
+     * the original path is returned and the file is sent as-is.
+     */
+    static async prepareVoiceMemo(filePath: string): Promise<string> {
+        const ext = path.extname(filePath).toLowerCase();
+
+        try {
+            if (ext === ".mp3") {
+                const newPath = `${filePath.substring(0, filePath.length - 4)}.caf`;
+                await FileSystem.convertToVoiceMemoCaf(filePath, newPath);
+                return newPath;
+            }
+
+            if (ext === ".caf" && !(await FileSystem.isOpusCaf(filePath))) {
+                const tmpPath = path.join(path.dirname(filePath), `${uuidv4()}.caf`);
+                await FileSystem.convertToVoiceMemoCaf(filePath, tmpPath);
+                fs.renameSync(tmpPath, filePath);
+            }
+        } catch (ex: any) {
+            Server().log(`Failed to prepare voice memo, sending the original file: ${ex?.message ?? ex}`, "warn");
+        }
+
+        return filePath;
     }
 
     static async convertToJpg(originalPath: string, outputPath: string): Promise<void> {
