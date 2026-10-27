@@ -26,6 +26,7 @@ import { ScheduledService } from "../../lib/ScheduledService";
 import { Loggable } from "../../lib/logging/Loggable";
 import { ProxyServices } from "@server/databases/server/constants";
 import { ProcessSpawner } from "@server/lib/ProcessSpawner";
+import { AuthThrottle, resolveClientAddress } from "./authThrottle";
 
 /**
  * This service class handles all routing for incoming socket
@@ -59,8 +60,13 @@ export class HttpService extends Loggable {
 
     portCheckerService: ScheduledService;
 
+    authThrottle: AuthThrottle;
+
     initialize() {
         this.httpOpts = {};
+
+        // Re-created on every (re)initialize, so restarting the server clears all blocks
+        this.authThrottle = new AuthThrottle();
 
         // Configure certificates
         try {
@@ -147,6 +153,32 @@ export class HttpService extends Loggable {
     }
 
     /**
+     * Records a wrong password and raises a warning (which lands in the
+     * notification drawer) naming the address when it gets that client blocked.
+     */
+    recordAuthFailure(address: string | null, credential: string) {
+        const { blockAlert, globalAlert } = this.authThrottle.recordFailure(address, credential);
+        if (blockAlert) {
+            const until = new Date(blockAlert.retryAt).toLocaleString();
+            Server().log(
+                `Blocked client ${blockAlert.address} after ${blockAlert.failures} different incorrect passwords ` +
+                    `in the last ${blockAlert.rule.label}. Authentication from this address is refused until ${until}. ` +
+                    `If this is one of your own devices, restart the server to clear the block.`,
+                "warn"
+            );
+        }
+
+        if (globalAlert) {
+            Server().log(
+                `${globalAlert.failures} different incorrect passwords have been tried against the server in the ` +
+                    `last ${this.authThrottle.globalRuleLabel}. Someone may be trying to guess your password; ` +
+                    `consider changing it to a long, random one.`,
+                "warn"
+            );
+        }
+    }
+
+    /**
      * Checks to see if another process is listening on the socket port.
      */
     async checkIfPortInUse(port: number) {
@@ -190,7 +222,18 @@ export class HttpService extends Loggable {
                 this.log.info(`Client disconnected (Total Clients: ${this.socketServer.sockets.sockets.size})`);
             });
 
-            let pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
+            const clientAddress = resolveClientAddress(
+                socket.handshake.address,
+                socket.handshake.headers["x-forwarded-for"]
+            );
+            if (this.authThrottle.retryAt(clientAddress) > 0) {
+                socket.disconnect();
+                this.log.debug(`Closing client connection from blocked address ${clientAddress}.`);
+                return;
+            }
+
+            const rawPass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
+            let pass = rawPass;
             const cfgPass = String((await Server().repo.getConfig("password")) as string);
 
             // Decode the param incase it contains URL encoded characters
@@ -198,12 +241,15 @@ export class HttpService extends Loggable {
 
             // Basic authentication
             if (safeTrim(pass) === safeTrim(cfgPass)) {
+                this.authThrottle.recordSuccess(clientAddress);
                 this.log.info(
                     `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`
                 );
             } else {
                 socket.disconnect();
-                this.log.info(`Closing client connection. Authentication failed.`);
+                this.log.info(`Closing client connection (IP: ${clientAddress}). Authentication failed.`);
+                if (rawPass) this.recordAuthFailure(clientAddress, safeTrim(pass as string));
+                return;
             }
 
             /**

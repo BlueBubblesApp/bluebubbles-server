@@ -44,6 +44,20 @@ export class Forbidden extends HTTPError {
     }
 }
 
+export class TooManyRequests extends HTTPError {
+    constructor(response?: ResponseParams) {
+        super({
+            status: 429,
+            message: response?.message ?? "Too many failed authentication attempts. Try again later",
+            error: {
+                type: ErrorTypes.AUTHENTICATION_ERROR,
+                message: response?.error ?? ResponseMessages.TOO_MANY_REQUESTS
+            },
+            data: response?.data
+        });
+    }
+}
+
 export class BadRequest extends HTTPError {
     constructor(response?: ResponseParams) {
         super({
