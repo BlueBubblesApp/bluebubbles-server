@@ -47,9 +47,10 @@ module.exports = {
             "NSSystemAdministrationUsageDescription": "BlueBubbles needs access to manage your system",
         },
         "gatekeeperAssess": false,
-        // Electron 25's own floor (its Info.plist says 10.13); Apple Silicon is 11.0 regardless.
-        // Bundled proxies need more: ngrok 11.0, zrok 14.0, cloudflared 15.0.
-        "minimumSystemVersion": "10.13.0",
+        // node-mac-permissions hard-links Speech.framework and CGPreflight/RequestScreenCaptureAccess,
+        // all new in 10.15, so the server can't start on anything older (Electron 25 alone would allow 10.13).
+        // Apple Silicon is 11.0 regardless. Bundled proxies need more: ngrok 11.0, zrok 14.0, cloudflared 15.0.
+        "minimumSystemVersion": "10.15.0",
         "signIgnore": [
             "ngrok$",
             "zrok$",

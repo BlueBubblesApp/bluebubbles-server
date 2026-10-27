@@ -20,14 +20,13 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
 4. Run the dev server (this will start both the renderer and server)
     - `npm run start`
 
-### macOS Warning
+### Supported macOS versions
 
-If you are using macOS 10.x and are having issues building/running the server, please downgrade the `node-mac-permissions` dependency to `v2.2.0`. The reason it's on a newer version is to fix a production crashing issue on Big Sur+. Please downgrade it manually for testing on macOS v10.x.
+The server requires **macOS 10.15 (Catalina) or newer**. Apple Silicon Macs require macOS 11 (Big Sur), which is the oldest release they run.
 
-```bash
-cd packages/server
-npm install node-mac-permissions@2.2.0
-```
+The floor comes from `node-mac-permissions`: it links `Speech.framework` and the screen-capture permission functions in CoreGraphics, all of which first shipped in 10.15. On 10.14 or older, macOS refuses to load the module, and because the server imports it at startup, the server never starts.
+
+Each bundled proxy has its own minimum on top of that: ngrok needs macOS 11, zrok macOS 14 and Cloudflare macOS 15.
 
 ## Structure / Directory Map
 
