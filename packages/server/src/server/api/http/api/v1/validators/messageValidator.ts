@@ -9,7 +9,7 @@ import { FileSystem } from "@server/fileSystem";
 import { MessageInterface } from "@server/api/interfaces/messageInterface";
 import { validateWhereClauses, WhereClauseError } from "@server/databases/imessage/helpers/whereClauseValidator";
 
-import { ValidateInput } from "./index";
+import { ValidateChatGuid, ValidateInput } from "./index";
 import { BadRequest } from "../responses/errors";
 
 export class MessageValidator {
@@ -142,10 +142,9 @@ export class MessageValidator {
 
     static async validateAttachment(ctx: RouterContext, next: Next) {
         const { files } = ctx.request;
-        const { tempGuid, name, method, isAudioMessage, effectId, subject, selectedMessageGuid } = ValidateInput(
-            ctx.request?.body,
-            MessageValidator.sendAttachmentRules
-        );
+        const { chatGuid, tempGuid, name, method, isAudioMessage, effectId, subject, selectedMessageGuid } =
+            ValidateInput(ctx.request?.body, MessageValidator.sendAttachmentRules);
+        ValidateChatGuid(chatGuid);
 
         // The name is used as the file name on disk, so it can't be a path
         if (!FileSystem.isSafeFileName(name)) {
