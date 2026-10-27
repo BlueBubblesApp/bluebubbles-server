@@ -5,7 +5,8 @@ const nodeExternals = require("webpack-node-externals");
 const baseConfig = require("./webpack.base.config");
 
 // node-fetch 3 is ESM-only, and Electron 25 can't load ESM from app.asar at runtime, so it (and its
-// ESM dependencies) are bundled instead. See src/server/lib/gaxiosFetch.ts.
+// ESM dependencies) are bundled instead. See src/server/lib/gaxiosFetch.ts. It must stay a devDependency:
+// as a dependency, electron-builder packages it over the hoisted node-fetch 2 that gaxios 6 requires.
 const allowlist = [
     /^node-fetch(\/|$)/,
     /^fetch-blob(\/|$)/,
