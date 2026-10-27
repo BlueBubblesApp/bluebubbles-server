@@ -52,6 +52,8 @@ export class AttachmentSerializer {
         // Get the fully qualified path
         let fPath = FileSystem.getRealPath(attachment.filePath);
         const mimeType = attachment.getMimeType();
+        // Before convertImage rewrites filePath (Live Photo .mov is beside the original).
+        const hasLivePhoto = !!AttachmentInterface.getLivePhotoPath(attachment);
 
         // If the attachment isn't finished downloading, the path will be null
         if (fPath) {
@@ -114,7 +116,7 @@ export class AttachmentSerializer {
                     hideAttachment: attachment.hideAttachment,
                     isSticker: attachment.isSticker,
                     originalGuid: attachment.originalGuid,
-                    hasLivePhoto: !!AttachmentInterface.getLivePhotoPath(attachment)
+                    hasLivePhoto
                 }
             };
         }
