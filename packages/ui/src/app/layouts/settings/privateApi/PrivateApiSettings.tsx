@@ -6,6 +6,7 @@ import {
     Spacer
 } from '@chakra-ui/react';
 import { PrivateApiField } from '../../../components/fields/PrivateApiField';
+import { GroupTypingIndicatorsField } from '../../../components/fields/GroupTypingIndicatorsField';
 
 
 export const PrivateApiSettings = (): JSX.Element => {
@@ -16,6 +17,7 @@ export const PrivateApiSettings = (): JSX.Element => {
                 <Divider orientation='horizontal' />
                 <Spacer />
                 <PrivateApiField />
+                <GroupTypingIndicatorsField />
             </Stack>
         </section>
     );
