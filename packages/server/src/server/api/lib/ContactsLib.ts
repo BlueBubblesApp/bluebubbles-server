@@ -11,22 +11,22 @@ try {
     contacts = null;
 }
 
-// Var to track if this is the first time we are loading contacts.
-// If it's the first time, we need to load all available info, so it's cached
-let isFirstLoad = true;
+// node-mac-contacts caches the result of its first getAllContacts() call natively, and keeps
+// returning that same array (whatever fields it was fetched with) until the Contacts store
+// reports a change. So the cache is primed once with every field we ever read, and re-primed
+// after each change.
+let needsPrime = true;
+
+// Logged once per failure streak, since every contact lookup would otherwise log it again
+let primeFailureLogged = false;
 
 export class ContactsLib {
-    static allExtraProps = [
-        'jobTitle',
-        'departmentName',
-        'organizationName',
-        'middleName',
-        'note',
-        'contactImage',
-        'contactThumbnailImage',
-        'instantMessageAddresses',
-        'socialProfiles'
-    ];
+    /**
+     * The optional fields the cache is primed with. Only the images are ever read
+     * (see ContactInterface.mapContacts); every other optional field (notes, job title,
+     * social profiles...) would be held in memory for nothing.
+     */
+    static cachedExtraProps = ["contactImage", "contactThumbnailImage"];
 
     static async requestAccess() {
         if (!contacts) return "Unknown";
@@ -38,31 +38,52 @@ export class ContactsLib {
         return contacts.getAuthStatus();
     }
 
-    static getContactPermissionStatus() {
-        if (!contacts) return "Unknown";
-        return contacts.getContactPermissionStatus();
-    }
-
-    static getAllContacts(extraProps: string[] = []) {
+    /**
+     * Returns every contact from the Contacts store.
+     *
+     * The returned array is node-mac-contacts' own cache: it is the same array on every call
+     * until the store changes, so callers must never mutate it or the contacts in it.
+     */
+    static getAllContacts(): any[] {
         if (!contacts) return [];
 
-        // If it's the first load, we need to load all available info.
-        // And also listen for changes so we can reload all the info again.
-        if (isFirstLoad) {
-            isFirstLoad = false;
-            contacts.getAllContacts(ContactsLib.allExtraProps);
-            ContactsLib.listenForChanges();
+        if (needsPrime) {
+            try {
+                const primed = contacts.getAllContacts(ContactsLib.cachedExtraProps);
+
+                // Without access nothing is cached (an empty list is returned each time), so keep
+                // priming until access is granted rather than locking in a cache with no images
+                if (contacts.getAuthStatus() !== "Authorized") return primed ?? [];
+
+                needsPrime = false;
+                primeFailureLogged = false;
+                ContactsLib.listenForChanges();
+                return primed ?? [];
+            } catch (ex: any) {
+                // Nothing was cached, so the next lookup tries again
+                if (!primeFailureLogged) {
+                    primeFailureLogged = true;
+                    Server().log(`Failed to load contacts: ${ex?.message ?? String(ex)}`, "warn");
+                }
+
+                return [];
+            }
         }
 
-        return contacts.getAllContacts(extraProps);
+        return contacts.getAllContacts(ContactsLib.cachedExtraProps) ?? [];
     }
 
     static listenForChanges() {
         if (!contacts) return;
+
+        // A listener left over from before (e.g. the change event never arrived) would make setup() throw
+        if (contacts.listener.isListening()) contacts.listener.remove();
+
         contacts.listener.setup();
-        contacts.listener.once('contact-changed', (_: string) => {
+        contacts.listener.once("contact-changed", (_: string) => {
+            // The native cache has already been cleared; rebuild it on the next lookup
             Server().log("Detected contact change, queueing full reload...", "debug");
-            isFirstLoad = true;
+            needsPrime = true;
             contacts.listener.remove();
         });
     }
