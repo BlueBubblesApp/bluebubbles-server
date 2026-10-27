@@ -138,11 +138,6 @@ export class OauthService extends Loggable {
             this.log.info(`Adding Firebase to Google Cloud Project`);
             await this.runStep("adding Firebase", () => this.addFirebase(projectId));
 
-            this.log.info(`Waiting for Service Account to generate (this may take some time)...`);
-            const serviceAccountJson = await this.runStep("generating credentials", () =>
-                this.getServiceAccount(projectId)
-            );
-
             this.log.info(`Creating Firestore...`);
             await this.runStep("creating the database", () => this.createDatabase(projectId));
 
@@ -158,6 +153,13 @@ export class OauthService extends Loggable {
             // against a project whose rules were not applied.
             this.log.info(`Creating Firestore Security Rules...`);
             await this.runStep("applying security rules", () => this.createSecurityRules(projectId));
+
+            // Last, because every key minted is a live credential that is only kept if setup
+            // completes: a failure in any earlier step must not leave an orphaned key behind.
+            this.log.info(`Waiting for Service Account to generate (this may take some time)...`);
+            const serviceAccountJson = await this.runStep("generating credentials", () =>
+                this.getServiceAccount(projectId)
+            );
 
             // Check if the current firebase server config is different from the previous.
             // If it is, we should log a warning and clear the devices.

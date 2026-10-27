@@ -225,11 +225,16 @@ export class ServerRepository extends EventEmitter {
         // If the webhook exists, don't re-add it, just return it
         if (item) return item;
 
+        // Only the known options, and only as booleans, so a caller can't override the URL or events
+        const security = { ...DEFAULT_WEBHOOK_SECURITY_OPTIONS };
+        for (const key of Object.keys(DEFAULT_WEBHOOK_SECURITY_OPTIONS) as Array<keyof WebhookSecurityOptions>) {
+            if (typeof options?.[key] === "boolean") security[key] = options[key];
+        }
+
         const webhook = repo.create({
             url,
             events: JSON.stringify(events.map(e => e.value)),
-            ...DEFAULT_WEBHOOK_SECURITY_OPTIONS,
-            ...options
+            ...security
         });
         return await repo.save(webhook);
     }

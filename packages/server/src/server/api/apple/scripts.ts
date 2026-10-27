@@ -10,13 +10,14 @@ const osVersion = macosVersion();
 
 const buildServiceScript = (inputService: string) => {
     // On macOS 11+ the service is an unquoted enum constant (iMessage, SMS), so it
-    // must never be anything but a bare identifier or it becomes AppleScript code
-    if (!/^[A-Za-z]+$/.test(inputService ?? "")) {
+    // must be one of the known services or it becomes AppleScript code
+    const knownService = ["iMessage", "SMS", "RCS"].find(s => s.toLowerCase() === String(inputService).toLowerCase());
+    if (!knownService) {
         throw new Error(`Invalid service: ${inputService}`);
     }
 
     // Wrap the service in quotes if we are on < macOS 11 and it's not iMessage
-    let theService = inputService;
+    let theService = knownService;
     if (!isMinBigSur && theService !== "iMessage") {
         theService = `"${theService}"`;
     }
@@ -69,6 +70,10 @@ const getServiceFromInput = (value: string) => {
     // If we have 0 or 1 items, it means there is no `;` character
     // so we should default to iMessage
     if (valSplit.length <= 1) return "iMessage";
+
+    // macOS 26+ replaced the service prefix with the literal "any", which isn't a
+    // service AppleScript knows. The fallback only handles DMs, so assume iMessage.
+    if (valSplit[0].toLowerCase() === "any") return "iMessage";
 
     // Otherwise, return the "first" index in the array,
     return valSplit[0];

@@ -72,6 +72,10 @@ export class FileSystem {
 
     public static attachmentCacheDir = path.join(FileSystem.baseDir, "Attachments", "Cached");
 
+    // Chunked uploads get their own directory, so a client-chosen GUID can never name
+    // (and later recursively delete) the cache or another send's folder
+    public static attachmentChunksDir = path.join(FileSystem.baseDir, "Attachments", "Chunks");
+
     public static certsDir = path.join(FileSystem.baseDir, "Certs");
 
     public static themesDir = path.join(FileSystem.baseDir, "Themes");
@@ -146,6 +150,7 @@ export class FileSystem {
         if (!fs.existsSync(FileSystem.baseDir)) fs.mkdirSync(FileSystem.baseDir);
         if (!fs.existsSync(FileSystem.attachmentsDir)) fs.mkdirSync(FileSystem.attachmentsDir);
         if (!fs.existsSync(FileSystem.attachmentCacheDir)) fs.mkdirSync(FileSystem.attachmentCacheDir);
+        if (!fs.existsSync(FileSystem.attachmentChunksDir)) fs.mkdirSync(FileSystem.attachmentChunksDir);
         if (!fs.existsSync(FileSystem.convertDir)) fs.mkdirSync(FileSystem.convertDir);
         if (!fs.existsSync(FileSystem.contactsDir)) fs.mkdirSync(FileSystem.contactsDir);
         if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
@@ -352,7 +357,7 @@ export class FileSystem {
         if (!Number.isInteger(index) || index < 0) throw new Error(`Invalid chunk number: "${chunkNumber}"`);
 
         const parent = FileSystem.getChunkDirectory(guid);
-        if (!fs.existsSync(parent)) fs.mkdirSync(parent);
+        if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
         fs.writeFileSync(path.join(parent, `${index}.chunk`), buffer);
     }
 
@@ -361,12 +366,14 @@ export class FileSystem {
      *
      * The GUID comes from the client and every chunk function writes, reads, or
      * recursively deletes this directory, so it must be a single plain path
-     * component that stays inside the attachments directory.
+     * component that stays inside the chunks directory (and is not that directory).
      *
      * @param guid Unique identifier for the attachment
      */
     private static getChunkDirectory(guid: string): string {
-        return FileSystem.resolveWithin(FileSystem.attachmentsDir, FileSystem.sanitizeFileName(guid));
+        const dir = FileSystem.resolveWithin(FileSystem.attachmentChunksDir, FileSystem.sanitizeFileName(guid));
+        if (dir === path.resolve(FileSystem.attachmentChunksDir)) throw new Error(`Invalid attachment GUID: "${guid}"`);
+        return dir;
     }
 
     static readonly maxLogLines = 10000;
@@ -684,7 +691,8 @@ export class FileSystem {
         // Converted files are cached by path, so a truncated output would be served forever.
         // afconvert happily "succeeds" on a CAF that is still being written, so convert into
         // a temporary file and only publish it if the source did not change underneath us.
-        const tmpPath = `${outputPath}.partial`;
+        // The name is unique per call: the same attachment is often converted by several requests at once.
+        const tmpPath = `${outputPath}.${uuidv4()}.partial`;
         const before = fs.statSync(oldPath);
         try {
             // Attachment file names come from whoever sent the message, so they must

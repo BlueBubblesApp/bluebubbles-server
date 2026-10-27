@@ -49,7 +49,8 @@ export class WebhookService extends Loggable {
     private async sendPost(webhook: Webhook, event: WebhookEvent) {
         const options = getWebhookSecurityOptions(webhook);
 
-        // Re-validate on every send so rows written before these checks existed are held to them too
+        // Re-validate on every send against the row's own options. Rows that predate these options were migrated
+        // with every option off, so for them this only enforces an http(s) scheme.
         const url = parseWebhookUrl(webhook.url, options);
 
         const config: AxiosRequestConfig = {
