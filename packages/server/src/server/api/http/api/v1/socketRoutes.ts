@@ -46,6 +46,27 @@ import { ProxyServices } from "@server/databases/server/constants";
 const unknownError = "Unknown Error. Check server logs!";
 const log = getLogger("SocketRoutes");
 
+// The param that holds the chat GUID, for each event that takes one
+const chatGuidParamKeys: Record<string, string> = {
+    "get-chat": "chatGuid",
+    "get-chat-messages": "identifier",
+    "get-messages": "chatGuid",
+    "get-last-chat-message": "identifier",
+    "get-participants": "identifier",
+    "send-message": "guid",
+    "send-message-chunk": "guid",
+    "rename-group": "identifier",
+    "add-participant": "identifier",
+    "remove-participant": "identifier",
+    "send-reaction": "chatGuid",
+    "toggle-chat-read-status": "chatGuid",
+    "open-chat": "chatGuid",
+    "started-typing": "chatGuid",
+    "stopped-typing": "chatGuid",
+    "mark-chat-read": "chatGuid",
+    "update-typing-status": "chatGuid"
+};
+
 export class SocketRoutes {
     static createRoutes(socket: Socket) {
         const response = (
@@ -76,6 +97,24 @@ export class SocketRoutes {
 
             if (resData.error) log.debug(resData.error.message);
         };
+
+        /**
+         * Rewrite the chat GUID param to the GUID of the matching chat in the chat.db.
+         * Chats can be prefixed with `any`, `iMessage`, or `SMS` (macOS Tahoe uses `any`),
+         * so a client may send a GUID that differs from the stored one only by its prefix.
+         */
+        socket.use(async ([event, params]: any[], next: (error?: Error) => void) => {
+            const key = chatGuidParamKeys[event];
+            if (key && params && typeof params[key] === "string") {
+                try {
+                    params[key] = await Server().iMessageRepo.resolveChatGuid(params[key]);
+                } catch (ex: any) {
+                    log.debug(`Failed to resolve chat GUID, "${params[key]}": ${ex?.message ?? ex}`);
+                }
+            }
+
+            next();
+        });
 
         /**
          * Return information about the server
