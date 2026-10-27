@@ -28,6 +28,19 @@ export const getConversionPath = (attachment: Attachment, extension: string): st
     return `${newDir}/${newName}.${extension}`;
 }
 
+/**
+ * Whether the attachment's file on disk has reached the size Messages recorded for it.
+ * Once a transfer finishes, `total_bytes` matches the file size exactly.
+ */
+const isFullyWritten = (attachment: Attachment): boolean => {
+    const fPath = FileSystem.getRealPath(attachment.filePath);
+    if (!fPath || !fs.existsSync(fPath)) return false;
+
+    const size = fs.statSync(fPath).size;
+    if (size === 0) return false;
+    return !attachment.totalBytes || size >= attachment.totalBytes;
+};
+
 export const convertAudio = async (
     attachment: Attachment,
     {
@@ -50,7 +63,12 @@ export const convertAudio = async (
 
     if (!fs.existsSync(newPath) && !dryRun) {
         try {
-            if (isNotEmpty(ext)) {
+            if (isNotEmpty(ext) && !isFullyWritten(attachment)) {
+                // Messages writes the file after the row appears (e.g. right after we send a
+                // voice memo). Skip for now; the next serialize or download will convert it.
+                Server().log(`Attachment, ${attachment.transferName}, is still being written. Skipping...`, "debug");
+                return null;
+            } else if (isNotEmpty(ext)) {
                 Server().log(`Converting attachment, ${attachment.transferName}, to an MP3...`);
                 await FileSystem.convertCafToMp3(attachment.filePath, newPath);
             }
