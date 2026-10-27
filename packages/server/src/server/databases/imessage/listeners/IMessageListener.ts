@@ -27,19 +27,39 @@ export class IMessageListener extends Loggable {
 
     lastCheck = 0;
 
-    constructor({ filePaths, repo, cache }: { filePaths: string[], repo: MessageRepository, cache: IMessageCache }) {
+    pollIntervalMs: number;
+
+    pollTimer: NodeJS.Timeout | null = null;
+
+    constructor({
+        filePaths,
+        repo,
+        cache,
+        pollIntervalMs = 1000
+    }: {
+        filePaths: string[],
+        repo: MessageRepository,
+        cache: IMessageCache,
+        pollIntervalMs?: number
+    }) {
         super();
 
         this.filePaths = filePaths;
         this.repo = repo;
         this.pollers = [];
         this.cache = cache;
+        this.pollIntervalMs = pollIntervalMs;
         this.stopped = false;
         this.processLock = new Sema(1);
     }
 
     stop() {
         this.stopped = true;
+        if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
+        }
+        this.watcher?.stop();
         this.removeAllListeners();
     }
 
@@ -79,6 +99,20 @@ export class IMessageListener extends Loggable {
         });
 
         this.watcher.start();
+        this.startPollTimer();
+    }
+
+    startPollTimer() {
+        if (this.pollTimer || this.pollIntervalMs <= 0) return;
+
+        this.pollTimer = setInterval(async () => {
+            await this.handleChangeEvent({
+                filePath: "poll-interval",
+                prevStat: null,
+                currentStat: null
+            });
+        }, this.pollIntervalMs);
+        this.pollTimer.unref?.();
     }
 
     @DebounceSubsequentWithWait('IMessageListener.handleChangeEvent', 500)
