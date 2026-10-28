@@ -1,7 +1,7 @@
 import type { ChatTransitionEntry } from "../snapshot/ChatStateSnapshot";
 import { compareDecimalStrings } from "../snapshot/ChatStateSnapshot";
 
-export type ChatStateChange = { guid: string; read: boolean } | { guid: string; deleted: true };
+export type ChatStateChange = { guid: string; read: boolean; readPointer?: string } | { guid: string; deleted: true };
 
 /** Diffs consecutive Apple-side states without replaying historical state. */
 export class ChatStateChangeDetector {
@@ -38,9 +38,9 @@ export class ChatStateChangeDetector {
             if (pointerChange < 0 || (previous.read && !next.read)) {
                 changes.push({ guid, read: false });
             } else if (!previous.read && next.read) {
-                changes.push({ guid, read: true });
+                changes.push({ guid, read: true, readPointer: next.readPointer });
             } else if (pointerChange > 0 && next.read && (await isChatFullyRead(guid))) {
-                changes.push({ guid, read: true });
+                changes.push({ guid, read: true, readPointer: next.readPointer });
             }
         }
 

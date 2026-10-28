@@ -34,6 +34,16 @@ export type ChatTransitionRow = {
 export const supportsChatStateSnapshot = (isHighSierraOrLater: boolean): boolean => isHighSierraOrLater;
 
 /** Compare non-negative decimal integers without converting them to JS Number. */
+/**
+ * When Apple last marked the chat read, in epoch milliseconds. The read
+ * pointer is chat.last_read_message_timestamp: nanoseconds since 2001-01-01 UTC.
+ */
+export function readPointerToEpochMs(readPointer: string): number | undefined {
+    if (!/^\d+$/.test(readPointer) || /^0+$/.test(readPointer)) return undefined;
+    // BigInt keeps the 18-digit nanosecond value exact before scaling down.
+    return Number(BigInt(readPointer) / BigInt(1000000)) + Date.UTC(2001, 0, 1);
+}
+
 export function compareDecimalStrings(a: string, b: string): number {
     if (a.length !== b.length) return a.length < b.length ? -1 : 1;
     if (a === b) return 0;

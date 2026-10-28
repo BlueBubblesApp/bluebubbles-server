@@ -1,7 +1,7 @@
 import { CHAT_DELETED, CHAT_READ_STATUS_CHANGED } from "@server/events";
 import { IMessagePollResult, IMessagePollType, IMessagePoller } from ".";
 import { isChatFullyRead } from "./IncomingReadEventDetector";
-import { loadChatTransitionState } from "../snapshot/ChatStateSnapshot";
+import { loadChatTransitionState, readPointerToEpochMs } from "../snapshot/ChatStateSnapshot";
 import { ChatStateChangeDetector } from "./ChatStateChangeDetector";
 
 export class ChatUpdatePoller extends IMessagePoller {
@@ -27,7 +27,11 @@ export class ChatUpdatePoller extends IMessagePoller {
             }
             return {
                 eventType: CHAT_READ_STATUS_CHANGED,
-                data: { guid: change.guid, read: change.read }
+                data: {
+                    guid: change.guid,
+                    read: change.read,
+                    readAt: change.read && change.readPointer ? readPointerToEpochMs(change.readPointer) : undefined
+                }
             };
         });
     }

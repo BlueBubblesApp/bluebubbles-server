@@ -1392,7 +1392,7 @@ class BlueBubblesServer extends EventEmitter {
             this.iMessageListener.addPoller(new ChatUpdatePoller(this.iMessageRepo, cache));
         }
 
-        this.iMessageListener.on(CHAT_READ_STATUS_CHANGED, async (item: { guid: string; read: boolean }) => {
+        this.iMessageListener.on(CHAT_READ_STATUS_CHANGED, async (item: { guid: string; read: boolean; readAt?: number }) => {
             // Preserve the detector's transition decision verbatim. On Monterey,
             // Mark as Unread moves the chat-level read pointer backward while the
             // message rows remain read; re-querying those rows would erase the
@@ -1400,7 +1400,10 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.info(`Chat read state changed [${item.guid}]: ${item.read ? "read" : "unread"}`);
             await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
                 chatGuid: item.guid,
-                read: item.read
+                read: item.read,
+                // When Apple marked it read, so a client can tell a message sent
+                // before the read from one sent after it. Older clients ignore it.
+                ...(item.readAt != null ? { readAt: item.readAt } : {})
             });
         });
 

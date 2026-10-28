@@ -65,7 +65,7 @@ test("incoming message read emits read when the chat pointer is unchanged", asyn
             targetedChecks++;
             return true;
         }),
-        [{ guid: "a", read: true }]
+        [{ guid: "a", read: true, readPointer: "100" }]
     );
     assert.equal(targetedChecks, 0);
 });
@@ -90,7 +90,7 @@ test("pointer advance emits read only after the targeted unread query confirms i
             checked.push(guid);
             return true;
         }),
-        [{ guid: "a", read: true }]
+        [{ guid: "a", read: true, readPointer: "101" }]
     );
     assert.deepEqual(checked, ["a"]);
 });
@@ -154,4 +154,12 @@ test("newly appearing chat seeds silently", async () => {
         await detector.observe([entry("new", { messageCount: 3, readPointer: "400" })], async () => true),
         []
     );
+});
+
+test("a read change carries the read pointer it was read up to", async () => {
+    const detector = new ChatStateChangeDetector();
+    detector.seed([entry("a", { read: false, readPointer: "100" })]);
+    assert.deepEqual(await detector.observe([entry("a", { read: true, readPointer: "250" })], async () => true), [
+        { guid: "a", read: true, readPointer: "250" }
+    ]);
 });
