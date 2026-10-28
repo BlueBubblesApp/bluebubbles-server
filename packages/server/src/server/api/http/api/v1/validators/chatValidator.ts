@@ -49,14 +49,20 @@ export class ChatValidator {
         tempGuid: "string",
         effectId: "string",
         subject: "string",
+        ddScan: "boolean"
     };
 
     static async validateCreate(ctx: RouterContext, next: Next) {
-        const { addresses } = ValidateInput(ctx?.request?.body, ChatValidator.createRules);
+        const { addresses, method, ddScan } = ValidateInput(ctx?.request?.body, ChatValidator.createRules);
 
         // Addresses are built into AppleScript and chat GUIDs, so only accept plain values
         if (!addresses.every(isValidAddress)) {
             throw new BadRequest({ error: "Each address must be a phone number or email address" });
+        }
+
+        // The AppleScript path can't run a data-detector scan, so imply the Private API
+        if (ddScan && !method) {
+            (ctx.request.body as any).method = "private-api";
         }
 
         await next();

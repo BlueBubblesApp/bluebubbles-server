@@ -144,7 +144,8 @@ export class ChatInterface {
         service = "iMessage",
         attributedBody = null,
         subject = null,
-        effectId = null
+        effectId = null,
+        ddScan = false
     }: {
         addresses: string[];
         message: string;
@@ -152,6 +153,7 @@ export class ChatInterface {
         attributedBody?: Record<string, any> | null;
         subject?: string;
         effectId?: string;
+        ddScan?: boolean;
     }): Promise<Chat> {
         checkPrivateApiStatus();
 
@@ -161,7 +163,8 @@ export class ChatInterface {
             service,
             attributedBody,
             subject,
-            effectId
+            effectId,
+            ddScan
         });
         if (isEmpty(result.identifier)) {
             throw new Error("Failed to create chat via the Private API!");
@@ -287,7 +290,8 @@ export class ChatInterface {
         tempGuid,
         attributedBody = null,
         subject = null,
-        effectId = null
+        effectId = null,
+        ddScan = false
     }: {
         addresses: string[];
         message?: string | null;
@@ -297,6 +301,7 @@ export class ChatInterface {
         attributedBody?: Record<string, any> | null;
         subject?: string;
         effectId?: string;
+        ddScan?: boolean;
     }): Promise<Chat> {
         // Make sure we are executing this on a group chat
         if (isEmpty(addresses)) {
@@ -320,7 +325,8 @@ export class ChatInterface {
                 service,
                 attributedBody,
                 subject,
-                effectId
+                effectId,
+                ddScan
             });
         } else {
             return await ChatInterface.createWithAppleScript({

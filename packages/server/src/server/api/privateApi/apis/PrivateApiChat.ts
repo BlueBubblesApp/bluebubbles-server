@@ -4,6 +4,7 @@ import {
     TransactionResult,
     TransactionType
 } from "@server/managers/transactionManager/transactionPromise";
+import { isMinCatalina } from "@server/env";
 import { PrivateApiAction } from ".";
 
 export class PrivateApiChat extends PrivateApiAction {
@@ -15,7 +16,8 @@ export class PrivateApiChat extends PrivateApiAction {
         service = "iMessage",
         attributedBody = null,
         effectId = null,
-        subject = null
+        subject = null,
+        ddScan = false
     }: {
         addresses: string[];
         message: string;
@@ -23,24 +25,27 @@ export class PrivateApiChat extends PrivateApiAction {
         attributedBody?: Record<string, any> | null;
         effectId?: string;
         subject?: string;
+        ddScan?: boolean;
     }): Promise<TransactionResult> {
         const action = "create-chat";
         this.throwForNoMissingFields(action, [addresses, message]);
 
         // Yes this is correct. The transaction returns a message GUID, not a chat GUID
         const request = new TransactionPromise(TransactionType.MESSAGE);
-        return this.sendApiMessage(
-            "create-chat",
-            {
-                addresses,
-                message,
-                service,
-                attributedBody,
-                effectId,
-                subject
-            },
-            request
-        );
+        const data: any = {
+            addresses,
+            message,
+            service,
+            attributedBody,
+            effectId,
+            subject
+        };
+
+        if (isMinCatalina) {
+            data.ddScan = ddScan ? 1 : 0;
+        }
+
+        return this.sendApiMessage("create-chat", data, request);
     }
 
     async deleteMessage(chatGuid: string, messageGuid: string): Promise<TransactionResult> {
