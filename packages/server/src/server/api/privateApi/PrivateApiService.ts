@@ -37,6 +37,10 @@ export class PrivateApiService extends Loggable {
 
     activeClients: Record<string, Socket> = {};
 
+    // Actions each helper process said it supports when it connected. Helpers that predate
+    // this don't send any, so an action missing here means "ask for it and it will be ignored".
+    capabilities: Record<string, string[]> = {};
+
     restartCounter = 0;
 
     transactionManager: TransactionManager;
@@ -168,7 +172,12 @@ export class PrivateApiService extends Loggable {
 
         if (proc) {
             delete this.activeClients[proc];
+            delete this.capabilities[proc];
         }
+    }
+
+    supportsAction(action: string): boolean {
+        return Object.values(this.capabilities).some(actions => actions.includes(action));
     }
 
     async configureServer(): Promise<void> {
