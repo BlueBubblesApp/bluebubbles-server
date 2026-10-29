@@ -2,6 +2,18 @@ import type { Message } from "@server/databases/imessage/entity/Message";
 import type { ValidRemoveTapback, ValidTapback } from "@server/types";
 import * as net from "net";
 
+/**
+ * Link preview data for sending a link as a rich link balloon (Private API only).
+ * `image` is the base64 of a PNG or JPEG.
+ */
+export type RichLink = {
+    url: string;
+    title?: string;
+    siteName?: string;
+    summary?: string;
+    image?: string;
+};
+
 export type SendMessageParams = {
     chatGuid: string;
     message: string;
@@ -13,6 +25,7 @@ export type SendMessageParams = {
     tempGuid?: string;
     partIndex?: number;
     ddScan?: boolean;
+    richLink?: RichLink;
 };
 
 export type SendMessagePrivateApiParams = {
@@ -24,6 +37,7 @@ export type SendMessagePrivateApiParams = {
     selectedMessageGuid?: string;
     partIndex?: number;
     ddScan?: boolean;
+    richLink?: RichLink;
 };
 
 export type SendAttachmentPrivateApiParams = {

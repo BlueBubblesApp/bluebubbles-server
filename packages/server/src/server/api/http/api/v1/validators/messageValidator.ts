@@ -4,7 +4,7 @@ import type { File } from "formidable";
 import path from "path";
 import fs from "fs";
 import { Server } from "@server";
-import { isEmpty } from "@server/helpers/utils";
+import { detectImageExtension, isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { FileSystem } from "@server/fileSystem";
 import { MessageInterface } from "@server/api/interfaces/messageInterface";
 import { validateWhereClauses, WhereClauseError } from "@server/databases/imessage/helpers/whereClauseValidator";
@@ -88,6 +88,64 @@ export class MessageValidator {
         ddScan: "boolean"
     };
 
+    // Largest preview image accepted for a rich link (decoded bytes)
+    static maxRichLinkImageBytes = 5 * 1024 * 1024;
+
+    // Longest title, site name or summary accepted for a rich link
+    static maxRichLinkTextLength = 2000;
+
+    static richLinkRules = {
+        url: "required|string",
+        title: "string",
+        siteName: "string",
+        summary: "string",
+        image: "string"
+    };
+
+    static validateRichLink(richLink: any, message: string) {
+        if (typeof richLink !== "object" || Array.isArray(richLink)) {
+            throw new BadRequest({ error: "'richLink' must be an object" });
+        }
+
+        ValidateInput(richLink, MessageValidator.richLinkRules);
+
+        let url: URL;
+        try {
+            url = new URL(richLink.url);
+        } catch {
+            throw new BadRequest({ error: "'richLink.url' must be a valid URL" });
+        }
+
+        if (!["http:", "https:"].includes(url.protocol)) {
+            throw new BadRequest({ error: "'richLink.url' must be an http or https URL" });
+        }
+
+        // The message is what gets sent if the preview can't be, so it has to be the link (ignoring outer whitespace)
+        if (typeof message !== "string" || message.trim() !== richLink.url.trim()) {
+            throw new BadRequest({ error: "'message' must be the same as 'richLink.url' when sending a rich link" });
+        }
+
+        for (const field of ["title", "siteName", "summary"]) {
+            const value = richLink[field];
+            if (typeof value === "string" && value.length > MessageValidator.maxRichLinkTextLength) {
+                throw new BadRequest({
+                    error: `'richLink.${field}' is too long (${MessageValidator.maxRichLinkTextLength} characters max)`
+                });
+            }
+        }
+
+        if (isNotEmpty(richLink.image)) {
+            const image = Buffer.from(richLink.image, "base64");
+            if (image.length > MessageValidator.maxRichLinkImageBytes) {
+                throw new BadRequest({ error: "'richLink.image' is too large (5 MB max)" });
+            }
+
+            if (!detectImageExtension(image)) {
+                throw new BadRequest({ error: "'richLink.image' must be a base64 encoded PNG or JPEG" });
+            }
+        }
+    }
+
     static async validateText(ctx: RouterContext, next: Next) {
         const { tempGuid, method, effectId, subject, selectedMessageGuid, message, ddScan } = ValidateInput(
             ctx.request.body,
@@ -98,10 +156,19 @@ export class MessageValidator {
         // Default the method to AppleScript
         saniMethod = saniMethod ?? "apple-script";
 
-        // If we have an effectId, subject, reply, or attributedBody
+        // If we have an effectId, subject, reply, richLink, or attributedBody
         // let's imply we want to use the Private API
-        if (effectId || subject || selectedMessageGuid || ddScan || ctx.request.body.attributedBody) {
+        const { richLink } = ctx.request.body;
+        if (richLink && saniMethod !== "private-api" && method) {
+            throw new BadRequest({ error: `'richLink' can only be sent with the 'private-api' method` });
+        }
+
+        if (effectId || subject || selectedMessageGuid || ddScan || richLink || ctx.request.body.attributedBody) {
             saniMethod = "private-api";
+        }
+
+        if (richLink) {
+            MessageValidator.validateRichLink(richLink, message);
         }
 
         // If we are sending via apple-script, we require a tempGuid

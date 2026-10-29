@@ -41,6 +41,20 @@ export class PrivateApiMessage extends PrivateApiAction {
         return this.sendApiMessage("send-message", data, request);
     }
 
+    async sendRichLink(
+        chatGuid: string,
+        url: string,
+        title: string = null,
+        siteName: string = null,
+        summary: string = null,
+        imagePath: string = null
+    ): Promise<TransactionResult> {
+        const action = "send-rich-link";
+        this.throwForNoMissingFields(action, [chatGuid, url]);
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+        return this.sendApiMessage(action, { chatGuid, url, title, siteName, summary, imagePath }, request);
+    }
+
     async sendMultipart(
         chatGuid: string,
         parts: Record<string, any>[],

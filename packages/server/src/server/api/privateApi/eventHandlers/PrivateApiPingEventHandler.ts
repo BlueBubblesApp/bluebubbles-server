@@ -14,6 +14,7 @@ export class PrivateApiPingEventHandler extends Loggable implements PrivateApiEv
         this.log.info(`Received Ping from Private API Helper via ${proc ?? "Anonymous"}!`);
         if (isNotEmpty(proc)) {
             Server().privateApi.registerClient(proc, socket);
+            Server().privateApi.capabilities[proc] = Array.isArray(event?.capabilities) ? event.capabilities : [];
         }
     }
 }

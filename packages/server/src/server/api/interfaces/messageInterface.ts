@@ -3,8 +3,9 @@ import * as fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { checkPrivateApiStatus, isEmpty, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
+import { checkPrivateApiStatus, detectImageExtension, isEmpty, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
 import { isMinMonterey, isMinVentura } from "@server/env";
+import { v4 as uuidv4 } from "uuid";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/apple/mappings";
 import { invisibleMediaChar } from "@server/api/http/constants";
 import { ActionHandler } from "@server/api/apple/actions";
@@ -17,7 +18,8 @@ import type {
     UnsendMessageParams,
     EditMessageParams,
     SendAttachmentPrivateApiParams,
-    SendMultipartTextParams
+    SendMultipartTextParams,
+    RichLink
 } from "@server/api/types";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import path from "path";
@@ -59,7 +61,8 @@ export class MessageInterface {
         selectedMessageGuid = null,
         tempGuid = null,
         partIndex = 0,
-        ddScan = false
+        ddScan = false,
+        richLink = null
     }: SendMessageParams): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
@@ -107,7 +110,8 @@ export class MessageInterface {
                 effectId,
                 selectedMessageGuid,
                 partIndex,
-                ddScan
+                ddScan,
+                richLink
             });
         } else {
             throw new Error(`Invalid send method: ${method}`);
@@ -229,19 +233,29 @@ export class MessageInterface {
         effectId = null,
         selectedMessageGuid = null,
         partIndex = 0,
-        ddScan = false
+        ddScan = false,
+        richLink = null
     }: SendMessagePrivateApiParams) {
         checkPrivateApiStatus();
-        const result = await Server().privateApi.message.send(
-            chatGuid,
-            message,
-            attributedBody ?? null,
-            subject ?? null,
-            effectId ?? null,
-            selectedMessageGuid ?? null,
-            partIndex ?? 0,
-            ddScan ?? false
-        );
+
+        // A rich link replaces the plain text message. If the helper can't send it, fall back to the text.
+        let result = richLink ? await MessageInterface.sendRichLinkPrivateApi(chatGuid, richLink) : null;
+        if (richLink && result && !result.identifier) {
+            throw new Error("The rich link was sent, but Messages returned no message guid to look it up with");
+        }
+
+        if (!result) {
+            result = await Server().privateApi.message.send(
+                chatGuid,
+                message,
+                attributedBody ?? null,
+                subject ?? null,
+                effectId ?? null,
+                selectedMessageGuid ?? null,
+                partIndex ?? 0,
+                ddScan ?? false
+            );
+        }
 
         if (!result?.identifier) {
             throw new Error("Failed to send message!");
@@ -260,6 +274,57 @@ export class MessageInterface {
         }
 
         return retMessage;
+    }
+
+    /**
+     * Asks the helper to send a link with a preview balloon.
+     *
+     * @returns The helper result, or null if the link should be sent as plain text instead. That is the case
+     * when the helper is too old to know the action, or when it answered with an error (it sends nothing then).
+     * A timeout is thrown, not turned into null, because the link may have been sent by then.
+     */
+    static async sendRichLinkPrivateApi(chatGuid: string, richLink: RichLink) {
+        if (!Server().privateApi.supportsAction("send-rich-link")) {
+            Server().log("The Private API helper can't send rich links, sending the link as text", "warn");
+            return null;
+        }
+
+        // The helper reads the image from disk, so it goes in the same folder as the other Private API attachments
+        let imageDir: string = null;
+        let imagePath: string = null;
+        try {
+            if (isNotEmpty(richLink.image)) {
+                const image = Buffer.from(richLink.image, "base64");
+                const ext = detectImageExtension(image);
+                if (ext) {
+                    imageDir = FileSystem.resolveWithin(FileSystem.getAttachmentDirectory("private-api"), uuidv4());
+                    imagePath = FileSystem.resolveWithin(imageDir, `link-preview.${ext}`);
+                    fs.mkdirSync(imageDir, { recursive: true });
+                    fs.writeFileSync(imagePath, image);
+                }
+            }
+
+            const result = await Server().privateApi.message.sendRichLink(
+                chatGuid,
+                richLink.url.trim(),
+                richLink.title ?? null,
+                richLink.siteName ?? null,
+                richLink.summary ?? null,
+                imagePath
+            );
+
+            // The helper only resolves (instead of rejecting) once it has sent, or has sent the link as text itself.
+            // An empty identifier means it went out but the guid is unknown, which is no reason to send the text again.
+            return result;
+        } catch (ex: any) {
+            const reason = ex?.message ?? String(ex);
+            if (reason === "Transaction timeout") throw ex;
+
+            Server().log(`Failed to send the rich link (${reason}), sending the link as text`, "warn");
+            return null;
+        } finally {
+            if (imageDir) rimrafSync(imageDir);
+        }
     }
 
     static async sendAttachmentPrivateApi({
