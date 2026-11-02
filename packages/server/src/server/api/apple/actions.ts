@@ -13,7 +13,8 @@ import {
     exportContacts,
     restartMessages,
     openChat,
-    sendMessageFallback
+    sendMessageFallback,
+    syncMessages
 } from "@server/api/apple/scripts";
 import { ValidRemoveTapback } from "../../types";
 
@@ -547,6 +548,26 @@ export class ActionHandler {
         try {
             FileSystem.deleteAddressBook();
             await FileSystem.executeAppleScript(exportContacts());
+        } catch (ex: any) {
+            let msg = ex.message;
+            if (msg instanceof String) [, msg] = msg.split("execution error: ");
+            [msg] = msg.split(". (");
+
+            throw new Error(msg);
+        }
+    };
+
+    /**
+     * Triggers "Messages in iCloud" sync via AppleScript
+     *
+     * @returns The command line response
+     */
+    static syncMessages = async (): Promise<void> => {
+        log.debug("Executing Action: Sync Messages in iCloud");
+
+        try {
+            await FileSystem.startMessages();
+            await FileSystem.executeAppleScript(syncMessages());
         } catch (ex: any) {
             let msg = ex.message;
             if (msg instanceof String) [, msg] = msg.split("execution error: ");

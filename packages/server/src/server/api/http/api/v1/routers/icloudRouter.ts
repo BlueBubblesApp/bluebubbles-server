@@ -33,4 +33,13 @@ export class iCloudRouter {
             throw new ServerError({ message: "Failed to change iMessage Alias", error: ex?.message ?? ex.toString() });
         }
     }
+
+    static async syncMessages(ctx: RouterContext, _: Next) {
+        try {
+            await iCloudInterface.syncMessages();
+            return new Success(ctx, { message: "Successfully triggered iCloud Messages sync!" }).send();
+        } catch (ex: any) {
+            throw new ServerError({ message: "Failed to trigger iCloud Messages sync", error: ex?.message ?? ex.toString() });
+        }
+    }
 }
