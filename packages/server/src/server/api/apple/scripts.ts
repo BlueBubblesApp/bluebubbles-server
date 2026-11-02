@@ -980,3 +980,26 @@ export const checkForIncomingFacetime10 = () => {
         end tell
     end tell`;
 };
+
+export const syncMessages = () => {
+    return `tell application "System Events"
+        tell process "Messages"
+            try
+                click menu item "Settings…" of menu 1 of menu bar item "Messages" of menu bar 1
+            on error
+                try
+                    click menu item "Preferences…" of menu 1 of menu bar item "Messages" of menu bar 1
+                end try
+            end try
+            delay 0.5
+            try
+                click button "iMessage" of toolbar 1 of window 1
+                delay 0.5
+                click button "Sync Now" of group 1 of group 1 of window 1
+            end try
+            try
+                click (first button of window 1 whose subrole is "AXCloseButton")
+            end try
+        end tell
+    end tell`;
+};

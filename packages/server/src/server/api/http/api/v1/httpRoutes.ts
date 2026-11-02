@@ -115,6 +115,11 @@ export class HttpRoutes {
                         controller: iCloudRouter.getContactCard
                     },
                     {
+                        method: HttpMethod.POST,
+                        path: "sync",
+                        controller: iCloudRouter.syncMessages
+                    },
+                    {
                         method: HttpMethod.GET,
                         path: "findmy/devices",
                         controller: FindMyRouter.devices

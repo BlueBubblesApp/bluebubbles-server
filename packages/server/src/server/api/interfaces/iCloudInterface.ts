@@ -3,6 +3,7 @@ import fs from "fs";
 import { isMinBigSur, isMinHighSierra } from "@server/env";
 import { checkPrivateApiStatus, isNotEmpty } from "@server/helpers/utils";
 import { bytesToBase64 } from "byte-base64";
+import { ActionHandler } from "../apple/actions";
 
 export class iCloudInterface {
     static async getAccountInfo() {
@@ -40,5 +41,9 @@ export class iCloudInterface {
         }
 
         await Server().privateApi.cloud.modifyActiveAlias(alias);
+    }
+
+    static async syncMessages() {
+        await ActionHandler.syncMessages();
     }
 }
