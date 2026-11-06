@@ -1,0 +1,60 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/message/schedule?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "type": "send-message",
+        "payload": {
+          "chatGuid": "any;-;person@example.com",
+          "message": "Fixture scheduled message",
+          "method": "apple-script"
+        },
+        "scheduledFor": 1819726566267,
+        "schedule": {
+          "type": "once"
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Successfully created new scheduled message!",
+        "data": {
+          "id": 4,
+          "type": "send-message",
+          "payload": {
+            "chatGuid": "any;-;person@example.com",
+            "message": "Fixture scheduled message",
+            "method": "apple-script"
+          },
+          "scheduledFor": "+15555550100T15:36:06.267Z",
+          "schedule": {
+            "type": "once"
+          },
+          "status": "pending",
+          "error": null,
+          "sentAt": null,
+          "created": "+15555550100T15:36:06.000Z"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:36:06.284Z"
+}

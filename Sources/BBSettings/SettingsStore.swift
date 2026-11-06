@@ -1,0 +1,845 @@
+//  SettingsStore
+//  Typed, layered, transactional settings.
+//
+//  Three properties:
+//    1. Values carry an explicit type tag, so nothing is inferred from the stored string.
+//       (The Electron store infers: "1"/"0" become Bool and /^-?\d+$/ becomes Number, so a
+//       numeric setting whose value happens to be 0 or 1 comes back as a boolean. See
+//       `LegacyConfigMigration`.)
+//    2. Sources are layered rather than flattened into the database. A CLI argument is
+//       never WRITTEN to the DB.
+//    3. Writes are transactional. A batch emits ONE change, so a single Save in the UI
+//       cannot fire N cascading service restarts.
+//
+//  See `.claude/docs/database.md`.
+
+import BBCore
+import BBDiagnostics
+import BBPersistence
+import Foundation
+import GRDB
+import Logging
+
+/// A resolved value plus where it came from.
+public struct ResolvedSetting<Value: SettingValue>: Sendable {
+  public let value: Value
+  public let source: SettingSource
+}
+
+public actor SettingsStore {
+
+  /// Whether a write or a removal is in flight, and who is queued behind it. See `write`.
+  /// Every path that mutates the persisted layer takes this lane; `remove` is the second.
+  ///
+  /// A queue of continuations rather than a spin: a `while … { await Task.yield() }` would
+  /// work, since contention here is rare, and it burns a core while it waits, which is not
+  /// a thing to leave lying in a foundation module.
+  private var isWriting = false
+  private var writeWaiters: [CheckedContinuation<Void, Never>] = []
+
+  private func beginWrite() async {
+    guard isWriting else {
+      isWriting = true
+      return
+    }
+    await withCheckedContinuation { writeWaiters.append($0) }
+  }
+
+  private func endWrite() {
+    guard !writeWaiters.isEmpty else {
+      isWriting = false
+      return
+    }
+    // The next waiter inherits the flag rather than clearing and re-taking it, so a third
+    // caller arriving in between cannot jump the queue.
+    writeWaiters.removeFirst().resume()
+  }
+
+  private let database: AppDatabase
+  private let secrets: any SecretStore
+  private let logger = Logger(label: "bluebubbles.settings")
+
+  /// Layers above the persisted store, highest precedence last. Read-only at runtime:
+  /// a `write` always targets the persisted layer, so a CLI override is never clobbered
+  /// by a UI save and never silently persisted either.
+  private let configFileValues: [String: String]
+  private let commandLineValues: [String: String]
+
+  /// Decoded persisted values, read through on every access. Small enough to hold whole.
+  private var persisted: [String: StoredValue] = [:]
+
+  private var continuations: [UUID: AsyncStream<SettingsChange>.Continuation] = [:]
+
+  /// Attached after construction, because the alert centre is built later than storage is.
+  /// Failures seen before it arrives are held in `pendingAlerts` and raised on attach, so a
+  /// Keychain that is unreadable during start-up (the likeliest moment for it to be) is
+  /// not the one case that goes unreported.
+  private var alerts: (any AlertRaising)?
+  private var pendingAlerts: [SettingsError] = []
+
+  /// Told about every write that moved a value, and every removal, with the actor of the
+  /// work in flight. Attached by the composition root; nil in tests and before wiring.
+  private var auditObserver: (any SettingsWriteObserving)?
+
+  /// Keys whose last Keychain read failed. Two jobs: it stops a per-request read from
+  /// spawning a raise every time, and it lets a caller tell "this secret is empty" from
+  /// "this secret could not be read", which otherwise look identical from the outside.
+  private var unreadableSecrets: Set<String> = []
+  /// `--set` and config-file values already reported as refused, so each is said once
+  /// rather than on every read of the setting.
+  private var reportedOverrides: Set<String> = []
+
+  /// `Equatable` so a write can tell whether it actually moved anything; see the change
+  /// filter in `write`. `Data` compares by content, which is what makes the check meaningful.
+  struct StoredValue: Sendable, Equatable {
+    let json: Data
+    let typeTag: String
+    let isSecret: Bool
+  }
+
+  public init(
+    database: AppDatabase,
+    secrets: any SecretStore,
+    configFileValues: [String: String] = [:],
+    commandLineValues: [String: String] = [:]
+  ) async throws {
+    self.database = database
+    self.secrets = secrets
+    self.configFileValues = configFileValues
+    self.commandLineValues = commandLineValues
+    try await load()
+  }
+
+  // MARK: - Schema
+  //
+  // The `setting` table is created by `AppDatabase.migrate()`, which owns every migration
+  // for this database, and it is NOT redeclared here. Two definitions of one table under
+  // the same migration identifier is a silent drift hazard: editing either one leaves the
+  // other stale with nothing to catch it.
+  //
+  // Note the explicit `type_tag` column over there: it is what removes the guessing.
+
+  private func load() async throws {
+    // Mapped INSIDE the read closure, because `Row` borrows the statement's storage and
+    // is not `Sendable`. Returning rows from here is a compile error rather than a silent
+    // fallback to GRDB's synchronous overload; see `AppDatabase.queue`.
+    persisted = try await database.read { db in
+      var loaded: [String: StoredValue] = [:]
+      for row in try Row.fetchAll(db, sql: "SELECT key, value, type_tag, is_secret FROM setting") {
+        let key: String = row["key"]
+        loaded[key] = StoredValue(
+          json: row["value"],
+          typeTag: row["type_tag"],
+          isSecret: row["is_secret"]
+        )
+      }
+      return loaded
+    }
+  }
+
+  // MARK: - Alerts
+
+  /// Hands the store the audit log, which hears about every change from then on.
+  ///
+  /// A separate attachment from `attachAlerts` because the two are built at different
+  /// moments and answer different questions: an alert says something went wrong, an audit
+  /// record says something happened.
+  public func attachAuditObserver(_ observer: (any SettingsWriteObserving)?) {
+    auditObserver = observer
+  }
+
+  /// Hands the store somewhere to report to, and drains anything that failed before it existed.
+  public func attachAlerts(_ alerts: any AlertRaising) async {
+    self.alerts = alerts
+    let pending = pendingAlerts
+    pendingAlerts.removeAll()
+    for error in pending { await alerts.raise(error, actions: []) }
+  }
+
+  /// Keys whose most recent Keychain read failed, for callers that must not present an
+  /// unreadable secret as an unset one: the settings screen above all, where a password
+  /// shown as blank invites the user to reset a password that was never actually lost.
+  public var unreadableSecretKeys: Set<String> { unreadableSecrets }
+
+  // MARK: - Reading
+
+  /// The three distinct outcomes of reading a secret.
+  ///
+  /// `try? secrets.get(key)` would collapse the last two, and that collapse is the failure
+  /// this exists to prevent: a Keychain that is locked, or whose ACL the app no longer
+  /// satisfies, would be indistinguishable from one holding nothing. The server password
+  /// would then resolve to the declared default of "" and every client would be turned away
+  /// with `serverMisconfigured("Failed to retrieve password from the database")`,
+  /// fail-closed, but naming a subsystem that is working perfectly.
+  enum SecretRead {
+    case value(String)
+    /// No such item. A password that has genuinely never been set.
+    case absent
+    /// The Keychain refused. The value may well exist; we cannot see it.
+    case unreadable
+  }
+
+  func readSecret(_ key: String) -> SecretRead {
+    do {
+      let value = try secrets.get(key)
+      // A read that works re-arms the alert, so a Keychain that fails, is fixed, and
+      // fails again is reported the second time too.
+      unreadableSecrets.remove(key)
+      guard let value else { return .absent }
+      return .value(value)
+    } catch {
+      report(keychainFailure: error, key: key)
+      return .unreadable
+    }
+  }
+
+  /// Records a Keychain failure once per key per episode, and says so out loud.
+  ///
+  /// Shared by `readSecret` and `presence(ofSecretKey:)` so the two agree about what
+  /// `unreadableSecretKeys` contains: a screen that asked "is anything stored?", got a
+  /// refusal, and left the key off that set would go on to present an unreadable secret as
+  /// an unset one, which is the whole failure this bookkeeping exists to prevent.
+  private func report(keychainFailure error: any Error, key: String) {
+    let failure =
+      (error as? SettingsError)
+      // -1 only if a store other than the Keychain one throws something
+      // unexpected; `Security` is not imported here, and BBSettings builds on Linux.
+      ?? SettingsError.keychainUnavailable(key: key, status: -1)
+    // Raise once per key per episode. `resolve` runs on the authentication path, so
+    // without this latch a locked Keychain would spawn a Task per request; the alert
+    // centre would coalesce them by code, but only after the work had been done.
+    if unreadableSecrets.insert(key).inserted {
+      if let alerts {
+        Task { await alerts.raise(failure, actions: []) }
+      } else {
+        pendingAlerts.append(failure)
+      }
+    }
+    logger.error(
+      "Keychain read failed",
+      metadata: [
+        "key": .string(key),
+        "error": .string(String(describing: failure)),
+      ])
+  }
+
+  /// What is known about a secret WITHOUT materialising it.
+  ///
+  /// The settings screen reads a secret only when the user asks it to, and this is what it
+  /// draws the row from until then: enough to show that a password is stored, and to tell
+  /// that apart from one that is not, and from a Keychain that will not answer. Reading to
+  /// find that out would defeat the point — on the legacy keychain a read can raise an
+  /// access panel, and doing that on every appearance of the Connection tab is what the
+  /// on-demand reveal exists to stop.
+  ///
+  /// An override still wins, and still without a Keychain call: a password set on the
+  /// command line is the one in effect, and the row has to say so.
+  public func presence(ofSecretKey key: String) -> SecretPresence {
+    if commandLineValues[key] != nil { return .stored(.commandLine) }
+    if configFileValues[key] != nil { return .stored(.configFile) }
+    do {
+      return try secrets.contains(key) ? .stored(.persistedStore) : .absent
+    } catch {
+      // NOT `.absent`. A Keychain that refuses is not a Keychain with nothing in it, and
+      // collapsing the two is what invites a user to reset a password that was never lost.
+      report(keychainFailure: error, key: key)
+      return .unreadable
+    }
+  }
+
+  /// The declared-setting spelling of `presence(ofSecretKey:)`.
+  public func presence(of setting: Setting<String>) -> SecretPresence {
+    precondition(setting.isSecret, "\(setting.key) is not declared as a secret")
+    return presence(ofSecretKey: setting.key)
+  }
+
+  public func get<Value: SettingValue>(_ setting: Setting<Value>) -> Value {
+    resolve(setting).value
+  }
+
+  // MARK: - Dynamic keys
+  //
+  // Settings declared at RUNTIME rather than compiled in: a service's or plugin's own
+  // fields, which arrive from its manifest. They cannot go through `Setting<Value>` because
+  // that is a compile-time descriptor and a plugin's fields are data, so these take the key
+  // directly.
+  //
+  // Deliberately NOT a general-purpose escape hatch: the caller is expected to be a
+  // `SettingsScope`, which is what decides whether the key may be touched at all. Reaching
+  // for these to bypass a declared setting would be missing the point of both.
+
+  /// A dynamically-keyed value, or nil when it has never been set.
+  ///
+  /// Command line and config file still win, so a plugin's field can be overridden the same
+  /// way a core setting can, which matters for support ("run it once with X set") and for
+  /// tests.
+  public func string(forKey key: String) -> String? {
+    if let raw = commandLineValues[key] { return raw }
+    if let raw = configFileValues[key] { return raw }
+
+    if let stored = persisted[key] {
+      if stored.isSecret {
+        switch readSecret(key) {
+        case .value(let secret): return secret
+        // Both give back nil, but only one of them has alerted first.
+        case .absent, .unreadable: return nil
+        }
+      }
+      if let value = try? JSONDecoder().decode(String.self, from: stored.json) {
+        return value
+      }
+      // A value stored as some other type still has a readable form: a toggle is
+      // "true"/"false" to a form. Returning nil for it would make a boolean field look
+      // unset the moment it was saved.
+      return String(decoding: stored.json, as: UTF8.self)
+        .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+    }
+
+    // A secret with no marker row, the shape the legacy migration produces.
+    if case .value(let secret) = readSecret(key), !secret.isEmpty { return secret }
+    return nil
+  }
+
+  /// The STORED value of a non-secret dynamically-keyed string, ignoring the command line and
+  /// the config file. Nil when nothing is stored.
+  ///
+  /// For a start-up step that amends what is stored rather than what this run was told: an
+  /// amendment computed from `string(forKey:)` under a `--set` override would persist the
+  /// override, which `write` exists to never do.
+  public func persistedString(forKey key: String) -> String? {
+    guard let stored = persisted[key], !stored.isSecret else { return nil }
+    return try? JSONDecoder().decode(String.self, from: stored.json)
+  }
+
+  /// Removes a dynamically-keyed value entirely.
+  ///
+  /// A real delete, not a write of `""`. The two are indistinguishable to most readers:
+  /// `string(forKey:)` gives back an empty string either way, but they are not the same
+  /// thing: an empty row means "configured, to nothing", and it survives as a row that
+  /// declared defaults will then decline to fill, because something is already there. Reset
+  /// has to leave the service looking untouched, which means the key must not exist.
+  ///
+  /// Through the same write lane as `write`, because the row delete and the Keychain delete
+  /// are separated by an await. Outside the lane, a secret write landing in that window
+  /// staged its new value in the Keychain, and this then deleted it after the fact: the
+  /// marker row said a secret was stored, the Keychain held nothing, and the change this
+  /// announced named a removal that had already been overwritten.
+  public func remove(forKey key: String) async throws {
+    await beginWrite()
+    defer { endWrite() }
+    try await database.write { db in
+      try db.execute(sql: "DELETE FROM setting WHERE key = ?", arguments: [key])
+    }
+    persisted.removeValue(forKey: key)
+    // The Keychain half too, or a cleared credential lingers where only the marker row
+    // was removed: invisible, and still readable by anything that knows the key.
+    //
+    // PROPAGATED, not `try?`. The optional-try produced exactly the lingering credential
+    // this comment warns about and named no path the failure was reported on, which is the
+    // project's own test for whether a `try?` is allowed. A settings write is never a `try?`,
+    // and a delete that half-succeeded is the case a caller most needs to hear about: the
+    // row is gone, so nothing will ever try again.
+    try secrets.delete(key)
+    broadcast(SettingsChange(changedKeys: [key]))
+    auditObserver?.settingsDidChange(SettingsWriteRecord(changes: [], removedKeys: [key]))
+  }
+
+  /// Writes a dynamically-keyed value.
+  ///
+  /// `isSecret` decides the Keychain rather than a declaration, because for a plugin field
+  /// the manifest is the only place that fact exists.
+  public func set(_ value: String, forKey key: String, isSecret: Bool = false) async throws {
+    try await write { batch in
+      batch.setDynamic(value, forKey: key, isSecret: isSecret)
+    }
+  }
+
+  public func resolve<Value: SettingValue>(_ setting: Setting<Value>) -> ResolvedSetting<Value> {
+    // Highest precedence first.
+    if let raw = commandLineValues[setting.key],
+      let value = accepted(raw, for: setting, from: .commandLine)
+    {
+      return ResolvedSetting(value: value, source: .commandLine)
+    }
+    if let raw = configFileValues[setting.key],
+      let value = accepted(raw, for: setting, from: .configFile)
+    {
+      return ResolvedSetting(value: value, source: .configFile)
+    }
+    // A declared secret is resolved from the Keychain WITHOUT requiring a marker row.
+    // The legacy migration moves secrets straight into the Keychain and deliberately
+    // leaves the database row out, so keying on the row would make a migrated install
+    // report that it has no server password while authentication, which reads the
+    // Keychain directly, works fine. The two views of the same value have to agree.
+    if setting.isSecret {
+      if case .value(let secret) = readSecret(setting.key), !secret.isEmpty,
+        let value = secret as? Value
+      {
+        return ResolvedSetting(value: value, source: .persistedStore)
+      }
+      // An unreadable secret still resolves to the default here, because `resolve`
+      // has nowhere to put "unknown", but it has alerted, and `unreadableSecretKeys`
+      // now says so, which is what a caller needs to avoid presenting it as unset.
+      return ResolvedSetting(value: setting.defaultValue, source: .declaredDefault)
+    }
+
+    if let stored = persisted[setting.key] {
+      if stored.isSecret {
+        if case .value(let secret) = readSecret(setting.key),
+          let value = secret as? Value
+        {
+          return ResolvedSetting(value: value, source: .persistedStore)
+        }
+      } else if stored.typeTag == Value.typeTag {
+        do {
+          let value = try JSONDecoder().decode(Value.self, from: stored.json)
+          return ResolvedSetting(value: value, source: .persistedStore)
+        } catch {
+          // The right type and a value that will not decode: a row damaged by hand or by a
+          // half-finished write. The default applies, as for a mismatch, and is SAID: the
+          // mismatch was logged and this, the stranger of the two, was not.
+          logger.warning(
+            "Stored value unreadable; using default",
+            metadata: [
+              "key": .string(setting.key),
+              "type": .string(Value.typeTag),
+              "error": .string(String(describing: error)),
+            ])
+        }
+      } else {
+        // Recorded rather than silently coerced: coercion is the bug being fixed.
+        logger.warning(
+          "Stored type mismatch; using default",
+          metadata: [
+            "key": .string(setting.key),
+            "expected": .string(Value.typeTag),
+            "found": .string(stored.typeTag),
+          ])
+      }
+    }
+    return ResolvedSetting(value: setting.defaultValue, source: .declaredDefault)
+  }
+
+  /// Secrets are returned as `SecureString`, never as a plain String, so the caller has to
+  /// opt in to materialising it.
+  ///
+  /// `nil` means the Keychain could not be read, and is deliberately NOT the same as the
+  /// empty `SecureString` returned for a secret that is merely unset. The authentication
+  /// path rejects both, but only one of them is the user's fault: conflating them is what
+  /// made a Keychain failure surface as a claim about the database.
+  public func secret(_ setting: Setting<String>) -> SecureString? {
+    precondition(setting.isSecret, "\(setting.key) is not declared as a secret")
+    if let raw = commandLineValues[setting.key] { return SecureString(raw) }
+    if let raw = configFileValues[setting.key] { return SecureString(raw) }
+    switch readSecret(setting.key) {
+    case .value(let value): return SecureString(value)
+    case .absent: return SecureString(setting.defaultValue)
+    case .unreadable: return nil
+    }
+  }
+
+  // MARK: - Writing
+
+  /// Writes one setting. Prefer `write { }` for anything touching more than one key.
+  public func set<Value: SettingValue>(_ setting: Setting<Value>, to value: Value) async throws {
+    try await write { batch in
+      try batch.set(setting, to: value)
+    }
+  }
+
+  /// A write whose caller cannot propagate the failure (a closure handed to a service, a
+  /// SwiftUI action) but must not lose it either. Logged at error level with the key, and
+  /// the result says whether the value stuck so the caller can tell the user.
+  ///
+  /// This is the ONLY sanctioned home for a swallowed settings error. A `try?` on `set`
+  /// hides a Keychain refusal or a full disk behind a control that appears to have worked.
+  @discardableResult
+  public func trySet<Value: SettingValue>(_ setting: Setting<Value>, to value: Value) async
+    -> Bool
+  {
+    do {
+      try await set(setting, to: value)
+      return true
+    } catch {
+      logWriteFailure(key: setting.key, error: error)
+      return false
+    }
+  }
+
+  /// The string-keyed twin of `trySet(_:to:)`, for service-owned keys.
+  @discardableResult
+  public func trySet(_ value: String, forKey key: String, isSecret: Bool = false) async -> Bool {
+    do {
+      try await set(value, forKey: key, isSecret: isSecret)
+      return true
+    } catch {
+      logWriteFailure(key: key, error: error)
+      return false
+    }
+  }
+
+  private func logWriteFailure(key: String, error: any Error) {
+    logger.error(
+      "A setting could not be saved",
+      metadata: ["key": .string(key), "error": .string(String(describing: error))])
+  }
+
+  /// Applies a batch and emits exactly one change, naming only the keys whose value moved.
+  ///
+  /// One change per batch is what stops a UI Save touching five keys from producing five
+  /// restart cascades. Only the keys that MOVED is what stops a rewrite of an unchanged value
+  /// from becoming a restart loop; see `Commit.changedKeys`. A batch that moved nothing
+  /// announces nothing.
+  @discardableResult
+  public func write(_ body: (inout SettingsBatch) throws -> Void) async throws -> SettingsChange {
+    var batch = SettingsBatch()
+    try body(&batch)
+    guard !batch.operations.isEmpty else { return SettingsChange(changedKeys: []) }
+
+    // Every operation is validated before ANY of them is applied. Validating inside the
+    // apply loop instead would persist operations 1..n-1 and then throw on n, leaving the
+    // store half-written, which is the exact failure this batching API exists to prevent.
+    try batch.validateAll()
+
+    // SERIALISED across the whole write, because staging and committing are separated by
+    // an await and the actor releases between them.
+    //
+    // `stageSecrets` runs synchronously and records the PREVIOUS value of each secret so a
+    // failed transaction can put it back. A second write touching the same key that lands
+    // in the suspension window recorded the FIRST write's value as its previous — so if the
+    // first transaction then failed, its rollback restored that, clobbering the second
+    // write's already-committed secret. Narrow, silent, and the value is a credential.
+    //
+    // One in-flight write at a time removes the window entirely. Settings writes are rare
+    // and small; nothing here is on a hot path.
+    await beginWrite()
+    defer { endWrite() }
+
+    let committed = try await commit(batch)
+    let change = SettingsChange(changedKeys: committed.changedKeys)
+    guard !change.changedKeys.isEmpty else { return change }
+    announce(change, of: committed)
+    return change
+  }
+
+  /// What a committed batch did: the rows it wrote, what they replaced, and which secrets
+  /// moved. Enough to say what changed without touching the Keychain again.
+  private struct Commit {
+    let rows: [PendingRow]
+    /// `persisted` as it was BEFORE the rows were applied.
+    let previous: [String: StoredValue]
+    /// Secrets whose new value differs from the one the Keychain held, computed from what
+    /// `stageSecrets` had already read.
+    let secretsThatMoved: Set<String>
+
+    /// ONLY the keys whose value is not what it was.
+    ///
+    /// A write that stores the value already there is not a change, and announcing it as one
+    /// is how a publish becomes a loop: every connection method republishes `server_address`
+    /// on each connect, and each announcement restarts services that then reconnect. The
+    /// primary guard against that is a service not restarting on a key it consumes live (see
+    /// `HTTPService.liveKeys`); this is the second, and it is the one that holds when the
+    /// published value is unchanged.
+    ///
+    /// A secret is compared too, against the value the Keychain held, because its own row
+    /// carries no value to compare. Announcing every secret write as a change made a service
+    /// rewriting its own unchanged secret restart itself: zrok rewrote `reserved_token` and
+    /// restarted, 175 times in 71 seconds against zrok's API.
+    var changedKeys: Set<String> {
+      Set(
+        rows.filter { row in
+          row.isSecret ? secretsThatMoved.contains(row.key) : previous[row.key] != row.stored
+        }.map(\.key))
+    }
+
+    /// The audit record for `change`: the same keys the broadcast names, and never a secret's
+    /// values, only that the key changed.
+    func auditRecord(for change: SettingsChange) -> SettingsWriteRecord {
+      SettingsWriteRecord(
+        changes: rows.filter { change.changedKeys.contains($0.key) }.map { row in
+          SettingsWriteRecord.Change(
+            key: row.key,
+            isSecret: row.isSecret,
+            previousJSON: row.isSecret ? nil : previous[row.key]?.json,
+            currentJSON: row.isSecret ? nil : row.json
+          )
+        },
+        removedKeys: []
+      )
+    }
+  }
+
+  /// Makes a batch durable: the Keychain, then one transaction, then the in-memory view.
+  ///
+  /// The Keychain goes first because it is the one store that cannot join the database
+  /// transaction, so it is applied where it can still be undone: if the transaction fails,
+  /// those secrets are put back and the caller sees a write that did nothing rather than one
+  /// that half-happened. ONE transaction for the whole batch, because per-operation ones would
+  /// let a failure partway through commit the earlier keys with nobody told. The in-memory
+  /// view moves last, so a failed transaction cannot leave `resolve` reporting a value that is
+  /// not stored.
+  private func commit(_ batch: SettingsBatch) async throws -> Commit {
+    let rows = batch.operations.map(PendingRow.init)
+    let restore = try stageSecrets(in: batch)
+
+    let previousSecrets = Dictionary(
+      restore.map { ($0.key, $0.previous ?? "") }, uniquingKeysWith: { first, _ in first })
+    let secretsThatMoved = Set(
+      batch.operations
+        .filter { $0.isSecret && previousSecrets[$0.key] != ($0.secretValue ?? "") }
+        .map(\.key))
+
+    do {
+      try await persist(rows, at: Date())
+    } catch {
+      rollBackSecrets(restore)
+      throw error
+    }
+
+    let previous = persisted
+    for row in rows {
+      persisted[row.key] = row.stored
+    }
+    return Commit(rows: rows, previous: previous, secretsThatMoved: secretsThatMoved)
+  }
+
+  /// Tells every follower and the audit log what moved.
+  ///
+  /// The audit log is told SYNCHRONOUSLY, here, so the record carries the task-local actor
+  /// of whoever called `write`: a request, a service, or the person at the window. An
+  /// observer told from the change stream would have lost that by the time it arrived.
+  private func announce(_ change: SettingsChange, of commit: Commit) {
+    broadcast(change)
+    auditObserver?.settingsDidChange(commit.auditRecord(for: change))
+  }
+
+  /// One operation of a batch, bound out of the `Operation` before the database closure.
+  /// `Operation` holds a validate closure and so is not Sendable; these fields are, and
+  /// they are all the writes actually need. Capturing the Operation whole would be a data
+  /// race the compiler is right to reject.
+  private struct PendingRow: Sendable {
+    let key: String
+    let typeTag: String
+    let isSecret: Bool
+    /// Empty for a secret: the row records only THAT one exists, never its value.
+    let json: Data
+
+    init(_ operation: SettingsBatch.Operation) {
+      key = operation.key
+      typeTag = operation.typeTag
+      isSecret = operation.isSecret
+      json = operation.isSecret ? Data() : operation.encodedValue
+    }
+
+    var stored: StoredValue { StoredValue(json: json, typeTag: typeTag, isSecret: isSecret) }
+  }
+
+  /// Writes the batch's secrets to the Keychain and returns what each replaced, so a later
+  /// failure can put them back. Its own failure rolls back what it had already written.
+  private func stageSecrets(in batch: SettingsBatch) throws -> [(key: String, previous: String?)] {
+    var restore: [(key: String, previous: String?)] = []
+    do {
+      for operation in batch.operations where operation.isSecret {
+        // `try`, not `try?`. A swallowed read would record `nil` ("there was
+        // nothing here before") and a rollback after an unreadable Keychain would
+        // then DELETE the existing secret rather than restore it. Failing the write
+        // is also the right call on its own terms: a Keychain we cannot read is not
+        // one we should be writing to.
+        restore.append((operation.key, try secrets.get(operation.key)))
+        try secrets.set(operation.key, value: operation.secretValue ?? "")
+      }
+    } catch {
+      rollBackSecrets(restore)
+      throw error
+    }
+    return restore
+  }
+
+  /// Upserts every row in one transaction.
+  private func persist(_ rows: [PendingRow], at now: Date) async throws {
+    try await database.write { db in
+      for row in rows {
+        try db.execute(
+          sql: """
+            INSERT INTO setting (key, value, type_tag, is_secret, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                type_tag = excluded.type_tag, is_secret = excluded.is_secret,
+                updated_at = excluded.updated_at
+            """,
+          arguments: [row.key, row.json, row.typeTag, row.isSecret, now]
+        )
+      }
+    }
+  }
+
+  /// Best-effort undo of the Keychain half of a failed batch.
+  ///
+  /// Best-effort because a Keychain that just refused a write may refuse the undo too.
+  /// Failing loudly here would replace one problem with a worse one: the caller already
+  /// has an error to report, and the durable store is untouched either way.
+  private func rollBackSecrets(_ restore: [(key: String, previous: String?)]) {
+    for entry in restore.reversed() {
+      if let previous = entry.previous {
+        try? secrets.set(entry.key, value: previous)
+      } else {
+        try? secrets.delete(entry.key)
+      }
+    }
+  }
+
+  // MARK: - Observation
+
+  public func changes() -> AsyncStream<SettingsChange> {
+    let id = UUID()
+    return AsyncStream { continuation in
+      continuations[id] = continuation
+      continuation.onTermination = { [weak self] _ in
+        Task { await self?.removeContinuation(id) }
+      }
+    }
+  }
+
+  private func removeContinuation(_ id: UUID) { continuations[id] = nil }
+
+  private func broadcast(_ change: SettingsChange) {
+    for continuation in continuations.values { continuation.yield(change) }
+  }
+
+  /// Loose decoding for the string-shaped layers (YAML, CLI), which have no type tags. The
+  /// value type decides what it accepts; see `SettingValue.parse(loose:)`.
+  private func decodeLoose<Value: SettingValue>(_ raw: String, as type: Value.Type) -> Value? {
+    Value.parse(loose: raw)
+  }
+
+  /// An override value, if it parses and is inside the setting's declared range.
+  ///
+  /// The override layers are not writes, so they never met a range at all: `--set
+  /// socket_port=70000` and `--set start_delay=9999` were taken as given. The RANGE only, not
+  /// the declared validators, which can be set-time policy; see `Setting.rangeViolation`. A
+  /// value refused either way is passed over for the next layer and said once, at warning,
+  /// naming the key and never the value, which may be a credential.
+  private func accepted<Value: SettingValue>(
+    _ raw: String, for setting: Setting<Value>, from layer: SettingSource
+  ) -> Value? {
+    let reason: String
+    if let value = decodeLoose(raw, as: Value.self) {
+      guard let violation = setting.rangeViolation(value) else { return value }
+      reason = violation
+    } else {
+      reason = "not a \(Value.typeTag)"
+    }
+    let identity = "\(layer)|\(setting.key)"
+    if !reportedOverrides.contains(identity) {
+      reportedOverrides.insert(identity)
+      logger.warning(
+        "Ignoring a setting override the setting refuses",
+        metadata: [
+          "key": .string(setting.key), "layer": .string("\(layer)"),
+          "reason": .string(reason),
+        ])
+    }
+    return nil
+  }
+}
+
+/// What one `write` or `remove` did, for an audit log.
+///
+/// Values travel as the JSON the row holds (`"abc"`, `1234`, `true`) rather than as decoded
+/// Swift values, so the store does not have to know every type a dynamic key can take. Nil
+/// means unset, and a secret has nil for both: the record is that the key changed.
+public struct SettingsWriteRecord: Sendable, Equatable {
+
+  public struct Change: Sendable, Equatable {
+    public let key: String
+    public let isSecret: Bool
+    public let previousJSON: Data?
+    public let currentJSON: Data?
+
+    public init(key: String, isSecret: Bool, previousJSON: Data?, currentJSON: Data?) {
+      self.key = key
+      self.isSecret = isSecret
+      self.previousJSON = previousJSON
+      self.currentJSON = currentJSON
+    }
+  }
+
+  /// Keys whose stored value moved, with what it was and what it is.
+  public let changes: [Change]
+  /// Keys that were deleted outright.
+  public let removedKeys: [String]
+
+  public init(changes: [Change], removedKeys: [String]) {
+    self.changes = changes
+    self.removedKeys = removedKeys
+  }
+}
+
+/// Somewhere a settings change is reported. Synchronous and non-throwing on purpose: it is
+/// called inside the store's write lane, with the caller's task-local actor still in scope,
+/// and must hand the record on without waiting.
+public protocol SettingsWriteObserving: Sendable {
+  func settingsDidChange(_ record: SettingsWriteRecord)
+}
+
+/// Accumulates writes so a batch is applied and announced atomically.
+public struct SettingsBatch {
+
+  struct Operation {
+    let key: String
+    let typeTag: String
+    let isSecret: Bool
+    let encodedValue: Data
+    let secretValue: String?
+    let validate: () throws -> Void
+  }
+
+  private(set) var operations: [Operation] = []
+
+  /// Runs every operation's validator, throwing the first refusal. Before anything is
+  /// applied: see `SettingsStore.write`.
+  func validateAll() throws {
+    for operation in operations { try operation.validate() }
+  }
+
+  /// Writes a dynamically-keyed value: a service or plugin field from a manifest.
+  ///
+  /// No validator, because a manifest field has none to run: its constraints live in the
+  /// `FieldKind` and are enforced by the form that produced the value. Anything stricter
+  /// belongs in the service's own `start`, where it can report a reason.
+  public mutating func setDynamic(_ value: String, forKey key: String, isSecret: Bool) {
+    operations.append(
+      Operation(
+        key: key,
+        typeTag: String.typeTag,
+        isSecret: isSecret,
+        encodedValue: (try? JSONEncoder().encode(value)) ?? Data("\"\"".utf8),
+        secretValue: isSecret ? value : nil,
+        validate: {}
+      )
+    )
+  }
+
+  public mutating func set<Value: SettingValue>(_ setting: Setting<Value>, to value: Value) throws {
+    let encoded = try JSONEncoder().encode(value)
+    operations.append(
+      Operation(
+        key: setting.key,
+        typeTag: Value.typeTag,
+        isSecret: setting.isSecret,
+        encodedValue: encoded,
+        secretValue: setting.isSecret ? (value as? String) : nil,
+        validate: { try setting.validate?(value) }
+      )
+    )
+  }
+}
+
+/// The set of keys that changed. Deliberately not the whole settings object: services react
+/// to what moved, and the registry routes on the intersection.
+public struct SettingsChange: Sendable, Equatable {
+  public let changedKeys: Set<String>
+  public init(changedKeys: Set<String>) { self.changedKeys = changedKeys }
+  public func contains(_ key: String) -> Bool { changedKeys.contains(key) }
+  public func intersects(_ keys: Set<String>) -> Bool { !changedKeys.isDisjoint(with: keys) }
+}

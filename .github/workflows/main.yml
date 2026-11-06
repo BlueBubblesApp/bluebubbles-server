@@ -1,8 +1,21 @@
-name: Build-BlueBubbles-Server
+name: Build-BlueBubbles-Server (Electron)
+
+# The Electron server moved to electron/ when the Swift server became the repository
+# root. It is still maintained and still cuts releases, because the Swift server needs
+# macOS 14 and the Electron one reaches further back. This workflow is unchanged apart
+# from being pointed at that directory, and the paths filter keeps it from rebuilding
+# the Electron app on every Swift commit.
 
 on:
   push:
     branches: [ master ]
+    paths:
+      - 'electron/**'
+      - '.github/workflows/main.yml'
+
+defaults:
+  run:
+    working-directory: electron
 
 jobs:
   build:
@@ -33,28 +46,33 @@ jobs:
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # create variables
-          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          # Every path here is quoted. `$RUNNER_TEMP` carries no spaces on GitHub's images
+          # today, so this is not a bug being fixed but one being prevented, in a script
+          # whose failure mode is a signing step misbehaving on a runner image nobody chose.
+          # The profile directory genuinely does contain a space, and it is now a variable
+          # rather than a backslash escape repeated twice.
+          CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
+          PP_PATH="$RUNNER_TEMP/build_pp.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          PROFILES="$HOME/Library/MobileDevice/Provisioning Profiles"
 
           # import certificate and provisioning profile from secrets
-          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
-          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o "$PP_PATH"
 
           # create temporary keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           # import certificate to keychain
-          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
 
           # apply provisioning profile
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
+          mkdir -p "$PROFILES"
+          cp "$PP_PATH" "$PROFILES"
       - name: Build & Publish BlueBubbles
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

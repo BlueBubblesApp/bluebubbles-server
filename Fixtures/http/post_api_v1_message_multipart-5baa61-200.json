@@ -1,0 +1,117 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/message/multipart?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "chatGuid": "any;-;person@example.com",
+        "tempGuid": "fixture-B0A1CFD7-35C7-432C-A44A-27B96CF3D4EC",
+        "parts": [
+          {
+            "partIndex": 0,
+            "text": "REDACTED"
+          }
+        ]
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Message sent!",
+        "data": {
+          "originalROWID": 418347,
+          "guid": "90819309-C1EB-4A12-89FC-81E6D46F30BC",
+          "text": "REDACTED",
+          "attributedBody": [
+            {
+              "string": "Fixture multipart message",
+              "runs": [
+                {
+                  "range": [
+                    0,
+                    25
+                  ],
+                  "attributes": {
+                    "__kIMBaseWritingDirectionAttributeName": "-1",
+                    "__kIMMessagePartAttributeName": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": {
+            "originalROWID": 4,
+            "address": "REDACTED",
+            "service": "iMessage",
+            "uncanonicalizedId": null,
+            "country": "US"
+          },
+          "handleId": 4,
+          "otherHandle": 0,
+          "attachments": [],
+          "subject": null,
+          "error": 0,
+          "dateCreated": 1788191140829,
+          "dateRead": null,
+          "dateDelivered": null,
+          "isDelivered": false,
+          "isFromMe": true,
+          "hasDdResults": false,
+          "isArchived": false,
+          "itemType": 0,
+          "groupTitle": null,
+          "groupActionType": 0,
+          "balloonBundleId": null,
+          "associatedMessageGuid": null,
+          "associatedMessageType": null,
+          "expressiveSendStyleId": null,
+          "threadOriginatorGuid": null,
+          "hasPayloadData": false,
+          "country": null,
+          "isDelayed": false,
+          "isAutoReply": false,
+          "isSystemMessage": false,
+          "isServiceMessage": false,
+          "isForward": false,
+          "threadOriginatorPart": null,
+          "isCorrupt": false,
+          "datePlayed": null,
+          "cacheRoomnames": null,
+          "isSpam": false,
+          "isExpired": false,
+          "timeExpressiveSendPlayed": null,
+          "isAudioMessage": false,
+          "replyToGuid": "209E1FF5-42D2-4AB4-A5B4-096C6BF9D873",
+          "shareStatus": 0,
+          "shareDirection": 0,
+          "wasDeliveredQuietly": false,
+          "didNotifyRecipient": false,
+          "chats": [],
+          "messageSummaryInfo": null,
+          "payloadData": null,
+          "dateEdited": null,
+          "dateRetracted": null,
+          "partCount": 1,
+          "tempGuid": "fixture-B0A1CFD7-35C7-432C-A44A-27B96CF3D4EC"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:45:40.844Z"
+}

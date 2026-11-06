@@ -1,0 +1,59 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/sticker/E5319610-D541-4467-ADB1-FAD35A1654CB?password=__REDACTED__",
+    "headers": {
+      "host": "127.0.0.1:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": {
+          "shelf": "recent",
+          "search_text": null,
+          "accessibility_name": "final smoke",
+          "identifier": "E5319610-D541-4467-ADB1-FAD35A1654CB",
+          "effect": -1,
+          "byte_count": 528,
+          "representations": [
+            {
+              "width": 160,
+              "mime_type": "image/png",
+              "role": "",
+              "identifier": "D531F8F8-77C8-4C1B-895C-3CE819ED498C",
+              "height": 160,
+              "uti": "public.png",
+              "is_preferred": true,
+              "byte_count": 528
+            }
+          ],
+          "attribution_name": "Stickers",
+          "created_at": 1788447769320,
+          "name": null,
+          "last_used_at": 1788447769320,
+          "library_index": 16384,
+          "kind": "user",
+          "external_uri": "sticker:///user/identifier/F1D76DE3-2724-426B-9569-EA43C0430C87",
+          "attribution_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:+15555550100:com.apple.Stickers.UserGenerated.MessagesExtension"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-09-04T15:12:39.956Z"
+}

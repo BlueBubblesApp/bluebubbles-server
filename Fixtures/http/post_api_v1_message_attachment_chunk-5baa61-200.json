@@ -1,0 +1,157 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/message/attachment/chunk?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "multipart/form-data; boundary=------------------------orAjKA3UFl0cwAyE6V0WKH"
+    },
+    "body": {
+      "kind": "text",
+      "value": "--------------------------orAjKA3UFl0cwAyE6V0WKH\r\nContent-Disposition: form-data; name=\"attachmentGuid\"\r\n\r\nfixture-chunk-5BC050BB-3E1C-4301-92DA-61C1285E01D7\r\n--------------------------orAjKA3UFl0cwAyE6V0WKH\r\nContent-Disposition: form-data; name=\"chatGuid\"\r\n\r\nany;-;person@example.com\r\n--------------------------orAjKA3UFl0cwAyE6V0WKH\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nfixture.png\r\n--------------------------orAjKA3UFl0cwAyE6V0WKH\r\nContent-Disposition: form-data; name=\"method\"\r\n\r\napple-script\r\n--------------------------orAjKA3UFl0cwAyE6V0WKH\r\nContent-Disposition: form-data; name=\"chunkIndex\"\r\n\r\n0\r\n--------------------------orAjKA3UFl0cwAyE6V0WKH\r\nContent-Disposition: form-data; name=\"totalChunks\"\r\n\r\n1\r\n--------------------------orAjKA3UFl0cwAyE6V0WKH\r\nContent-Disposition: form-data; name=\"isComplete\"\r\n\r\ntrue\r\n--------------------------orAjKA3UFl0cwAyE6V0WKH\r\nContent-Disposition: form-data; name=\"chunk\"; filename=\"fixture.png\"\r\nContent-Type: image/png\r\n\r\n�PNG\r\n\u001a\n\u0000\u0000\u0000\rIHDR\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0010\b\u0002\u0000\u0000\u0000��h6\u0000\u0000\u0000HIDATx����\u0014�\u0000\u0000��!�\u0010B\b!�\u0010B\b!�\u0010B\u001f\u0003\b!�\u0010B�a�\u000e0\u001el\u0019m�l�mYlYm�l�m9l9m�l�mylym�L�\u0017,\u0010�φ\u0014\u0000\u0000\u0000\u0000IEND�B`�\r\n--------------------------orAjKA3UFl0cwAyE6V0WKH--\r\n"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Attachment sent!",
+        "data": {
+          "originalROWID": 418350,
+          "guid": "3DFAE6F4-4D6C-4AE5-ACFE-A64FD0150A6E",
+          "text": "REDACTED",
+          "attributedBody": [
+            {
+              "string": "￼",
+              "runs": [
+                {
+                  "range": [
+                    0,
+                    1
+                  ],
+                  "attributes": {
+                    "__kIMFileTransferGUIDAttributeName": "BA8A1E26-A2B3-4B2F-A389-43E4E7E4FAE1",
+                    "__kIMMessagePartAttributeName": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "handle": {
+            "originalROWID": 4,
+            "address": "REDACTED",
+            "service": "iMessage",
+            "uncanonicalizedId": null,
+            "country": "US"
+          },
+          "handleId": 4,
+          "otherHandle": 0,
+          "attachments": [
+            {
+              "originalROWID": 11942,
+              "guid": "BA8A1E26-A2B3-4B2F-A389-43E4E7E4FAE1",
+              "uti": "public.png",
+              "mimeType": "image/png",
+              "transferName": "REDACTED",
+              "totalBytes": 183,
+              "transferState": 5,
+              "isOutgoing": true,
+              "hideAttachment": false,
+              "isSticker": false,
+              "originalGuid": "BA8A1E26-A2B3-4B2F-A389-43E4E7E4FAE1",
+              "hasLivePhoto": false,
+              "height": 128,
+              "width": 128,
+              "metadata": {
+                "size": 129,
+                "height": 128,
+                "width": 128
+              }
+            }
+          ],
+          "subject": null,
+          "error": 0,
+          "dateCreated": 1788191465848,
+          "dateRead": null,
+          "dateDelivered": null,
+          "isDelivered": false,
+          "isFromMe": true,
+          "hasDdResults": false,
+          "isArchived": false,
+          "itemType": 0,
+          "groupTitle": null,
+          "groupActionType": 0,
+          "balloonBundleId": null,
+          "associatedMessageGuid": null,
+          "associatedMessageType": null,
+          "expressiveSendStyleId": null,
+          "threadOriginatorGuid": null,
+          "hasPayloadData": false,
+          "country": null,
+          "isDelayed": false,
+          "isAutoReply": false,
+          "isSystemMessage": false,
+          "isServiceMessage": false,
+          "isForward": false,
+          "threadOriginatorPart": null,
+          "isCorrupt": false,
+          "datePlayed": null,
+          "cacheRoomnames": null,
+          "isSpam": false,
+          "isExpired": false,
+          "timeExpressiveSendPlayed": null,
+          "isAudioMessage": false,
+          "replyToGuid": "90819309-C1EB-4A12-89FC-81E6D46F30BC",
+          "shareStatus": 0,
+          "shareDirection": 0,
+          "wasDeliveredQuietly": false,
+          "didNotifyRecipient": false,
+          "chats": [
+            {
+              "originalROWID": 50,
+              "guid": "any;-;person@example.com",
+              "style": 45,
+              "chatIdentifier": "REDACTED",
+              "isArchived": false,
+              "displayName": "REDACTED",
+              "isFiltered": false,
+              "groupId": "36D57D0C-7B05-410A-9006-C1062028D187",
+              "properties": [
+                {
+                  "hasViewedPotentialSpamChat": true,
+                  "pv": 0,
+                  "numberOfTimesRespondedtoThread": 3,
+                  "shouldForceToSMS": false,
+                  "lastSeenMessageGuid": "REDACTED",
+                  "hasBeenAutoSpamReported": true,
+                  "markedAsKnownDate": "+15555550100T14:38:18.959Z",
+                  "LSMD": "+15555550100T15:51:05.848Z"
+                }
+              ],
+              "lastAddressedHandle": "REDACTED"
+            }
+          ],
+          "messageSummaryInfo": [
+            {
+              "ust": true
+            }
+          ],
+          "payloadData": null,
+          "dateEdited": null,
+          "dateRetracted": null,
+          "partCount": 1
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:51:06.484Z"
+}

@@ -1,0 +1,57 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/chat/any;-;person@example.com?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "data": {
+          "guid": "any;-;person@example.com",
+          "isFiltered": false,
+          "style": 45,
+          "properties": [
+            {
+              "LSMD": "+15555550100T18:51:41.839Z",
+              "hasBeenAutoSpamReported": true,
+              "numberOfTimesRespondedtoThread": 2,
+              "shouldForceToSMS": false,
+              "markedAsKnownDate": "+15555550100T13:41:07.734Z",
+              "lastSeenMessageGuid": "REDACTED",
+              "com.apple.iChat.LastArchivedMessageID": [
+                "435183A5-1B41-4C3F-ADF6-8007E1B6E760",
+                193387
+              ]
+            }
+          ],
+          "groupId": "981C41D9-C2AB-439B-8C63-C659A933CE7F",
+          "chatIdentifier": "REDACTED",
+          "originalROWID": 26,
+          "participants": [],
+          "isArchived": false,
+          "displayName": null,
+          "lastAddressedHandle": "REDACTED"
+        },
+        "message": "Success"
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T18:35:47.529Z"
+}
