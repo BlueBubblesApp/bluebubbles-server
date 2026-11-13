@@ -447,6 +447,67 @@ const testUnavailableHttp = async () => {
     assert.equal(retry.data.status, "initializing");
 };
 
+const testStartupIpcStatus = async () => {
+    const handlers = new Map();
+    const server = { repo: { getConfig: () => true }, privateApi: null };
+    const mocks = {
+        electron: { ipcMain: { handle: (name, callback) => handlers.set(name, callback) } },
+        "node-mac-permissions": {},
+        "@server": { Server: () => server },
+        "@server/fileSystem": {},
+        "@server/api/interfaces/alertsInterface": {},
+        "@server/api/apple/scripts": {},
+        "@server/helpers/utils": {},
+        "@server/api/interfaces/contactInterface": {},
+        "../../api/privateApi/PrivateApiService": { PrivateApiService: { port: 9090 } },
+        "@server/utils/PermissionUtils": {},
+        "@server/api/interfaces/scheduledMessagesInterface": {},
+        "@server/api/interfaces/chatInterface": {},
+        "@server/api/interfaces/generalInterface": {},
+        "@server/env": {},
+        "@server/lib/logging/Loggable": { ...logging, getLogger: () => ({}) },
+        "@server/managers/zrokManager": {},
+        "@server/databases/server/constants": {}
+    };
+    const { IPCService } = load("../src/server/services/ipcService/index.ts", mocks);
+    IPCService.startIpcListeners();
+    const getStatus = handlers.get("get-private-api-status");
+    const retry = handlers.get("retry-findmy-helper");
+
+    // IPC is available during the startup delay, before initServices creates
+    // PrivateApiService. Polling must not throw or claim helper readiness.
+    for (const uninitialized of [null, undefined]) {
+        server.privateApi = uninitialized;
+        const status = await getStatus();
+        assert.equal(status.enabled, true);
+        assert.equal(status.connected, false);
+        assert.equal(status.messagesConnected, false);
+        assert.equal(status.findMy, undefined);
+        await assert.rejects(
+            () => retry(),
+            error => error instanceof Error && /listener has not initialized yet/.test(error.message)
+        );
+    }
+
+    let retries = 0;
+    const readiness = { required: true, requested: true, status: "ready", reason: null, message: "Connected" };
+    server.privateApi = {
+        helper: {},
+        hasClient: processIdentifier => processIdentifier === "com.apple.MobileSMS",
+        findMyReadiness: readiness,
+        retryFindMy: async () => {
+            retries += 1;
+            return readiness;
+        }
+    };
+    const initialized = await getStatus();
+    assert.equal(initialized.connected, true);
+    assert.equal(initialized.messagesConnected, true);
+    assert.equal(initialized.findMy, readiness);
+    assert.equal(await retry(), readiness);
+    assert.equal(retries, 1, "retry reaches the service after initialization");
+};
+
 (async () => {
     await testLifecycle();
     await testExitBeforeRegistration();
@@ -455,7 +516,8 @@ const testUnavailableHttp = async () => {
     await testExplicitRestartAfterSocketLoss();
     await testTargetedPreference();
     await testUnavailableHttp();
-    console.log("PASS: Find My readiness, targeted retry, timeout isolation and unavailable API");
+    await testStartupIpcStatus();
+    console.log("PASS: Find My readiness, targeted retry, timeout isolation, unavailable API and startup IPC");
 })().catch(error => {
     console.error(error);
     process.exitCode = 1;
