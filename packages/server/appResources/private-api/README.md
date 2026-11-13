@@ -64,6 +64,10 @@ handles before changing the cache. A valid complete empty snapshot clears it;
 valid partial snapshots merge without replacing newer cached locations. Older
 Messages helpers retain support for responses without completion metadata.
 
+Friends HTTP and socket payloads serialize `is_locating_in_progress` as a JSON
+boolean, matching the released clients. Native helper `0`/`1` flags are
+normalized at the Server boundary.
+
 ## Find My release smoke test
 
 TCC Automation grants are tied to the signed application identity. Before a

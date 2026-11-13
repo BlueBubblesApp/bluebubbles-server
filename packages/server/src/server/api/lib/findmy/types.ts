@@ -139,7 +139,7 @@ export type FindMyFriendLocation = {
     subtitle: string | null;
     title: string | null;
     last_updated: number | null;
-    is_locating_in_progress: 0 | 1;
+    is_locating_in_progress: boolean;
     status: "legacy" | "live" | "shallow";
     location_type?: number | null;
     horizontal_accuracy?: number | null;

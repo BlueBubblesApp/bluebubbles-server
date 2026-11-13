@@ -60,7 +60,7 @@ assert.equal(normalizedLocation.short_address, null);
 assert.equal(normalizedLocation.subtitle, null);
 assert.equal(normalizedLocation.title, "Alice");
 assert.equal(normalizedLocation.last_updated, 1234567);
-assert.equal(normalizedLocation.is_locating_in_progress, 1);
+assert.equal(normalizedLocation.is_locating_in_progress, true);
 assert.equal(normalizedLocation.status, "live");
 assert.equal(normalizedLocation.location_type, 2);
 assert.equal(normalizedLocation.horizontal_accuracy, 6.5);
@@ -68,6 +68,18 @@ assert.equal(normalizedLocation.vertical_accuracy, 9);
 assert.equal(normalizedLocation.speed, 1.25);
 assert.equal(normalizedLocation.altitude, 32);
 assert.equal(Object.prototype.hasOwnProperty.call(normalizedLocation, "description"), false);
+
+// Released clients require a JSON boolean, while native helpers can send 0/1.
+for (const [input, expected] of [
+    [true, true], [1, true], [false, false], [0, false],
+    [undefined, false], [null, false], ["1", false]
+]) {
+    const payload = normalizeFindMyFriendLocation({ handle: "flag@example.com", is_locating_in_progress: input });
+    const serialized = JSON.parse(JSON.stringify(payload));
+    assert.equal(serialized.is_locating_in_progress, expected);
+    assert.equal(typeof serialized.is_locating_in_progress, "boolean");
+}
+
 
 const missingLocation = normalizeFindMyFriendLocation({
     handle: "bob@example.com",

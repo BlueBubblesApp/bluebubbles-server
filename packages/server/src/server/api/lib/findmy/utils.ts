@@ -92,9 +92,7 @@ export const normalizeFindMyFriendLocation = (location: unknown): FindMyFriendLo
         title: normalizeLocationTitle(untrustedLocation.title),
         last_updated: normalizeOptionalNumber(untrustedLocation.last_updated),
         is_locating_in_progress:
-            untrustedLocation.is_locating_in_progress === true || untrustedLocation.is_locating_in_progress === 1
-                ? 1
-                : 0,
+            untrustedLocation.is_locating_in_progress === true || untrustedLocation.is_locating_in_progress === 1,
         status,
         location_type: normalizeOptionalNumber(untrustedLocation.location_type),
         horizontal_accuracy: normalizeOptionalNumber(untrustedLocation.horizontal_accuracy),
