@@ -90,8 +90,24 @@ export class ActionHandler {
 
             try {
                 // Generate the new send script
-                log.debug(`Sending AppleScript text using fallback script...`);
-                messageScript = sendMessageFallback(chatGuid, message ?? "", theAttachment);
+                log.debug(`Preparing AppleScript text fallback...`);
+                let resolvedService: string | null = null;
+                if (chatGuid.startsWith("any;")) {
+                    try {
+                        const [chats] = await Server().iMessageRepo.getChats({
+                            chatGuid,
+                            withParticipants: false,
+                            limit: 1
+                        });
+                        resolvedService = chats[0]?.serviceName ?? null;
+                    } catch {
+                        log.debug(
+                            "Failed to resolve the fallback chat service; the fallback message will not be sent."
+                        );
+                    }
+                }
+
+                messageScript = sendMessageFallback(chatGuid, message ?? "", theAttachment, resolvedService);
                 await FileSystem.executeAppleScript(messageScript);
             } catch (ex: any) {
                 error = ex;
