@@ -198,9 +198,10 @@ test("returns a server error when the file is still missing after a force downlo
 
 test("logs a failed force download once and returns a server error without streaming", async () => {
     const original = makeAttachment({ filePath: "/attachments/missing.jpg", mimeType: "image/jpeg" });
+    const privateError = "Private API failed for private@example.com at /Users/private/Attachments/image.jpg";
     const { AttachmentRouter, calls } = loadAttachmentRouter({
         attachment: original,
-        forceError: new Error("force download failed")
+        forceError: new Error(privateError)
     });
 
     await assert.rejects(AttachmentRouter.download(makeContext()), error => {
@@ -210,6 +211,7 @@ test("logs a failed force download once and returns a server error without strea
     });
     assert.deepEqual(calls.forceDownload, [original]);
     assert.equal(calls.logs.length, 1);
-    assert.match(calls.logs[0][0], /GUID: attachment-guid/);
+    assert.deepEqual(calls.logs, [["Failed to force download attachment (GUID: attachment-guid)."]]);
+    assert.equal(JSON.stringify(calls.logs).includes(privateError), false);
     assert.equal(calls.fileStreams.length, 0);
 });

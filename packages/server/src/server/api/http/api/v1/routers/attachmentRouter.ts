@@ -45,8 +45,8 @@ export class AttachmentRouter {
                 try {
                     attachment = await AttachmentInterface.forceDownload(attachment);
                     aPath = FileSystem.getRealPath(attachment.filePath);
-                } catch (ex) {
-                    Server().log(`Failed to force download attachment (GUID: ${attachment.guid}): ${String(ex)}`);
+                } catch {
+                    Server().log(`Failed to force download attachment (GUID: ${attachment.guid}).`);
                 }
             }
         }
