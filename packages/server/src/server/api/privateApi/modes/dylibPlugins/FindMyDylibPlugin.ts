@@ -216,12 +216,21 @@ export class FindMyDylibPlugin extends DylibPlugin {
         if (!this.acceptRegistration || this.stopRequested || !this.isEnabled) return;
         this.clearRegistrationTimer();
         this.state = { status: "ready", reason: null, message: "Find My helper is connected." };
+        const refreshes: Array<{ name: string; refresh: () => Promise<unknown> }> = [];
         if (Server().findMyFriendsCache.getAll().length === 0) {
-            await FindMyInterface.refreshFriends(false);
+            refreshes.push({ name: "Friends", refresh: () => FindMyInterface.refreshFriends(false) });
         }
-
         if (Server().findMyDevicesCache.getAll().length === 0) {
-            await FindMyInterface.refreshDevices();
+            refreshes.push({ name: "Devices", refresh: () => FindMyInterface.refreshDevices() });
         }
+        await Promise.all(
+            refreshes.map(async ({ name, refresh }) => {
+                try {
+                    await refresh();
+                } catch (error: any) {
+                    this.log.warn(`Unable to initialize Find My ${name}: ${error?.message ?? String(error)}`);
+                }
+            })
+        );
     }
 }

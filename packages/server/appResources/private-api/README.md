@@ -21,9 +21,9 @@ source commit `e2313f8b5a46d73f62c32e5bd718f0c8563a684e`.
 
 On macOS 15 or later, the Devices GET route reads the server's latest helper
 snapshot without changing the Find My view. The explicit Devices refresh route
-opens `findmy://devices`, waits for the dedicated helper, and reads the
-app-owned FMIP device collection. It does not use Accessibility clicks,
-keyboard events, visible-cell scraping, or fixed view-loading delays.
+requires the dedicated helper to be ready before opening `findmy://devices`
+and reading the app-owned FMIP device collection. It does not use Accessibility
+clicks, keyboard events, visible-cell scraping, or fixed view-loading delays.
 
 The artifact checksum must match its `.md5` file, it must contain `x86_64` and
 `arm64` slices, and it must use `@rpath/BlueBubblesFindMyHelper.dylib` as its
@@ -53,12 +53,19 @@ connection or SIP observation alone does not establish that Find My is ready;
 the Find My helper must actually register and remain connected. The Server does
 not change system security settings.
 
-The Friends GET route continues to return cached data while the helper is
-unavailable. A Friends refresh requests a fresh response: it returns HTTP 503
-when the required helper is unavailable, and it fails if the helper returns an
-invalid response instead of silently treating cached data as a fresh success.
+The Friends and Devices GET routes continue to return cached data while the
+helper is unavailable. Both refresh routes return HTTP 503 when the required
+helper is unavailable. A refresh fails if the helper returns an invalid response
+instead of silently treating cached data as a fresh success.
 The cache is retained in either case. Earlier macOS versions retain their
-existing Friends routing and fallback behavior.
+existing Find My routing and fallback behavior.
+
+Devices snapshots are validated before updating the cache. Complete snapshots
+replace the previous collection; partial snapshots merge identifiable devices
+while retaining previously cached devices. Invalid or duplicate records reject
+the whole snapshot. After accepted helper registration, empty Friends and
+Devices caches initialize independently so a failure in one does not prevent
+the other from refreshing.
 
 The dedicated Friends helper returns `locations`, boolean `partial` and
 `friendListTimedOut` fields, a `timedOutHandles` string array, and a nonnegative
@@ -96,3 +103,7 @@ BlueBubbles Automation grant:
 7. Call the Devices GET, refresh, and GET routes. Confirm the first GET does not
    switch Find My views and the refreshed response includes both online and
    offline devices without converting missing locations to `(0, 0)`.
+8. With the required helper unavailable, confirm Devices GET retains its cache
+   and Devices refresh returns HTTP 503 without opening the Devices view. With
+   the helper ready, confirm complete and partial snapshots update the cache
+   appropriately and malformed snapshots preserve the previous cache.

@@ -19,7 +19,8 @@ export class FindMyRouter {
                 privateApiEnabled: Boolean(Server().repo.getConfig("enable_private_api")),
                 helperRequired: isMinSequoia,
                 helperConnected: readiness.status === "ready" && Server().privateApi.hasClient("com.apple.findmy"),
-                cachedFriends: Server().findMyCache.getAll().length
+                cachedFriends: Server().findMyFriendsCache.getAll().length,
+                cachedDevices: Server().findMyDevicesCache.getAll().length
             }
         }).send();
     }
@@ -48,6 +49,9 @@ export class FindMyRouter {
                 data: locations
             }).send();
         } catch (ex: any) {
+            if (ex instanceof FindMyUnavailableError) {
+                throw new ServiceUnavailable({ error: ex.message, data: ex.readiness });
+            }
             throw new ServerError({
                 message: "Failed to refresh Find My device locations!",
                 error: ex?.message ?? ex.toString()

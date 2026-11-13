@@ -95,7 +95,8 @@ const createEnvironment = ({
     const server = {
         repo: { getConfig: name => config[name] },
         privateApi,
-        findMyCache: { getAll: () => [{}] }
+        findMyFriendsCache: { getAll: () => [{}] },
+        findMyDevicesCache: { getAll: () => [{}] }
     };
     const fileSystem = {
         FileSystem: {
@@ -136,7 +137,7 @@ const createEnvironment = ({
         "@server/env": { isMinSequoia: true, isMinBigSur: true, isMinMonterey: true },
         "@server/fileSystem": fileSystem,
         "@server/api/interfaces/findMyInterface": {
-            FindMyInterface: { refreshFriends: async () => [] }
+            FindMyInterface: { refreshFriends: async () => [], refreshDevices: async () => [] }
         },
         "@server/api/privateApi/FindMyHelperReadiness": readinessModule
     };
@@ -404,7 +405,8 @@ const testUnavailableHttp = async () => {
             hasClient: () => false,
             retryFindMy: async () => ({ ...unavailable, status: "initializing" })
         },
-        findMyCache: { getAll: () => [{ handle: "cached" }] }
+        findMyFriendsCache: { getAll: () => [{ handle: "cached" }] },
+        findMyDevicesCache: { getAll: () => [{ identifier: "cached" }] }
     };
     class Success {
         constructor(ctx, response) {
@@ -423,13 +425,17 @@ const testUnavailableHttp = async () => {
             FindMyInterface: {
                 refreshFriends: async () => {
                     throw new readinessModule.FindMyUnavailableError(unavailable);
-                }
+                },
+                refreshDevices: async () => {
+                    throw new readinessModule.FindMyUnavailableError(unavailable);
+                },
+                getDevices: async () => server.findMyDevicesCache.getAll()
             }
         },
         "@server/events": {},
         "@server/api/privateApi/FindMyHelperReadiness": readinessModule
     });
-    for (const refresh of [FindMyRouter.refreshFriends]) {
+    for (const refresh of [FindMyRouter.refreshFriends, FindMyRouter.refreshDevices]) {
         await assert.rejects(
             () => refresh({}, null),
             error => {
@@ -443,6 +449,9 @@ const testUnavailableHttp = async () => {
     assert.equal(status.data.status, "unavailable");
     assert.equal(status.data.helperConnected, false);
     assert.equal(status.data.cachedFriends, 1);
+    assert.equal(status.data.cachedDevices, 1);
+    const devices = await FindMyRouter.devices({}, null);
+    assert.deepEqual(devices.data, [{ identifier: "cached" }], "unavailable helper must not block cached Devices GET");
     const retry = await FindMyRouter.retry({}, null);
     assert.equal(retry.data.status, "initializing");
 };

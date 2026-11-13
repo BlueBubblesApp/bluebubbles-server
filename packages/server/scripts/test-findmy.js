@@ -25,6 +25,8 @@ const loadTypeScriptModule = (relativeSourcePath, moduleMocks = {}) => {
     return loadedModule.exports;
 };
 
+const readinessModule = loadTypeScriptModule("../src/server/api/privateApi/FindMyHelperReadiness.ts");
+
 const findMyUtilities = loadTypeScriptModule("../src/server/api/lib/findmy/utils.ts");
 const { normalizeFindMyDevice, normalizeFindMyDevices, normalizeFindMyFriendLocation, normalizeFindMyFriendLocations } =
     findMyUtilities;
@@ -292,7 +294,8 @@ const loadFindMyInterface = environment => {
             hideFindMyFriends: () => ""
         },
         "@server/api/lib/findmy/utils": findMyUtilities,
-        "@server/api/lib/findmy/privateApiSupport": findMyPrivateApiSupport
+        "@server/api/lib/findmy/privateApiSupport": findMyPrivateApiSupport,
+        "@server/api/privateApi/FindMyHelperReadiness": readinessModule
     }).FindMyInterface;
 };
 
@@ -304,7 +307,8 @@ const createRefreshScenario = ({
     helperError,
     fallbackError,
     expectedPrivateApiTarget = FIND_MY_PROCESS_IDENTIFIER,
-    initialLocations = [normalizedLocation]
+    initialLocations = [normalizedLocation],
+    readinessStatus = helperAvailable ? "ready" : "unavailable"
 }) => {
     let cachedLocations = [...initialLocations];
     const observations = {
@@ -319,6 +323,13 @@ const createRefreshScenario = ({
             getConfig: name => name === "enable_private_api"
         },
         privateApi: {
+            findMyReadiness: {
+                required: true,
+                requested: true,
+                status: readinessStatus,
+                reason: helperAvailable ? null : "registration_timeout",
+                message: "Test helper availability"
+            },
             hasClient: processIdentifier => {
                 observations.privateApiTargets.push(processIdentifier);
                 assert.equal(processIdentifier, expectedPrivateApiTarget);
@@ -344,7 +355,6 @@ const createRefreshScenario = ({
             }
         },
         logger: {
-            debug: () => {},
             warn: message => observations.warnings.push(message)
         }
     };
@@ -364,7 +374,12 @@ const createDeviceRefreshScenario = ({
     helperResponse,
     initialDevices = [],
     privateApiEnabled = true,
-    openFindMyOnStartup = true
+    openFindMyOnStartup = true,
+    readinessStatus = !privateApiEnabled || !openFindMyOnStartup
+        ? "disabled"
+        : helperAvailable
+        ? "ready"
+        : "unavailable"
 }) => {
     let cachedDevices = [...initialDevices];
     openedFindMyCommands = [];
@@ -385,6 +400,13 @@ const createDeviceRefreshScenario = ({
             }
         },
         privateApi: {
+            findMyReadiness: {
+                required: true,
+                requested: privateApiEnabled && openFindMyOnStartup,
+                status: readinessStatus,
+                reason: readinessStatus === "unavailable" ? "registration_timeout" : null,
+                message: "Test helper availability"
+            },
             hasClient: processIdentifier => {
                 observations.privateApiTargets.push(processIdentifier);
                 assert.equal(processIdentifier, FIND_MY_PROCESS_IDENTIFIER);
@@ -430,12 +452,17 @@ const runFindMyDylibPluginTests = async () => {
         { cachedFriends: 0, cachedDevices: 0, expectedRefreshes: ["friends", "devices"] },
         { cachedFriends: 1, cachedDevices: 0, expectedRefreshes: ["devices"] },
         { cachedFriends: 0, cachedDevices: 1, expectedRefreshes: ["friends"] },
-        { cachedFriends: 1, cachedDevices: 1, expectedRefreshes: [] }
+        { cachedFriends: 1, cachedDevices: 1, expectedRefreshes: [] },
+        { cachedFriends: 0, cachedDevices: 0, expectedRefreshes: ["friends", "devices"], fail: "friends" },
+        { cachedFriends: 0, cachedDevices: 0, expectedRefreshes: ["friends", "devices"], fail: "devices" }
     ];
 
     for (const scenario of scenarios) {
         const refreshes = [];
+        const warnings = [];
         activeServer = {
+            repo: { getConfig: () => true },
+            privateApi: { hasClient: () => true },
             findMyFriendsCache: {
                 getAll: () => Array.from({ length: scenario.cachedFriends }, () => ({}))
             },
@@ -443,7 +470,10 @@ const runFindMyDylibPluginTests = async () => {
                 getAll: () => Array.from({ length: scenario.cachedDevices }, () => ({}))
             }
         };
-
+        const refresh = async name => {
+            refreshes.push(name);
+            if (scenario.fail === name) throw new Error("Test refresh failed");
+        };
         const { FindMyDylibPlugin } = loadTypeScriptModule(
             "../src/server/api/privateApi/modes/dylibPlugins/FindMyDylibPlugin.ts",
             {
@@ -452,6 +482,7 @@ const runFindMyDylibPluginTests = async () => {
                     DylibPlugin: class {
                         constructor(name) {
                             this.name = name;
+                            this.log = { warn: message => warnings.push(message) };
                         }
                     }
                 },
@@ -459,16 +490,26 @@ const runFindMyDylibPluginTests = async () => {
                 "@server": { Server: () => activeServer },
                 "@server/api/interfaces/findMyInterface": {
                     FindMyInterface: {
-                        refreshFriends: async () => refreshes.push("friends"),
-                        refreshDevices: async () => refreshes.push("devices")
+                        refreshFriends: async () => refresh("friends"),
+                        refreshDevices: async () => refresh("devices")
                     }
-                }
+                },
+                "@server/api/privateApi/FindMyHelperReadiness": readinessModule
             }
         );
 
         const plugin = new FindMyDylibPlugin("Find My Helper");
         await plugin.afterClientRegistration();
+        assert.deepEqual(refreshes, [], "unaccepted registrations cannot warm either cache");
+        plugin.acceptRegistration = true;
+        await plugin.afterClientRegistration();
         assert.deepEqual(refreshes, scenario.expectedRefreshes);
+        assert.equal(plugin.readiness.status, "ready");
+        assert.equal(
+            warnings.length,
+            scenario.fail ? 1 : 0,
+            "a failed warmup must be logged while allowing the other cache to initialize"
+        );
     }
 };
 
@@ -477,7 +518,7 @@ const runRefreshBranchTests = async () => {
     let locations = await FindMyInterface.refreshFriends();
     await settleBackgroundFallback();
     assert.equal(observations.helperCalls, 0);
-    assert.equal(observations.fallbackCalls, 1);
+    assert.equal(observations.fallbackCalls, 0, "unavailable Sequoia helper must not trigger an app refresh");
     assert.equal(locations.length, 1);
 
     observations = createRefreshScenario({
@@ -561,6 +602,30 @@ const runRefreshBranchTests = async () => {
     assert.equal(observations.fallbackCalls, 1);
     assert.equal(locations.length, 1);
     assert.equal(observations.warnings.length, 2, "helper and fallback failures must both be observed");
+
+    observations = createRefreshScenario({ helperAvailable: false });
+    await assert.rejects(() => FindMyInterface.refreshFriends(true, true), readinessModule.FindMyUnavailableError);
+    assert.equal(observations.helperCalls, 0);
+    assert.equal(observations.fallbackCalls, 0, "unavailable fresh refresh must not activate the app");
+    assert.deepEqual(await FindMyInterface.getFriends(), [normalizedLocation], "cached GET remains available");
+
+    observations = createRefreshScenario({ helperAvailable: true, readinessStatus: "initializing" });
+    await assert.rejects(() => FindMyInterface.refreshFriends(true, true), readinessModule.FindMyUnavailableError);
+    assert.equal(observations.helperCalls, 0, "a socket alone must not bypass readiness");
+
+    observations = createRefreshScenario({ helperAvailable: true, helperError: new Error("helper failed") });
+    await assert.rejects(() => FindMyInterface.refreshFriends(true, true), /usable fresh response/);
+    assert.equal(observations.fallbackCalls, 0, "a failed fresh refresh must not be disguised as cached success");
+    assert.deepEqual(await FindMyInterface.getFriends(), [normalizedLocation]);
+
+    observations = createRefreshScenario({
+        helperAvailable: true,
+        helperResponse: {
+            data: { locations: [], partial: false, friendListTimedOut: false, timedOutHandles: [], skippedFriends: 0 }
+        }
+    });
+    assert.deepEqual(await FindMyInterface.refreshFriends(true, true), [], "complete empty snapshots are valid");
+    assert.equal(observations.fallbackCalls, 0);
 
     FindMyInterface = loadFindMyInterface({ isMinBigSur: true, isMinSonoma: false, isMinSequoia: false });
     observations = createRefreshScenario({
@@ -768,23 +833,76 @@ const runDeviceRefreshTests = async () => {
     await assert.rejects(() => FindMyInterface.refreshDevices(), /inconsistent completion state/);
     assert.equal(observations.replacements, 0, "an inconsistent partial state must preserve the device cache");
 
-    createDeviceRefreshScenario({
-        helperAvailable: false,
-        helperResponse: { data: { devices: [], partial: false, skippedDevices: 0 } }
-    });
-    await assert.rejects(() => FindMyInterface.refreshDevices(), /did not connect/);
+    for (const scenario of [
+        { helperAvailable: false },
+        { helperAvailable: true, readinessStatus: "initializing" },
+        { helperAvailable: true, readinessStatus: "unavailable" },
+        { helperAvailable: false, readinessStatus: "ready" },
+        { privateApiEnabled: false },
+        { openFindMyOnStartup: false }
+    ]) {
+        observations = createDeviceRefreshScenario({
+            ...scenario,
+            initialDevices: [normalizedOfflineDevice],
+            helperResponse: { data: { devices: [], partial: false, skippedDevices: 0 } }
+        });
+        await assert.rejects(() => FindMyInterface.refreshDevices(), readinessModule.FindMyUnavailableError);
+        assert.deepEqual(openedFindMyCommands, [], "unavailable readiness must block the Devices URI");
+        assert.equal(observations.helperCalls, 0);
+        assert.equal(observations.replacements, 0);
+        assert.equal(observations.updates, 0);
+        assert.deepEqual(
+            await FindMyInterface.getDevices(),
+            [normalizedOfflineDevice],
+            "cached Devices GET remains available for every unavailable state"
+        );
+    }
 
-    createDeviceRefreshScenario({
-        privateApiEnabled: false,
-        helperResponse: { data: { devices: [], partial: false, skippedDevices: 0 } }
-    });
-    await assert.rejects(() => FindMyInterface.refreshDevices(), /requires the Private API/);
+    // Snapshot validation must finish before either cache mutation path.
+    for (const partial of [false, true]) {
+        for (const devices of [
+            [rawDeviceWithLocation, { identifier: "" }],
+            [rawDeviceWithLocation, { identifier: rawDeviceWithLocation.identifier.trim() }]
+        ]) {
+            observations = createDeviceRefreshScenario({
+                initialDevices: [normalizedOfflineDevice],
+                helperResponse: { data: { devices, partial, skippedDevices: partial ? 1 : 0 } }
+            });
+            await assert.rejects(() => FindMyInterface.refreshDevices(), /invalid device records|duplicate device/);
+            assert.equal(observations.replacements, 0);
+            assert.equal(observations.updates, 0, "invalid partial snapshots must not mutate the cache either");
+            assert.deepEqual(await FindMyInterface.getDevices(), [normalizedOfflineDevice]);
+        }
+    }
 
-    createDeviceRefreshScenario({
-        openFindMyOnStartup: false,
-        helperResponse: { data: { devices: [], partial: false, skippedDevices: 0 } }
+    observations = createDeviceRefreshScenario({
+        initialDevices: [normalizedOfflineDevice],
+        helperResponse: { data: { devices: [], partial: true, skippedDevices: 1 } }
     });
-    await assert.rejects(() => FindMyInterface.refreshDevices(), /Open FindMy App on Startup/);
+    assert.deepEqual(
+        await FindMyInterface.refreshDevices(),
+        [normalizedOfflineDevice],
+        "a valid empty partial result must retain known devices"
+    );
+    assert.equal(observations.updates, 1);
+    assert.equal(observations.replacements, 0);
+
+    FindMyInterface = loadFindMyInterface({ isMinBigSur: true, isMinSonoma: false, isMinSequoia: false });
+    observations = createDeviceRefreshScenario({ helperAvailable: false });
+    let legacyAppRefreshes = 0;
+    const filesRead = [];
+    FindMyInterface.refreshUsingFindMyApp = async () => {
+        legacyAppRefreshes += 1;
+    };
+    FindMyInterface.readDataFile = async type => {
+        filesRead.push(type);
+        return type === "Devices" ? [normalizedOfflineDevice] : [];
+    };
+    assert.deepEqual(await FindMyInterface.refreshDevices(), [normalizedOfflineDevice]);
+    assert.equal(legacyAppRefreshes, 1, "earlier macOS retains the existing app refresh");
+    assert.deepEqual(filesRead, ["Devices", "Items"], "earlier macOS retains data-file routing");
+    assert.equal(observations.helperCalls, 0);
+    assert.deepEqual(openedFindMyCommands, [], "earlier macOS does not use the new Devices URI/helper path");
 };
 
 runFindMyDylibPluginTests()

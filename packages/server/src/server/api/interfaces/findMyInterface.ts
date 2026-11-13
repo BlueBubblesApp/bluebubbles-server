@@ -24,9 +24,6 @@ import {
 
 import { FindMyUnavailableError } from "@server/api/privateApi/FindMyHelperReadiness";
 
-const FIND_MY_DEVICES_HELPER_CONNECTION_TIMEOUT_MS = 10_000;
-const FIND_MY_DEVICES_HELPER_CONNECTION_POLL_MS = 100;
-
 export class FindMyInterface {
     static async getFriends(): Promise<FindMyFriendLocation[]> {
         return normalizeFindMyFriendLocations(Server().findMyFriendsCache.getAll());
@@ -92,26 +89,13 @@ export class FindMyInterface {
     }
 
     private static async refreshDevicesThroughPrivateApi(): Promise<FindMyDevice[]> {
-        const privateApiEnabled = Boolean(Server().repo.getConfig("enable_private_api"));
-        if (!privateApiEnabled) {
-            throw new Error("Find My Devices on macOS 15 or later requires the Private API");
-        }
-
-        const openFindMyOnStartup = Boolean(Server().repo.getConfig("open_findmy_on_startup"));
-        if (!openFindMyOnStartup) {
-            throw new Error("Find My Devices requires Open FindMy App on Startup to be enabled");
-        }
-
         const targetProcessIdentifier = resolveFindMyDevicesPrivateApiTarget({ isMinSequoia });
         if (targetProcessIdentifier == null) {
             throw new Error("The Find My Devices helper is unavailable on this macOS version");
         }
 
+        this.requireFindMyHelperReady(targetProcessIdentifier);
         await FileSystem.execShellCommand("/usr/bin/open findmy://devices");
-        const helperAvailable = await this.waitForPrivateApiClient(targetProcessIdentifier);
-        if (!helperAvailable) {
-            throw new Error("The Find My Devices helper did not connect before the refresh timeout");
-        }
 
         const result = await Server().privateApi.findmy.refreshDevices();
         const refreshResponse = result?.data as FindMyDevicesRefreshResponse | undefined;
@@ -154,19 +138,6 @@ export class FindMyInterface {
                 `${devicesWithLocations} included a location.`
         );
         return Server().findMyDevicesCache.getAll();
-    }
-
-    private static async waitForPrivateApiClient(processIdentifier: string): Promise<boolean> {
-        const maximumAttempts = Math.ceil(
-            FIND_MY_DEVICES_HELPER_CONNECTION_TIMEOUT_MS / FIND_MY_DEVICES_HELPER_CONNECTION_POLL_MS
-        );
-        for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
-            if (Server().privateApi.hasClient(processIdentifier)) {
-                return true;
-            }
-            await waitMs(FIND_MY_DEVICES_HELPER_CONNECTION_POLL_MS);
-        }
-        return Server().privateApi.hasClient(processIdentifier);
     }
 
     private static requireFindMyHelperReady(processIdentifier: string): void {
