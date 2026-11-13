@@ -162,7 +162,7 @@ export class MessageRepository extends Loggable {
         // Original GUIDs can also be prefixed with at_x_ or p:/.
         const lookupGuids = [attachmentGuid];
         if (attachmentGuid.length > 36) {
-            lookupGuids.push(this.normalizeAttachmentGuid(attachmentGuid));
+            lookupGuids.push(attachmentGuid.substring(attachmentGuid.length - 36));
         }
 
         for (const lookupGuid of lookupGuids) {
