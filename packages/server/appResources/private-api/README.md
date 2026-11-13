@@ -17,7 +17,7 @@ Older supported macOS releases continue to route Friends requests through the
 Messages helper when that private API is available.
 
 The checked-in artifact is built from [Helper PR #65](https://github.com/BlueBubblesApp/bluebubbles-helper/pull/65),
-source commit `2c598a00bc7c7705892c80557b1be4d1df6bf78c`.
+source commit `de8a2515d4f1e9c85b4d919d58a4a54d299872f8`.
 
 The artifact checksum must match its `.md5` file, it must contain `x86_64` and
 `arm64` slices, and it must use `@rpath/BlueBubblesFindMyHelper.dylib` as its
