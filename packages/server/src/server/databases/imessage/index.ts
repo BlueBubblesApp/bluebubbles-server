@@ -476,7 +476,15 @@ export class MessageRepository extends Loggable {
         for (const item of message.attributedBody ?? []) {
             for (const run of item?.runs ?? []) {
                 const guid = run?.attributes?.__kIMFileTransferGUIDAttributeName;
-                if (typeof guid === "string" && guid.length > 0) guids.add(guid);
+                // Reject malformed references before the suffix/LIKE lookup can match unrelated attachments.
+                if (
+                    typeof guid === "string" &&
+                    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+                        this.normalizeAttachmentGuid(guid)
+                    )
+                ) {
+                    guids.add(guid);
+                }
             }
         }
 

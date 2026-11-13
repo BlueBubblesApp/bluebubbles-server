@@ -58,6 +58,13 @@ function messageQuery(repo, messages) {
     await repo.addMissingAttachmentsFromAttributedBody([a, b]);
     assert.equal(queries, 1, 'rehydration neither duplicates nor refetches existing attachments');
 
+    const prefixed = { attributedBody: [{ runs: ['p:/' + guid, 'at_0_' + guid.toLowerCase()].map(value => ({
+        attributes: { __kIMFileTransferGUIDAttributeName: value }
+    })) }], attachments: [] };
+    await repo.addMissingAttachmentsFromAttributedBody([prefixed]);
+    assert.equal(prefixed.attachments.length, 1, 'valid prefixed UUID references remain supported');
+    assert.equal(queries, 2, 'equivalent prefixed references share one lookup');
+
     const original = { ...body, attachments: [{
         ROWID: 42, guid: 'different', originalGuid: 'prefix-' + guid.toLowerCase()
     }] };
@@ -70,7 +77,10 @@ function messageQuery(repo, messages) {
     repo.getAttachment = async () => { throw new Error('Unexpected attachment lookup'); };
     await repo.addMissingAttachmentsFromAttributedBody([
         { attributedBody: null },
-        { attributedBody: [{ runs: [{ attributes: { __kIMFileTransferGUIDAttributeName: 17 } }] }] }
+        { attributedBody: [{ runs: [{ attributes: { __kIMFileTransferGUIDAttributeName: 17 } }] }] },
+        { attributedBody: [{ runs: ['%', '_', 'not-a-guid'].map(guid => ({
+            attributes: { __kIMFileTransferGUIDAttributeName: guid }
+        })) }] }
     ]);
 
     // Exercise each public retrieval boundary, including opting out of attachments.
