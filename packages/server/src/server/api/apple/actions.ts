@@ -90,7 +90,7 @@ export class ActionHandler {
 
             try {
                 // Generate the new send script
-                log.debug(`Sending AppleScript text using fallback script...`);
+                log.debug(`Preparing AppleScript text fallback...`);
                 let resolvedService: string | null = null;
                 if (chatGuid.startsWith("any;")) {
                     try {
