@@ -1,7 +1,6 @@
 import { ChildProcess, SpawnOptionsWithoutStdio, spawn } from "child_process";
 import { Loggable } from "./logging/Loggable";
 
-
 export type ProcessSpawnerConstructorArgs = {
     command: string;
     args?: string[];
@@ -29,7 +28,6 @@ type ProcessSpawnerOutput = {
     data: string;
 };
 
-
 export class ProcessSpawner extends Loggable {
     tag = "ProcessSpawner";
 
@@ -50,7 +48,7 @@ export class ProcessSpawner extends Loggable {
     storeOutput: boolean;
 
     waitForExit: boolean;
-    
+
     errorOnStderr: boolean;
 
     onOutput: ((data: any) => void) | null;
@@ -79,11 +77,19 @@ export class ProcessSpawner extends Loggable {
     }
 
     get stdout() {
-        return this._output.filter(x => x.type === "stdout").map(x => x.data).join("").trim();
+        return this._output
+            .filter(x => x.type === "stdout")
+            .map(x => x.data)
+            .join("")
+            .trim();
     }
 
     get stderr() {
-        return this._output.filter(x => x.type === "stderr").map(x => x.data).join("").trim();
+        return this._output
+            .filter(x => x.type === "stderr")
+            .map(x => x.data)
+            .join("")
+            .trim();
     }
 
     constructor({
@@ -101,9 +107,9 @@ export class ProcessSpawner extends Loggable {
         errorOnStderr = false
     }: ProcessSpawnerConstructorArgs) {
         super();
-        
+
         this.command = command;
-        if (this.command.includes(" ")) {
+        if (options.shell !== false && this.command.includes(" ")) {
             this.command = `"${this.command}"`;
         }
 
@@ -130,7 +136,23 @@ export class ProcessSpawner extends Loggable {
     async execute(): Promise<ProcessSpawner> {
         return new Promise((resolve: (spawner: ProcessSpawner) => void, reject: (err: ProcessSpawnerError) => void) => {
             try {
-                this.process = spawn(this.command, this.quoteArgs(this.args), { ...this.options, shell: true });
+                // Only callers that opt out of the shell receive verbatim arguments and
+                // an actual host process to supervise. Existing shell callers retain
+                // their quoting/expansion behavior.
+                const direct = this.options.shell === false;
+                this.process = spawn(this.command, direct ? this.args : this.quoteArgs(this.args), {
+                    ...this.options,
+                    shell: !direct
+                });
+                this.process.on("error", (error: Error) => {
+                    this.handleLog(`Process failed to start: ${error?.message ?? String(error)}`);
+                    reject({
+                        message: error?.message ?? String(error),
+                        output: this.output,
+                        process: this.process,
+                        wasForceQuit: false
+                    });
+                });
                 this.process.stdout.on("data", chunk => this.handleOutput(chunk, "stdout"));
                 this.process.stderr.on("data", chunk => {
                     this.handleOutput(chunk, "stderr");
@@ -144,7 +166,7 @@ export class ProcessSpawner extends Loggable {
                         });
                     }
                 });
-                this.process.on("exit", (code) => {
+                this.process.on("exit", code => {
                     let msg = `Process was force quit`;
                     let wasForceQuit = true;
                     if (code != null) {
@@ -196,7 +218,7 @@ export class ProcessSpawner extends Loggable {
         if (this.storeOutput) {
             this._output.push({ type, data: chunkStr });
         }
-        
+
         if (this.onOutput) {
             this.onOutput(chunkStr);
         }
@@ -214,9 +236,9 @@ export class ProcessSpawner extends Loggable {
         }
     }
 
-    async kill() {
+    async kill(signal: NodeJS.Signals = "SIGTERM") {
         if (this.process) {
-            this.process.kill();
+            this.process.kill(signal);
         }
     }
 
@@ -234,7 +256,7 @@ export class ProcessSpawner extends Loggable {
         command: string,
         args: string[] = [],
         options: SpawnOptionsWithoutStdio = {},
-        tag = 'CommandExecutor',
+        tag = "CommandExecutor",
         verbose = false
     ): Promise<string> {
         const spawner = new ProcessSpawner({

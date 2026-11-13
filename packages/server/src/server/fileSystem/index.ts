@@ -496,17 +496,38 @@ export class FileSystem {
         return FileSystem.execShellCommand(`osascript -e ${parts.join(" -e ")}`);
     }
 
-    static async requestFindMyAutomationPermissions() {
+    // Permission preparation must be cancellable without leaving a shell wrapper
+    // between the Server and osascript. Other AppleScript callers are unchanged.
+    private static executeFindMyPermissionRequest(script: string, signal?: AbortSignal): Promise<string> {
+        return new Promise((resolve, reject) => {
+            child_process.execFile(
+                "/usr/bin/osascript",
+                ["-e", script],
+                { signal, encoding: "utf8" },
+                (error, stdout, stderr) => {
+                    if (error) {
+                        reject(error);
+                        return;
+                    }
+                    resolve(stdout || stderr);
+                }
+            );
+        });
+    }
+
+    static async requestFindMyAutomationPermissions(signal?: AbortSignal) {
         const requests = [
             { name: "System Events", script: requestSystemEventsAutomation() },
             { name: "Find My", script: requestFindMyAutomation() }
         ];
 
         for (const request of requests) {
+            if (signal?.aborted) throw new Error("Find My initialization was cancelled");
             try {
-                await FileSystem.executeAppleScript(request.script);
+                await FileSystem.executeFindMyPermissionRequest(request.script, signal);
                 Server().logger.debug(`Requested ${request.name} Automation permission`);
             } catch (ex: any) {
+                if (signal?.aborted) throw ex;
                 Server().logger.warn(
                     `Unable to request ${request.name} Automation permission! CLI Error: ${ex?.message ?? String(ex)}`
                 );

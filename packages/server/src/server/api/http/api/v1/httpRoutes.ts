@@ -114,6 +114,16 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.GET,
+                        path: "findmy/status",
+                        controller: FindMyRouter.status
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "findmy/retry",
+                        controller: FindMyRouter.retry
+                    },
+                    {
+                        method: HttpMethod.GET,
                         path: "findmy/devices",
                         controller: FindMyRouter.devices
                     },

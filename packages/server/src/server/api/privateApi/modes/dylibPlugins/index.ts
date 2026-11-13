@@ -28,7 +28,9 @@ export abstract class DylibPlugin extends Loggable {
 
     lastFailureAt = 0;
 
-    private injectionCompletion: Promise<void> = Promise.resolve();
+    protected injectionCompletion: Promise<void> = Promise.resolve();
+
+    protected currentParentProcess: ProcessSpawner | null = null;
 
     private resolveInjectionCompletion: (() => void) | null = null;
 
@@ -48,6 +50,13 @@ export abstract class DylibPlugin extends Loggable {
     protected afterClientRegistration(): Promise<void> {
         return Promise.resolve();
     }
+
+    // Find My verifies one bounded attempt. Other helpers retain their existing supervision.
+    protected get restartParentAfterExit(): boolean {
+        return true;
+    }
+
+    protected onParentProcessStarted(): void {}
 
     async stopParentProcess(): Promise<void> {
         try {
@@ -132,18 +141,23 @@ export abstract class DylibPlugin extends Loggable {
                         waitForExit: true,
                         restartOnNonZeroExit: false,
                         options: {
+                            shell: false,
                             env: {
+                                ...process.env,
                                 DYLD_INSERT_LIBRARIES: this.dylibPath
                             }
                         }
                     });
 
+                    this.currentParentProcess = parentProcess;
                     const parentProcessExit = parentProcess.execute();
+                    this.onParentProcessStarted();
                     hideTimer = setTimeout(() => {
                         void this.hideApp();
                     }, APP_HIDE_DELAY_MS);
 
                     await parentProcessExit;
+                    if (!this.restartParentAfterExit) return;
                     this.log.debug(`${this.name} parent process exited; restarting`);
                     this.consecutiveFailureCount = 0;
                 } catch (error: any) {
@@ -151,6 +165,7 @@ export abstract class DylibPlugin extends Loggable {
                         `Detected DYLIB crash for App ${this.parentApp}. Error: ${error?.message ?? String(error)}`
                     );
                     if (this.stopRequested) return;
+                    if (!this.restartParentAfterExit) throw error;
 
                     if (Date.now() - this.lastFailureAt > FAILURE_BUDGET_RESET_INTERVAL_MS) {
                         this.consecutiveFailureCount = 0;
@@ -165,6 +180,7 @@ export abstract class DylibPlugin extends Loggable {
                         );
                     }
                 } finally {
+                    this.currentParentProcess = null;
                     if (hideTimer) {
                         clearTimeout(hideTimer);
                         hideTimer = null;

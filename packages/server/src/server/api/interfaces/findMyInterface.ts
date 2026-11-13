@@ -13,6 +13,7 @@ import {
 } from "@server/api/lib/findmy/types";
 import { normalizeFindMyFriendLocations, transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
 import { resolveFindMyFriendsPrivateApiTarget } from "@server/api/lib/findmy/privateApiSupport";
+import { FindMyUnavailableError } from "@server/api/privateApi/FindMyHelperReadiness";
 
 export class FindMyInterface {
     static async getFriends(): Promise<FindMyFriendLocation[]> {
@@ -75,10 +76,34 @@ export class FindMyInterface {
         return await this.getDevices();
     }
 
-    static async refreshFriends(allowFindMyAppFallback = true): Promise<FindMyFriendLocation[]> {
+    private static requireFindMyHelperReady(processIdentifier: string): void {
+        const api = Server().privateApi;
+        const readiness = api.findMyReadiness;
+        if (readiness.status !== "ready" || !api.hasClient(processIdentifier)) {
+            throw new FindMyUnavailableError(
+                readiness.status === "ready"
+                    ? {
+                          ...readiness,
+                          status: "unavailable",
+                          reason: "connection_lost",
+                          message: "Find My helper is not connected. Retry to check its availability again."
+                      }
+                    : readiness
+            );
+        }
+    }
+
+    static async refreshFriends(
+        allowFindMyAppFallback = true,
+        requireFreshResult = false
+    ): Promise<FindMyFriendLocation[]> {
         const privateApiEnabled = Boolean(Server().repo.getConfig("enable_private_api"));
         const privateApiTarget = resolveFindMyFriendsPrivateApiTarget({ isMinBigSur, isMinSonoma, isMinSequoia });
         const privateApiHelperAvailable = privateApiTarget != null && Server().privateApi.hasClient(privateApiTarget);
+        if (isMinSequoia && (Server().privateApi.findMyReadiness.status !== "ready" || !privateApiHelperAvailable)) {
+            if (requireFreshResult && privateApiTarget) this.requireFindMyHelperReady(privateApiTarget);
+            return this.getFriends();
+        }
         let receivedUsableHelperResponse = false;
         if (privateApiEnabled && privateApiTarget != null && privateApiHelperAvailable) {
             try {
@@ -118,6 +143,10 @@ export class FindMyInterface {
                     `Unable to refresh Find My Friends through the helper: ${error?.message ?? String(error)}`
                 );
             }
+        }
+
+        if (requireFreshResult && isMinSequoia && !receivedUsableHelperResponse) {
+            throw new Error("Find My Friends helper did not return a usable fresh response; cached data was retained");
         }
 
         const shouldRefreshUsingFindMyApp = allowFindMyAppFallback && (!receivedUsableHelperResponse || !isMinSequoia);

@@ -122,6 +122,10 @@ export const getPrivateApiStatus = async () => {
     return await ipcRenderer.invoke('get-private-api-status');
 };
 
+export const retryFindMyHelper = async () => {
+    return await ipcRenderer.invoke('retry-findmy-helper');
+};
+
 export const getAttachmentCacheInfo = async () => {
     return await ipcRenderer.invoke('get-attachment-cache-info');
 };

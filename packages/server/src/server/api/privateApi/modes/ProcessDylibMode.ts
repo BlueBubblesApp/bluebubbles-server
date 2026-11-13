@@ -6,10 +6,12 @@ import { FindMyDylibPlugin } from "./dylibPlugins/FindMyDylibPlugin";
 import { getLogger } from "@server/lib/logging/Loggable";
 
 export class ProcessDylibMode extends PrivateApiMode {
+    static readonly findMyPlugin = new FindMyDylibPlugin("Find My Helper");
+
     static plugins = [
         new MessagesDylibPlugin("Messages Helper"),
         new FaceTimeDylibPlugin("FaceTime Helper"),
-        new FindMyDylibPlugin("Find My Helper")
+        ProcessDylibMode.findMyPlugin
     ];
 
     static async install() {
@@ -27,6 +29,15 @@ export class ProcessDylibMode extends PrivateApiMode {
 
     static async uninstall() {
         return;
+    }
+
+    async updateFindMyPreference(): Promise<void> {
+        const plugin = ProcessDylibMode.findMyPlugin;
+        if (!plugin.isEnabled) {
+            await plugin.stop();
+        } else {
+            await plugin.retry();
+        }
     }
 
     async start() {

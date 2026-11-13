@@ -132,8 +132,14 @@ export class IPCService extends Loggable {
             return {
                 enabled: Server().repo.getConfig("enable_private_api") as boolean,
                 connected: !!Server().privateApi?.helper,
+                messagesConnected: Server().privateApi.hasClient("com.apple.MobileSMS"),
+                findMy: Server().privateApi.findMyReadiness,
                 port: PrivateApiService.port
             };
+        });
+
+        ipcMain.handle("retry-findmy-helper", async () => {
+            return Server().privateApi.retryFindMy();
         });
 
         ipcMain.handle("reinstall-helper-bundle", async (_, __) => {

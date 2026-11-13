@@ -25,6 +25,8 @@ const loadTypeScriptModule = (relativeSourcePath, moduleMocks = {}) => {
     return loadedModule.exports;
 };
 
+const readinessModule = loadTypeScriptModule("../src/server/api/privateApi/FindMyHelperReadiness.ts");
+
 const findMyUtilities = loadTypeScriptModule("../src/server/api/lib/findmy/utils.ts");
 const { normalizeFindMyFriendLocation, normalizeFindMyFriendLocations } = findMyUtilities;
 const { JsonLineBuffer } = loadTypeScriptModule("../src/server/api/privateApi/JsonLineBuffer.ts");
@@ -181,7 +183,8 @@ const loadFindMyInterface = environment => {
             hideFindMyFriends: () => ""
         },
         "@server/api/lib/findmy/utils": findMyUtilities,
-        "@server/api/lib/findmy/privateApiSupport": findMyPrivateApiSupport
+        "@server/api/lib/findmy/privateApiSupport": findMyPrivateApiSupport,
+        "@server/api/privateApi/FindMyHelperReadiness": readinessModule
     }).FindMyInterface;
 };
 
@@ -193,7 +196,8 @@ const createRefreshScenario = ({
     helperError,
     fallbackError,
     expectedPrivateApiTarget = FIND_MY_PROCESS_IDENTIFIER,
-    initialLocations = [normalizedLocation]
+    initialLocations = [normalizedLocation],
+    readinessStatus = helperAvailable ? "ready" : "unavailable"
 }) => {
     let cachedLocations = [...initialLocations];
     const observations = {
@@ -208,6 +212,13 @@ const createRefreshScenario = ({
             getConfig: name => name === "enable_private_api"
         },
         privateApi: {
+            findMyReadiness: {
+                required: true,
+                requested: true,
+                status: readinessStatus,
+                reason: helperAvailable ? null : "registration_timeout",
+                message: "Test helper availability"
+            },
             hasClient: processIdentifier => {
                 observations.privateApiTargets.push(processIdentifier);
                 assert.equal(processIdentifier, expectedPrivateApiTarget);
@@ -252,7 +263,7 @@ const runRefreshBranchTests = async () => {
     let locations = await FindMyInterface.refreshFriends();
     await settleBackgroundFallback();
     assert.equal(observations.helperCalls, 0);
-    assert.equal(observations.fallbackCalls, 1);
+    assert.equal(observations.fallbackCalls, 0, "unavailable Sequoia helper must not trigger an app refresh");
     assert.equal(locations.length, 1);
 
     observations = createRefreshScenario({
@@ -336,6 +347,28 @@ const runRefreshBranchTests = async () => {
     assert.equal(observations.fallbackCalls, 1);
     assert.equal(locations.length, 1);
     assert.equal(observations.warnings.length, 2, "helper and fallback failures must both be observed");
+
+    observations = createRefreshScenario({ helperAvailable: false });
+    await assert.rejects(() => FindMyInterface.refreshFriends(true, true), readinessModule.FindMyUnavailableError);
+    assert.equal(observations.helperCalls, 0);
+    assert.equal(observations.fallbackCalls, 0, "unavailable fresh refresh must not activate the app");
+    assert.deepEqual(await FindMyInterface.getFriends(), [normalizedLocation], "cached GET remains available");
+
+    observations = createRefreshScenario({ helperAvailable: true, readinessStatus: "initializing" });
+    await assert.rejects(() => FindMyInterface.refreshFriends(true, true), readinessModule.FindMyUnavailableError);
+    assert.equal(observations.helperCalls, 0, "a socket alone must not bypass readiness");
+
+    observations = createRefreshScenario({ helperAvailable: true, helperError: new Error("helper failed") });
+    await assert.rejects(() => FindMyInterface.refreshFriends(true, true), /usable fresh response/);
+    assert.equal(observations.fallbackCalls, 0, "a failed fresh refresh must not be disguised as cached success");
+    assert.deepEqual(await FindMyInterface.getFriends(), [normalizedLocation]);
+
+    observations = createRefreshScenario({
+        helperAvailable: true,
+        helperResponse: { data: { locations: [], partial: false } }
+    });
+    assert.deepEqual(await FindMyInterface.refreshFriends(true, true), [], "complete empty snapshots are valid");
+    assert.equal(observations.fallbackCalls, 0);
 
     FindMyInterface = loadFindMyInterface({ isMinBigSur: true, isMinSonoma: false, isMinSequoia: false });
     observations = createRefreshScenario({

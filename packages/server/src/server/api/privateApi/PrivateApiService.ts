@@ -26,6 +26,7 @@ import { v4 } from "uuid";
 import { Loggable } from "../../lib/logging/Loggable";
 import { JsonLineBuffer } from "./JsonLineBuffer";
 import { selectPrivateApiClients } from "./PrivateApiClientSelector";
+import { FindMyHelperReadiness } from "./FindMyHelperReadiness";
 
 const FIRST_MACOS_USER_IDENTIFIER = 501;
 const MAX_SOCKET_RESTART_ATTEMPTS = 5;
@@ -66,6 +67,32 @@ export class PrivateApiService extends Loggable {
         if (!processIdentifier) return this.helper;
         const client = this.clientsByProcessIdentifier[processIdentifier];
         return client != null && !client.destroyed;
+    }
+
+    get findMyReadiness(): FindMyHelperReadiness {
+        const readiness = ProcessDylibMode.findMyPlugin.readiness;
+        if (readiness.requested && (!(this.mode instanceof ProcessDylibMode) || !this.server?.listening)) {
+            return {
+                ...readiness,
+                status: "unavailable",
+                reason: "not_started",
+                message:
+                    "Find My requires the process-DYLIB Private API mode and a running listener " +
+                    "before availability can be checked."
+            };
+        }
+        return readiness;
+    }
+
+    async retryFindMy(): Promise<FindMyHelperReadiness> {
+        if (!(this.mode instanceof ProcessDylibMode) || !this.server?.listening) {
+            throw new Error("The Private API listener must be running before Find My can be checked.");
+        }
+        return ProcessDylibMode.findMyPlugin.retry();
+    }
+
+    async updateFindMyPreference(): Promise<void> {
+        if (this.mode instanceof ProcessDylibMode) await this.mode.updateFindMyPreference();
     }
 
     get message(): PrivateApiMessage {

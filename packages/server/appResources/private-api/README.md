@@ -28,6 +28,29 @@ Automation permission requests for Find My and System Events happen only when
 the Find My integration is started or its Accessibility fallback is explicitly
 used. Normal server startup does not prompt for unrelated Automation access.
 
+## Find My availability
+
+On macOS 15 and later, the Server checks the Find My helper separately from the
+Messages connection. An enabled Find My integration gets one 30-second attempt,
+including Automation permission preparation, to launch and register its helper.
+A missing connection is reported as unavailable rather than continuously
+relaunching Find My. The Private API status panel and authenticated
+`GET /api/v1/icloud/findmy/status` route report the current state. After addressing
+permissions or a launch failure, use the panel's **Retry Find My check** button
+or `POST /api/v1/icloud/findmy/retry` to start another attempt.
+
+The Server reports system security information as diagnostics. A Messages
+connection or SIP observation alone does not establish that Find My is ready;
+the Find My helper must actually register and remain connected. The Server does
+not change system security settings.
+
+The Friends GET route continues to return cached data while the helper is
+unavailable. A Friends refresh requests a fresh response: it returns HTTP 503
+when the required helper is unavailable, and it fails if the helper returns an
+invalid response instead of silently treating cached data as a fresh success.
+The cache is retained in either case. Earlier macOS versions retain their
+existing Friends routing and fallback behavior.
+
 ## Find My release smoke test
 
 TCC Automation grants are tied to the signed application identity. Before a
@@ -40,3 +63,10 @@ BlueBubbles Automation grant:
 3. Confirm the helper registers as `com.apple.findmy` and Find My can be hidden.
 4. Call the Friends GET, refresh, and GET routes and verify that all three
    succeed without helper, framing, transaction, or permission errors.
+5. On macOS 15 or later, confirm the Find My status is ready. Disable the Find
+   My startup preference and confirm Messages remains connected. Re-enable it
+   and confirm a new Find My availability check succeeds.
+6. With the required Find My helper unavailable, confirm a Friends GET can
+   still return its cache while a refresh returns HTTP 503. Retry the Find My
+   check and verify that a valid fresh response, including an empty snapshot,
+   succeeds after helper registration.
