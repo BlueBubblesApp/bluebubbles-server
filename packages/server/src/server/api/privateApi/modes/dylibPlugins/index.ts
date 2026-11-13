@@ -174,9 +174,10 @@ export abstract class DylibPlugin extends Loggable {
                     return;
                 }
 
-                // An app that fails right away with companion DYLIBs is retried without them, so a bad
-                // companion can never keep this plugin's own DYLIB from loading.
-                if (companions.length > 0 && Date.now() - launchedAt < 15000) {
+                // An app that dies within a few seconds of launch with companion DYLIBs (one that can't be
+                // loaded, or that crashes as it loads) is retried without them, so a bad companion can never
+                // keep this plugin's own DYLIB from loading.
+                if (companions.length > 0 && Date.now() - launchedAt < 5000) {
                     this.log.error(
                         `${this.parentApp} failed to start with companion DYLIBs (${companions.join(", ")}). ` +
                         "Retrying without them."
