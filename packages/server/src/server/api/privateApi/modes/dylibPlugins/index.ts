@@ -5,6 +5,7 @@ import { FileSystem } from "@server/fileSystem";
 import { hideApp } from "@server/api/apple/scripts";
 import { Loggable } from "@server/lib/logging/Loggable";
 import { ProcessSpawner } from "@server/lib/ProcessSpawner";
+import { parseCompanionDylibs } from "./companionDylibs";
 
 export abstract class DylibPlugin extends Loggable {
     tag = "DylibPlugin";
@@ -23,6 +24,12 @@ export abstract class DylibPlugin extends Loggable {
 
     dylibLastErrorTime = 0;
 
+    /**
+     * The config key that holds extra DYLIBs to inject alongside this plugin's own (one path per line).
+     * Plugins that support companions set this. Leave it null for none.
+     */
+    companionConfigKey: string | null = null;
+
     abstract get isEnabled(): boolean;
 
     abstract get dylibPath(): string;
@@ -30,6 +37,20 @@ export abstract class DylibPlugin extends Loggable {
     constructor(name: string) {
         super();
         this.name = name;
+    }
+
+    /**
+     * The companion DYLIBs to inject right now. This is read from the config each time, so a changed
+     * setting applies the next time the parent app is launched.
+     */
+    get companionDylibPaths(): string[] {
+        if (!this.companionConfigKey) return [];
+        return parseCompanionDylibs(
+            Server().repo.getConfig(this.companionConfigKey),
+            this.dylibPath,
+            filePath => fs.existsSync(filePath),
+            message => this.log.warn(message)
+        );
     }
 
     async stopParentProcess(): Promise<void> {
@@ -90,7 +111,12 @@ export abstract class DylibPlugin extends Loggable {
             throw new Error(`Unable to locate ${this.name} parent process!`);
         }
 
+        // Companion DYLIBs are dropped for the rest of this run if the app fails to launch with them
+        let useCompanions = true;
+
         while (this.dylibFailureCounter < 5) {
+            let companions: string[] = [];
+            let launchedAt = 0;
             try {
                 // Stop the running Messages app
                 await this.stopParentProcess();
@@ -103,6 +129,12 @@ export abstract class DylibPlugin extends Loggable {
                     return;
                 }
 
+                companions = useCompanions ? this.companionDylibPaths : [];
+                if (companions.length > 0) {
+                    this.log.debug(`Injecting companion DYLIBs: ${companions.join(", ")}`);
+                }
+
+                launchedAt = Date.now();
                 const spawner = new ProcessSpawner({
                     command: this.parentProcessPath,
                     args: [],
@@ -113,7 +145,7 @@ export abstract class DylibPlugin extends Loggable {
                     restartOnNonZeroExit: false,
                     options: {
                         env: {
-                            DYLD_INSERT_LIBRARIES: this.dylibPath
+                            DYLD_INSERT_LIBRARIES: [this.dylibPath, ...companions].join(":")
                         }
                     },
                 })
@@ -140,6 +172,16 @@ export abstract class DylibPlugin extends Loggable {
                 if (this.isStopping) {
                     this.isInjecting = false;
                     return;
+                }
+
+                // An app that fails right away with companion DYLIBs is retried without them, so a bad
+                // companion can never keep this plugin's own DYLIB from loading.
+                if (companions.length > 0 && Date.now() - launchedAt < 15000) {
+                    this.log.error(
+                        `${this.parentApp} failed to start with companion DYLIBs (${companions.join(", ")}). ` +
+                        "Retrying without them."
+                    );
+                    useCompanions = false;
                 }
 
                 // If the last time we errored was more than 15 seconds ago, reset the counter.

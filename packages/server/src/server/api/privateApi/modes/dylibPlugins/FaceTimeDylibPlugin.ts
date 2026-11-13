@@ -13,6 +13,9 @@ export class FaceTimeDylibPlugin extends DylibPlugin {
 
     bundleIdentifier = "com.apple.FaceTime";
 
+    // Other tools that hook FaceTime can be listed here so they're injected alongside this helper
+    companionConfigKey = "ft_companion_dylibs";
+
     get isEnabled() {
         return (Server().repo.getConfig("enable_ft_private_api") as boolean) && isMinBigSur;
     }

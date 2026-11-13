@@ -37,6 +37,8 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     auto_install_updates: () => 0,
     enable_private_api: () => 0,
     enable_ft_private_api: () => 0,
+    // Extra DYLIBs injected into FaceTime alongside the FaceTime helper. One absolute path per line.
+    ft_companion_dylibs: () => "",
     use_oled_dark_mode: () => 0,
     db_poll_interval: () => 1000,
     dock_badge: () => 1,

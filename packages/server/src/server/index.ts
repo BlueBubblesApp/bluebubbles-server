@@ -1047,6 +1047,12 @@ class BlueBubblesServer extends EventEmitter {
         ) {
             this.logger.debug("Detected Private API selection change");
             await Server().privateApi.restart();
+        } else if (
+            nextConfig.enable_ft_private_api &&
+            prevConfig.ft_companion_dylibs !== nextConfig.ft_companion_dylibs
+        ) {
+            this.logger.debug("Detected FaceTime companion DYLIB change");
+            await Server().privateApi.restart();
         } else if (prevConfig.private_api_mode !== nextConfig.private_api_mode) {
             this.logger.debug("Detected Private API Mode change");
             await Server().privateApi.restart();
