@@ -8,6 +8,8 @@ import { spawn, ChildProcess } from "child_process";
 import path from "path";
 import { ProcessSpawner, ProcessSpawnerError } from "@server/lib/ProcessSpawner";
 
+const ALREADY_ENABLED_ENVIRONMENT_ERROR = "you already have an enabled environment";
+
 export class ZrokManager extends Loggable {
     tag = "ZrokManager";
 
@@ -158,20 +160,24 @@ export class ZrokManager extends Loggable {
 
     static async setToken(token: string): Promise<string> {
         const logger = getLogger("ZrokManager");
-
+        logger.info(`Enabling Zrok...`);
         try {
-            logger.info(`Enabling Zrok...`);
             return await ProcessSpawner.executeCommand(this.daemonPath, ["enable", token], {}, "ZrokManager");
         } catch (ex: any | ProcessSpawnerError) {
             const output = ex?.output ?? ex?.message ?? String(ex);
-            if (output.includes("you already have an enabled environment")) {
-                return output;
-            } else if (output.includes("enableUnauthorized")) {
-                throw new Error("Invalid Zrok token!");
-            } else {
-                logger.error(`Failed to set Zrok token! Error: ${output}`);
-                throw new Error("Failed to set Zrok token! Please check your server logs for more information.");
+            if (output.includes(ALREADY_ENABLED_ENVIRONMENT_ERROR)) {
+                // This condition occurs before zrok validates the token; it does not prove the environment is stale.
+                throw new Error(
+                    "Zrok is already enabled. Disable the existing environment manually only if you intend to " +
+                        "replace it, then retry."
+                );
             }
+            if (output.includes("enableUnauthorized")) {
+                throw new Error("Invalid Zrok token!");
+            }
+
+            logger.error(`Failed to set Zrok token! Error: ${output}`);
+            throw new Error("Failed to set Zrok token! Please check your server logs for more information.");
         }
     }
 
