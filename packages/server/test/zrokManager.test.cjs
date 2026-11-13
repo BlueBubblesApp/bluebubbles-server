@@ -33,7 +33,7 @@ const loadZrokManager = responses => {
     };
     const executeCommand = async (...args) => {
         calls.push(args);
-        const response = responses.shift();
+        const response = typeof responses === "function" ? responses(...args) : responses.shift();
         if (!response) throw new Error("Unexpected ProcessSpawner call");
         if ("error" in response) throw response.error;
         return response.output;
@@ -70,6 +70,36 @@ const success = output => ({ output });
 const failure = output => ({ error: { output } });
 const expectedCall = (ZrokManager, args) => [ZrokManager.daemonPath, args, {}, "ZrokManager"];
 
+// The bundled zrok v1.0.4 checks IsEnabled before validating the supplied token (cmd/zrok/enable.go).
+// Its disable command removes the environment and shares (cmd/zrok/disable.go).
+for (const submittedToken of [token, "invalid-replacement-token"]) {
+    test(`preserves an existing environment and share when submitting ${submittedToken}`, async () => {
+        const state = { enabled: true, share: "healthy-existing-share" };
+        const { calls, ZrokManager } = loadZrokManager((_, [command, candidateToken]) => {
+            if (command === "disable") {
+                state.enabled = false;
+                state.share = null;
+                return success("environment disabled");
+            }
+            if (state.enabled) return { error: alreadyEnabledError };
+            if (candidateToken !== token) return failure("[ERROR]: enableUnauthorized");
+            state.enabled = true;
+            return success("environment enabled");
+        });
+
+        let error;
+        try {
+            await ZrokManager.setToken(submittedToken);
+        } catch (ex) {
+            error = ex;
+        }
+
+        assert.deepEqual(state, { enabled: true, share: "healthy-existing-share" });
+        assert.match(error?.message ?? "", /already enabled/);
+        assert.deepEqual(calls, [expectedCall(ZrokManager, ["enable", submittedToken])]);
+    });
+}
+
 test("returns the output when zrok enables normally", async () => {
     const { calls, ZrokManager } = loadZrokManager([success("environment enabled")]);
 
@@ -91,63 +121,4 @@ test("preserves generic enable errors without disabling or retrying", async () =
         message: "Failed to set Zrok token! Please check your server logs for more information."
     });
     assert.deepEqual(calls, [expectedCall(ZrokManager, ["enable", token])]);
-});
-
-test("disables a stale environment and retries enable exactly once", async () => {
-    const { calls, ZrokManager } = loadZrokManager([
-        { error: alreadyEnabledError },
-        success("environment disabled"),
-        success("environment enabled")
-    ]);
-
-    assert.equal(await ZrokManager.setToken(token), "environment enabled");
-    assert.deepEqual(calls, [
-        expectedCall(ZrokManager, ["enable", token]),
-        expectedCall(ZrokManager, ["disable"]),
-        expectedCall(ZrokManager, ["enable", token])
-    ]);
-});
-
-test("does not retry again when the second enable fails", async () => {
-    const { calls, ZrokManager } = loadZrokManager([
-        { error: alreadyEnabledError },
-        success("environment disabled"),
-        { error: alreadyEnabledError }
-    ]);
-
-    await assert.rejects(() => ZrokManager.setToken(token), {
-        message: "Failed to set Zrok token! Please check your server logs for more information."
-    });
-    assert.deepEqual(calls, [
-        expectedCall(ZrokManager, ["enable", token]),
-        expectedCall(ZrokManager, ["disable"]),
-        expectedCall(ZrokManager, ["enable", token])
-    ]);
-});
-
-test("preserves invalid-token errors from the retry", async () => {
-    const { calls, ZrokManager } = loadZrokManager([
-        { error: alreadyEnabledError },
-        success("environment disabled"),
-        failure("[ERROR]: enableUnauthorized")
-    ]);
-
-    await assert.rejects(() => ZrokManager.setToken(token), { message: "Invalid Zrok token!" });
-    assert.deepEqual(calls, [
-        expectedCall(ZrokManager, ["enable", token]),
-        expectedCall(ZrokManager, ["disable"]),
-        expectedCall(ZrokManager, ["enable", token])
-    ]);
-});
-
-test("stops recovery and preserves the disable error when stale-environment cleanup fails", async () => {
-    const { calls, ZrokManager } = loadZrokManager([
-        { error: alreadyEnabledError },
-        failure("[ERROR]: environment is still in use")
-    ]);
-
-    await assert.rejects(() => ZrokManager.setToken(token), {
-        message: "Failed to disable Zrok tunnel! Please check your server logs for more information."
-    });
-    assert.deepEqual(calls, [expectedCall(ZrokManager, ["enable", token]), expectedCall(ZrokManager, ["disable"])]);
 });

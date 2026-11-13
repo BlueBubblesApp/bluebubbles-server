@@ -160,34 +160,24 @@ export class ZrokManager extends Loggable {
 
     static async setToken(token: string): Promise<string> {
         const logger = getLogger("ZrokManager");
-        const enable = () => ProcessSpawner.executeCommand(this.daemonPath, ["enable", token], {}, "ZrokManager");
-        const throwEnableError = (ex: any | ProcessSpawnerError): never => {
+        logger.info(`Enabling Zrok...`);
+        try {
+            return await ProcessSpawner.executeCommand(this.daemonPath, ["enable", token], {}, "ZrokManager");
+        } catch (ex: any | ProcessSpawnerError) {
             const output = ex?.output ?? ex?.message ?? String(ex);
+            if (output.includes(ALREADY_ENABLED_ENVIRONMENT_ERROR)) {
+                // This condition occurs before zrok validates the token; it does not prove the environment is stale.
+                throw new Error(
+                    "Zrok is already enabled. Disable the existing environment manually only if you intend to " +
+                        "replace it, then retry."
+                );
+            }
             if (output.includes("enableUnauthorized")) {
                 throw new Error("Invalid Zrok token!");
             }
 
             logger.error(`Failed to set Zrok token! Error: ${output}`);
             throw new Error("Failed to set Zrok token! Please check your server logs for more information.");
-        };
-
-        logger.info(`Enabling Zrok...`);
-        try {
-            return await enable();
-        } catch (ex: any | ProcessSpawnerError) {
-            const output = ex?.output ?? ex?.message ?? String(ex);
-            if (!output.includes(ALREADY_ENABLED_ENVIRONMENT_ERROR)) {
-                return throwEnableError(ex);
-            }
-
-            logger.info("Zrok already has an enabled environment. Disabling it before retrying...");
-            await this.disable();
-
-            try {
-                return await enable();
-            } catch (retryEx: any | ProcessSpawnerError) {
-                return throwEnableError(retryEx);
-            }
         }
     }
 
