@@ -135,7 +135,6 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.GET,
                         path: "findmy/friends",
-                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: FindMyRouter.friends
                     },
                     {

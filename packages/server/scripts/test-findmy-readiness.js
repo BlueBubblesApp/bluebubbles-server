@@ -508,6 +508,76 @@ const testStartupIpcStatus = async () => {
     assert.equal(retries, 1, "retry reaches the service after initialization");
 };
 
+const testRegisteredCachedFriendsRoute = async () => {
+    const types = load("../src/server/api/http/api/v1/responses/types.ts");
+    const errors = load("../src/server/api/http/api/v1/responses/errors.ts", { "./types": types });
+    const cachedFriends = [{ handle: "cached@example.test" }];
+    const server = { repo: { getConfig: () => "test-password" }, log() {} };
+    const { AuthMiddleware } = load("../src/server/api/http/api/v1/middleware/authMiddleware.ts", {
+        "@server": { Server: () => server },
+        "@server/helpers/utils": { safeTrim: value => value.trim() },
+        "../responses/errors": errors
+    });
+    let helperChecks = 0;
+    const { PrivateApiMiddleware } = load("../src/server/api/http/api/v1/middleware/privateApiMiddleware.ts", {
+        "@server/helpers/utils": {
+            checkPrivateApiStatus: () => {
+                helperChecks += 1;
+                throw new Error("Private API is disabled or its helpers are disconnected");
+            }
+        },
+        "../responses/errors": errors
+    });
+    class Success {
+        constructor(ctx, response) { this.ctx = ctx; this.response = response; }
+        send() { this.ctx.body = this.response.data; }
+    }
+    const { FindMyRouter } = load("../src/server/api/http/api/v1/routers/findmyRouter.ts", {
+        "@server/env": {},
+        "@server": { Server: () => server },
+        "../responses/success": { Success },
+        "../responses/errors": errors,
+        "@server/api/interfaces/findMyInterface": { FindMyInterface: { getFriends: async () => cachedFriends } },
+        "@server/events": {},
+        "@server/api/privateApi/FindMyHelperReadiness": readinessModule
+    });
+    const passThrough = async (_ctx, next) => next();
+    const mocks = {
+        "@server": { Server: () => server },
+        "@server/helpers/utils": { isNotEmpty: value => !!value },
+        "./middleware/authMiddleware": { AuthMiddleware },
+        "./middleware/privateApiMiddleware": { PrivateApiMiddleware },
+        "../../types": load("../src/server/api/http/types.ts"),
+        "@server/lib/logging/Loggable": { getLogger: () => ({ debug() {} }) }
+    };
+    for (const name of ["MetricsMiddleware", "ErrorMiddleware", "LogMiddleware"]) {
+        mocks[`./middleware/${name[0].toLowerCase()}${name.slice(1)}`] = { [name]: passThrough };
+    }
+    const source = fs.readFileSync(path.resolve(__dirname, "../src/server/api/http/api/v1/httpRoutes.ts"), "utf8");
+    for (const [, name, modulePath] of source.matchAll(/import \{ (\w+) \} from "(\.\/(?:routers|validators)\/[^\"]+)";/g)) {
+        mocks[modulePath] = { [name]: new Proxy({}, { get: () => passThrough }) };
+    }
+    mocks["./routers/findmyRouter"] = { FindMyRouter };
+    const { HttpRoutes } = load("../src/server/api/http/api/v1/httpRoutes.ts", mocks);
+    const KoaRouter = require("koa-router");
+    const router = new KoaRouter();
+    HttpRoutes.createRoutes(router);
+    const friends = ctx => router.routes()(ctx, async () => {});
+    const context = password => ({
+        method: "GET", path: "/api/v1/icloud/findmy/friends",
+        request: { query: password == null ? {} : { password }, ip: "test" },
+        req: { setTimeout() {} }, res: { setTimeout() {} }
+    });
+    const authenticated = context("test-password");
+    await friends(authenticated);
+    assert.deepEqual(authenticated.body, cachedFriends, "registered GET returns its cache without a helper");
+    assert.equal(helperChecks, 0, "cached Friends GET must not consult Private API availability");
+    for (const password of [undefined, "incorrect-password"]) {
+        await assert.rejects(() => friends(context(password)), error => error.status === 401,
+            "cached Friends GET must still require authentication");
+    }
+};
+
 (async () => {
     await testLifecycle();
     await testExitBeforeRegistration();
@@ -517,6 +587,7 @@ const testStartupIpcStatus = async () => {
     await testTargetedPreference();
     await testUnavailableHttp();
     await testStartupIpcStatus();
+    await testRegisteredCachedFriendsRoute();
     console.log("PASS: Find My readiness, targeted retry, timeout isolation, unavailable API and startup IPC");
 })().catch(error => {
     console.error(error);
