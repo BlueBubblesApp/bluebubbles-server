@@ -365,7 +365,9 @@ const runRefreshBranchTests = async () => {
 
     observations = createRefreshScenario({
         helperAvailable: true,
-        helperResponse: { data: { locations: [], partial: false } }
+        helperResponse: {
+            data: { locations: [], partial: false, friendListTimedOut: false, timedOutHandles: [], skippedFriends: 0 }
+        }
     });
     assert.deepEqual(await FindMyInterface.refreshFriends(true, true), [], "complete empty snapshots are valid");
     assert.equal(observations.fallbackCalls, 0);
@@ -392,7 +394,79 @@ const runRefreshBranchTests = async () => {
     assert.equal(locations.length, 1);
 };
 
+const runFriendsSnapshotValidationTests = async () => {
+    FindMyInterface = loadFindMyInterface({ isMinBigSur: true, isMinSonoma: true, isMinSequoia: true });
+    const first = { ...normalizedLocation, handle: "first@example.test", status: "shallow", last_updated: 100 };
+    const second = { ...normalizedLocation, handle: "second@example.test", status: "shallow", last_updated: 100 };
+    const complete = { partial: false, friendListTimedOut: false, timedOutHandles: [], skippedFriends: 0 };
+    const invalidSnapshots = [
+        { ...complete, locations: [first, { handle: null }] },
+        { ...complete, locations: [first, { ...first, handle: ` ${first.handle} ` }] },
+        { ...complete, locations: [first, { handle: null }], partial: true },
+        { ...complete, locations: [first, first], partial: true },
+        { locations: [] },
+        { ...complete, locations: [], partial: "false" },
+        { ...complete, locations: [], friendListTimedOut: undefined },
+        { ...complete, locations: [], skippedFriends: -1 },
+        { ...complete, locations: [], skippedFriends: 0.5 },
+        { ...complete, locations: [], timedOutHandles: null },
+        { ...complete, locations: [], timedOutHandles: [""] },
+        { ...complete, locations: [], friendListTimedOut: true },
+        { ...complete, locations: [], timedOutHandles: [second.handle] },
+        { ...complete, locations: [], skippedFriends: 1 }
+    ];
+    for (const response of invalidSnapshots) {
+        const observations = createRefreshScenario({ helperAvailable: true, helperResponse: { data: response } });
+        const cache = new FindMyFriendsCache();
+        cache.replaceAll([first, second]);
+        activeServer.findMyCache = cache;
+        await assert.rejects(() => FindMyInterface.refreshFriends(true, true), /usable fresh response/);
+        assert.deepEqual(cache.getAll(), [first, second], "validation must complete before any Friends cache mutation");
+        assert.equal(observations.fallbackCalls, 0, "a rejected fresh snapshot must not become a fallback success");
+    }
+
+    const useRealCache = response => {
+        createRefreshScenario({ helperAvailable: true, helperResponse: { data: response } });
+        const cache = new FindMyFriendsCache();
+        cache.replaceAll([first, second]);
+        activeServer.findMyCache = cache;
+        return cache;
+    };
+    let cache = useRealCache({ ...complete, locations: [] });
+    assert.deepEqual(await FindMyInterface.refreshFriends(true, true), [], "a valid complete empty snapshot clears stale data");
+    assert.deepEqual(cache.getAll(), []);
+
+    cache = useRealCache({ ...complete, locations: [{ ...first, last_updated: 50 }], partial: true });
+    await FindMyInterface.refreshFriends(true, true);
+    assert.deepEqual(cache.getAll(), [first, second], "valid partial snapshots preserve missing friends and newer data");
+
+    const newerFirst = { ...first, last_updated: 200 };
+    cache = useRealCache({ ...complete, locations: [newerFirst], partial: true, timedOutHandles: [second.handle] });
+    await FindMyInterface.refreshFriends(true, true);
+    assert.deepEqual(cache.getAll(), [newerFirst, second], "a partial response preserves shallow coordinates and timestamps");
+
+    cache = useRealCache({ ...complete, locations: [newerFirst] });
+    await FindMyInterface.refreshFriends(true, true);
+    assert.deepEqual(cache.getAll(), [newerFirst], "a valid complete response replaces collection membership");
+
+    cache = useRealCache({ ...complete, locations: [], partial: true, friendListTimedOut: true });
+    await assert.rejects(() => FindMyInterface.refreshFriends(true, true), /usable fresh response/);
+    assert.deepEqual(cache.getAll(), [first, second], "an empty partial response retains known Friends");
+
+    FindMyInterface = loadFindMyInterface({ isMinBigSur: true, isMinSonoma: false, isMinSequoia: false });
+    const legacy = createRefreshScenario({
+        helperAvailable: true,
+        expectedPrivateApiTarget: MESSAGES_PROCESS_IDENTIFIER,
+        helperResponse: { data: { locations: [first] } }
+    });
+    assert.equal((await FindMyInterface.refreshFriends(true, true)).length, 1,
+        "older Messages helpers retain support for responses without completion metadata");
+    await settleBackgroundFallback();
+    assert.equal(legacy.fallbackCalls, 1);
+};
+
 runRefreshBranchTests()
+    .then(runFriendsSnapshotValidationTests)
     .then(() => console.log("PASS: Find My Friends integration tests"))
     .catch(error => {
         console.error(error);

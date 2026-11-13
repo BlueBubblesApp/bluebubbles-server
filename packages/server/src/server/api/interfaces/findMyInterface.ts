@@ -111,21 +111,45 @@ export class FindMyInterface {
                 const refreshResponse = result?.data as FindMyFriendsRefreshResponse | undefined;
                 if (Array.isArray(refreshResponse?.locations)) {
                     const refreshedLocations = normalizeFindMyFriendLocations(refreshResponse.locations);
-                    const responseContainsOnlyInvalidLocations =
-                        refreshResponse.locations.length > 0 && refreshedLocations.length === 0;
-                    const responseIsPartial = refreshResponse.partial === true;
-                    receivedUsableHelperResponse =
-                        !responseContainsOnlyInvalidLocations && (!responseIsPartial || refreshedLocations.length > 0);
-
-                    if (!responseContainsOnlyInvalidLocations) {
-                        if (responseIsPartial) {
-                            Server().findMyCache.updateAll(refreshedLocations);
-                        } else {
-                            Server().findMyCache.replaceAll(refreshedLocations);
-                        }
-                    } else {
-                        Server().logger.warn("Find My Friends helper returned no identifiable locations.");
+                    if (refreshedLocations.length !== refreshResponse.locations.length) {
+                        throw new Error("The Find My Friends helper returned invalid location records");
                     }
+                    const handles = refreshedLocations.map(location => location.handle);
+                    if (new Set(handles).size !== handles.length) {
+                        throw new Error("The Find My Friends helper returned duplicate friend handles");
+                    }
+
+                    // The dedicated helper reports whether its snapshot is complete.
+                    // Earlier Messages helpers do not supply this metadata.
+                    if (isMinSequoia) {
+                        if (
+                            typeof refreshResponse.partial !== "boolean" ||
+                            typeof refreshResponse.friendListTimedOut !== "boolean" ||
+                            !Array.isArray(refreshResponse.timedOutHandles) ||
+                            !refreshResponse.timedOutHandles.every(
+                                handle => typeof handle === "string" && handle.trim().length > 0
+                            ) ||
+                            !Number.isInteger(refreshResponse.skippedFriends) ||
+                            refreshResponse.skippedFriends < 0
+                        ) {
+                            throw new Error("The Find My Friends helper returned invalid completion metadata");
+                        }
+                        if (
+                            !refreshResponse.partial &&
+                            (refreshResponse.friendListTimedOut ||
+                                refreshResponse.timedOutHandles.length > 0 ||
+                                refreshResponse.skippedFriends > 0)
+                        ) {
+                            throw new Error("The Find My Friends helper returned an inconsistent completion state");
+                        }
+                    }
+                    const responseIsPartial = refreshResponse.partial === true;
+                    if (responseIsPartial) {
+                        Server().findMyCache.updateAll(refreshedLocations);
+                    } else {
+                        Server().findMyCache.replaceAll(refreshedLocations);
+                    }
+                    receivedUsableHelperResponse = !responseIsPartial || refreshedLocations.length > 0;
 
                     if (responseIsPartial) {
                         const timedOutFriendCount = Array.isArray(refreshResponse.timedOutHandles)

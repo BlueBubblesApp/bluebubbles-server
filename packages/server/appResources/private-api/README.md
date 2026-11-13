@@ -51,6 +51,16 @@ invalid response instead of silently treating cached data as a fresh success.
 The cache is retained in either case. Earlier macOS versions retain their
 existing Friends routing and fallback behavior.
 
+The dedicated Friends helper returns `locations`, boolean `partial` and
+`friendListTimedOut` fields, a `timedOutHandles` string array, and a nonnegative
+integer `skippedFriends` count. A complete snapshot (`partial: false`) must
+report no timeouts or skipped friends. A partial snapshot may conservatively
+retain previously cached friends even when no individual timeout is listed.
+The Server validates completion metadata, identifiable records, and duplicate
+handles before changing the cache. A valid complete empty snapshot clears it;
+valid partial snapshots merge without replacing newer cached locations. Older
+Messages helpers retain support for responses without completion metadata.
+
 ## Find My release smoke test
 
 TCC Automation grants are tied to the signed application identity. Before a
