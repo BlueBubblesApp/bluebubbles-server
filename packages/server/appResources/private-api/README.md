@@ -16,6 +16,9 @@ only when both Private API and **Open FindMy App on Startup** are enabled.
 Older supported macOS releases continue to route Friends requests through the
 Messages helper when that private API is available.
 
+The checked-in artifact is built from [Helper PR #65](https://github.com/BlueBubblesApp/bluebubbles-helper/pull/65),
+source commit `2c598a00bc7c7705892c80557b1be4d1df6bf78c`.
+
 The artifact checksum must match its `.md5` file, it must contain `x86_64` and
 `arm64` slices, and it must use `@rpath/BlueBubblesFindMyHelper.dylib` as its
 install name. Every server build checks this contract through:
