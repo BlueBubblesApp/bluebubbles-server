@@ -1,0 +1,291 @@
+//  IMCoreMessages
+//  Building an outgoing message: attributed text, subject, effect and reply metadata.
+//
+//  See `IMCoreChats.swift` for why these wrappers exist and how selectors are sourced.
+
+import BBPrivateAPIContract
+import CoreGraphics
+import Foundation
+import HelperShared
+import ObjectiveC.runtime
+
+// MARK: - Messages
+
+/// `IMMessage`: one outgoing message.
+///
+/// Built through the eleven-argument designated initializer, which is why the invocation
+/// bridge exists. Transcribed from the Objective-C helper.
+enum IMMessageBuilder {
+
+  /// The flags word, and it is not arbitrary.
+  ///
+  /// These constants come from the shipping helper and encode what kind of message this
+  /// is. Getting them wrong produces a message that sends and then renders incorrectly:
+  /// an audio message that appears as a file, a subject that vanishes.
+  enum Flags {
+    /// A plain outgoing message.
+    static let plain: Int64 = 0x100005
+    /// Carries a subject line.
+    static let withSubject: Int64 = 0x10000D
+    /// An audio message, which Messages renders with a waveform.
+    static let audio: Int64 = 0x300005
+    /// A tapback. Note it is 0x5, not one of the above: an association is a different
+    /// kind of message rather than a plain one with extra fields.
+    static let association: Int64 = 0x5
+  }
+
+  /// A plain or attachment-bearing message.
+  ///
+  /// ObjC: `initWithSender:time:text:messageSubject:fileTransferGUIDs:flags:error:guid:`
+  /// `subject:balloonBundleID:payloadData:expressiveSendStyleID:`.
+  ///
+  /// Note there are TWO subject parameters. `messageSubject` is the attributed subject that
+  /// actually appears; the later `subject:` is a legacy field the shipping helper passes
+  /// nil for. Passing the text in the wrong one silently drops it.
+  /// The `IMMessage` class, which every constructor below allocates and initialises in one
+  /// step through `IMCoreRuntime.create`.
+  ///
+  /// The allocation is deliberately NOT vended on its own: `-init…` consumes the receiver's
+  /// +1, so an uninitialised allocation held in Swift is a reference to an object the
+  /// initialiser may already have disposed of. See `IMCoreRuntime.create`.
+  private static func messageClass() throws -> AnyClass {
+    try IMCoreRuntime.requireClass("IMMessage")
+  }
+
+  /// A GUID for a message this helper builds, given to it AT CONSTRUCTION.
+  ///
+  /// **This is how a send knows which message it sent.** `-[IMChat sendMessage:]` returns
+  /// nothing, and reading `chat.lastSentMessage` afterwards answers whatever was sent last,
+  /// which is the PREVIOUS message whenever ours has not landed there yet or another send
+  /// overtook it: the client is then told its new message has an older message's GUID. A
+  /// GUID chosen here is on the object we hand to `sendMessage:`, so the reply names exactly
+  /// that message. Messages does the same in its own sticker send (`[NSString stringGUID]`
+  /// into the initialiser's `guid:`; see `sticker` below), and `stringGUID` is an uppercase
+  /// UUID string, which is what this is.
+  static func newGUID() -> String { UUID().uuidString }
+
+  /// The GUID of a message a class FACTORY built, giving it one when it has none.
+  ///
+  /// For the messages `newGUID` cannot reach because no initialiser is ours to call (the
+  /// poll vote's `customAcknowledgementMessageWithPayloadData:…`). `guid` is a read-write
+  /// property on `IMMessage` on every dumped release (`docs/headers/*/IMMessage.h`), so a
+  /// factory that left it empty is given one before the send, for the reason `newGUID`
+  /// gives.
+  static func assignedGUID(of message: AnyObject) throws -> String {
+    if let existing = try IMCoreRuntime.string(message, "guid"), !existing.isEmpty {
+      return existing
+    }
+    let guid = newGUID()
+    try IMCoreRuntime.invoke(message, "setGuid:", [guid])
+    return guid
+  }
+
+  static func message(
+    text: NSAttributedString,
+    subject: NSAttributedString?,
+    fileTransferGUIDs: [String],
+    effectID: String?,
+    isAudioMessage: Bool,
+    guid: String
+  ) throws -> AnyObject {
+    let type: AnyClass = try messageClass()
+
+    let flags: Int64 =
+      isAudioMessage
+      ? Flags.audio
+      : (subject != nil ? Flags.withSubject : Flags.plain)
+
+    let message = try IMCoreRuntime.create(
+      type,
+      "initWithSender:time:text:messageSubject:fileTransferGUIDs:flags:error:guid:"
+        + "subject:balloonBundleID:payloadData:expressiveSendStyleID:",
+      [
+        NSNull(),  // sender; nil means the local account
+        NSNull(),  // time; nil means now
+        text,
+        subject ?? NSNull(),
+        fileTransferGUIDs,
+        flags,
+        NSNull(),  // error
+        guid,  // ours, so the send can name this message; see `newGUID`
+        NSNull(),  // subject (legacy; see above)
+        NSNull(),  // balloonBundleID
+        NSNull(),  // payloadData
+        effectID ?? NSNull(),
+      ]
+    )
+
+    // Reply threading is set after construction, because the initializer has no parameter
+    // for it, by the caller: `IMThreads.Reply.thread(_:)`, the one place a reply is
+    // threaded on every send path.
+    return message
+  }
+
+  /// A tapback.
+  ///
+  /// ObjC: the `associatedMessageGUID:associatedMessageType:associatedMessageRange:`
+  /// `messageSummaryInfo:` variant. A different initializer and a different flags word: an
+  /// association is its own kind of message.
+  static func association(
+    text: NSAttributedString,
+    associatedGUID: String,
+    associatedType: Int64,
+    range: NSRange,
+    summaryInfo: [String: Any]?,
+    guid: String
+  ) throws -> AnyObject {
+    return try IMCoreRuntime.create(
+      try messageClass(),
+      "initWithSender:time:text:messageSubject:fileTransferGUIDs:flags:error:guid:"
+        + "subject:associatedMessageGUID:associatedMessageType:associatedMessageRange:"
+        + "messageSummaryInfo:",
+      [
+        NSNull(), NSNull(), text, NSNull(), NSNull(),
+        Flags.association,
+        NSNull(), guid, NSNull(),
+        associatedGUID,
+        associatedType,
+        NSValue(range: range),
+        summaryInfo ?? NSNull(),
+      ]
+    )
+  }
+
+  /// An iMessage-app balloon: a plain message carrying a plugin bundle id and its payload.
+  ///
+  /// The same eleven-argument initializer everything else uses, with the two arguments the
+  /// text path passes nil for actually filled in. The TEXT is the fallback line a device
+  /// shows when it cannot draw the balloon; Apple's own app messages carry an empty one and
+  /// let the layout's caption speak, and that is what is sent when no summary is given.
+  ///
+  /// It carries no image: one sent this way never uploads. See `CKCompositions.appBalloon`.
+  /// A turn in a session goes through `linkedAppMessage` instead: the association has to be
+  /// in the initialiser, because `IMMessage` has no setter for it.
+  static func appMessage(
+    balloonBundleID: String, payload: Data, summary: String?, guid: String,
+    sessionOriginGUID: String? = nil
+  ) throws -> AnyObject {
+    let text = NSAttributedString(string: summary ?? "")
+    if let sessionOriginGUID {
+      return try linkedAppMessage(
+        balloonBundleID: balloonBundleID, payload: payload, text: text, fileTransferGUIDs: [],
+        guid: guid, originGUID: sessionOriginGUID)
+    }
+    return try IMCoreRuntime.create(
+      try messageClass(),
+      "initWithSender:time:text:messageSubject:fileTransferGUIDs:flags:error:guid:"
+        + "subject:balloonBundleID:payloadData:expressiveSendStyleID:",
+      [
+        NSNull(), NSNull(), text, NSNull(), [],
+        Flags.plain, NSNull(), guid, NSNull(),
+        balloonBundleID, payload, NSNull(),
+      ]
+    )
+  }
+
+  /// `associated_message_type` of an app balloon that continues a session. Messages writes
+  /// 2 on every turn after the first and rewrites the first to 3 when one arrives; the
+  /// tapback and sticker families are 2000 and 1000, and plain messages 0.
+  static let sessionUpdateAssociation: Int64 = 2
+
+  /// An app balloon that is a turn in a session rather than a balloon of its own.
+  ///
+  /// The association initialiser (the tapback's, present on every dumped release) with the
+  /// balloon's fields set afterwards: the balloon initialiser has no association arguments,
+  /// and `IMMessage` has no `setAssociatedMessageGUID:` at runtime (MEASURED on 27.0.1: the
+  /// property is listed and the setter raises), while `setBalloonBundleID:` and
+  /// `setPayloadData:` are on every release from 14.6.1 to 27.0.1. PLAIN flags, not the
+  /// tapback's: a turn is a message with content that every device draws, and the association
+  /// is how they fold it into the session.
+  ///
+  /// The GUID is the session's FIRST message, bare (no `p:0/` prefix): the form every
+  /// received turn carries, and what the recipient's Messages matches against its own copy of
+  /// the first turn to rewrite it. The range is `{0, -1}`, which is what every genuine turn
+  /// carries in `chat.db`; the summary info is left to Messages, which writes `ust` on a
+  /// plain balloon by itself.
+  static func linkedAppMessage(
+    balloonBundleID: String, payload: Data, text: NSAttributedString,
+    fileTransferGUIDs: [String], guid: String, originGUID: String
+  ) throws -> AnyObject {
+    let message = try IMCoreRuntime.create(
+      try messageClass(),
+      "initWithSender:time:text:messageSubject:fileTransferGUIDs:flags:error:guid:"
+        + "subject:associatedMessageGUID:associatedMessageType:associatedMessageRange:"
+        + "messageSummaryInfo:",
+      [
+        NSNull(), NSNull(), text, NSNull(), fileTransferGUIDs,
+        Flags.plain, NSNull(), guid, NSNull(),
+        originGUID,
+        sessionUpdateAssociation,
+        NSValue(range: NSRange(location: 0, length: -1)),
+        NSNull(),
+      ]
+    )
+    try IMCoreRuntime.invoke(message, "setBalloonBundleID:", [balloonBundleID])
+    try IMCoreRuntime.invoke(message, "setPayloadData:", [payload as NSData])
+    return message
+  }
+
+  /// A sticker: an association that also carries a file transfer.
+  ///
+  /// TRANSCRIBED from Messages' own send, `-[CKChatController(CKChatController_Stickers)
+  /// _sendCommSafetyVerifiedSticker:withMediaObject:composition:parentMessagePartChatItem:
+  /// messageSummaryInfo:]` on macOS 26.5.2 (disassembled; see `docs/PRIVATE_API_SURFACE.md`
+  /// § Stickers). It is the fourteen-argument association initializer (the tapback one
+  /// with `threadIdentifier:` on the end) called with:
+  ///
+  ///     sender nil · time [NSDate date] · text = composition superFormatText
+  ///     messageSubject nil · fileTransferGUIDs from the composition · flags 5
+  ///     error nil · guid [NSString stringGUID] · subject nil
+  ///     associatedMessageGUID = parent part chat item's guid   ("p:0/<message guid>")
+  ///     associatedMessageType = 1000 (1001 for an emoji sticker)
+  ///     associatedMessageRange = parent part's messagePartRange
+  ///     messageSummaryInfo = whatever the caller had (nil from the drag-and-drop path)
+  ///     threadIdentifier = parent part's threadIdentifier
+  ///
+  /// Two of those are not what the tapback path passes and both matter. The RANGE is the
+  /// part's real range in the message text, not `(partIndex, 1)`: chat.db shows every
+  /// received sticker with the parent part's text length as its range length, and the
+  /// sticker's geometry is expressed relative to that part. The GUID is the CHAT ITEM's,
+  /// with the `p:<part>/` prefix, which is how Messages knows which balloon to draw it on.
+  ///
+  /// The thirteen-argument initializer is used when the fourteen-argument one is absent,
+  /// which loses the thread identifier and nothing else.
+  static func sticker(
+    text: NSAttributedString,
+    fileTransferGUIDs: [String],
+    guid: String,
+    associatedGUID: String,
+    associatedType: Int64,
+    range: NSRange,
+    summaryInfo: [String: Any]?,
+    threadIdentifier: String?
+  ) throws -> AnyObject {
+    let type: AnyClass = try messageClass()
+
+    let base =
+      "initWithSender:time:text:messageSubject:fileTransferGUIDs:flags:error:guid:"
+      + "subject:associatedMessageGUID:associatedMessageType:associatedMessageRange:"
+      + "messageSummaryInfo:"
+    var arguments: [Any] = [
+      NSNull(), NSDate(), text, NSNull(), fileTransferGUIDs,
+      Flags.association,
+      NSNull(), guid, NSNull(),
+      associatedGUID,
+      associatedType,
+      NSValue(range: range),
+      summaryInfo ?? NSNull(),
+    ]
+    let selector: String
+    if IMCoreRuntime.instancesRespond(
+      type, to: base + "threadIdentifier:")
+    {
+      selector = base + "threadIdentifier:"
+      arguments.append(threadIdentifier ?? NSNull())
+    } else {
+      selector = base
+    }
+
+    return try IMCoreRuntime.create(type, selector, arguments)
+  }
+}

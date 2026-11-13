@@ -1,0 +1,39 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/icloud/account/alias?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "alias": "person@example.com"
+      }
+    }
+  },
+  "response": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "message": "Bad Request",
+        "error": {
+          "type": "Validation Error",
+          "message": "`person@example.com` is not one of this account's aliases"
+        },
+        "status": 400
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T19:56:23.883Z"
+}

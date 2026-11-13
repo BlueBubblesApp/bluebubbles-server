@@ -1,0 +1,415 @@
+//  ChangeDetectionService
+//  Watches chat.db and turns writes into events.
+//
+//  Two signals: a kqueue watcher on chat.db and its WAL is the primary, low-latency one; a
+//  `PRAGMA data_version` check every 30 seconds is the backup, and queries only when SQLite
+//  says something was committed that the watcher did not report. See `ChangeDetector`.
+//
+//  Two kinds of event come out of it: the message events, and `chat-read-status-changed`
+//  when a chat's last-read time moves forward. That is every `read: true`, the mark-read
+//  route's included; the helper observes no read state, so nothing emits it twice. The one
+//  `read: false` is `ChatInterface.markUnread`'s, because going unread does not move it.
+
+import BBBuiltIns
+import BBCore
+import BBEvents
+import BBIMessage
+import BBInterfaces
+import BBSerialization
+import BBServiceKit
+import BBSettings
+import Logging
+
+/// Watches chat.db and turns writes into events.
+actor ChangeDetectionService: Service, ConfigurableService {
+  static let manifest = BuiltInManifests.changeDetection
+  static let restartPolicy = RestartPolicy.backoff(
+    base: .seconds(5), max: .seconds(60), attempts: 5
+  )
+
+  /// What this service touches, rather than the container that holds it.
+  typealias Host = any ScopedSettingsProviding & LoggerProviding & EventPublishing
+    & MessageSourceProviding & MessageReindexerProviding
+
+  /// Which of these changes altered what a message SAYS.
+  ///
+  /// Static and named rather than a closure in the pump, for the same reason `event(for:)`
+  /// is: it is a rule with cases, and a rule buried in a `for` loop is one nobody can assert
+  /// without standing up a detector and a database.
+  ///
+  /// `.edited` and `.retracted` are the whole list. Every other field the watcher reports —
+  /// delivered, read, played, notified, error — is a receipt or a status, and none of them
+  /// changes a word. A message that was DELETED is absent here on purpose: its row is gone,
+  /// so the index's row id resolves to nothing and the join drops it without being told.
+  static func rowIDsNeedingReindex(_ changes: [MessageChange]) -> [Int64] {
+    changes
+      .filter {
+        $0.changedFields.contains(.edited) || $0.changedFields.contains(.retracted)
+      }
+      .map(\.message.rowID)
+  }
+
+  private let scoped: ScopedSettings
+  private let events: EventBus
+  private let logger: Logger
+  /// Where the repository and the serializer are read from, per start.
+  ///
+  /// The SOURCE rather than the values: a start that threw because `chat.db` would not open is
+  /// retried on this same instance, and values captured when it was made would still be nil
+  /// when the database opens.
+  private let messageSource: any MessageSourceProviding
+  /// Held so it can be stopped. The detector is captured by the body alone, so it goes when
+  /// the body ends, and takes its poll with it.
+  private let pump = OwnedTask()
+
+  init(host: Host) {
+    self.scoped = host.scopedSettings(for: Self.manifest)
+    self.events = host.events
+    self.logger = host.logger
+    self.messageSource = host
+    self.reindexerSource = host
+  }
+
+  /// Where the search index's hook is read from, per batch.
+  ///
+  /// The SOURCE rather than the hook: the indexer publishes and withdraws as the feature is
+  /// switched on and off, so a reference captured once would go on writing to a store that
+  /// had been closed, or to one the user had just deleted.
+  private let reindexerSource: any MessageReindexerProviding
+
+  func start() async throws {
+    guard let repository = messageSource.messages else {
+      throw ServiceStartupError.unavailable("chat.db is not readable")
+    }
+
+    var configuration = ChangeDetectorConfiguration()
+    // Clamped here as well as validated on write: an install that stored a sub-30s value
+    // under the old meaning of the key must not come up polling.
+    configuration.backupInterval = .milliseconds(
+      max(30_000, try await scoped.get(Settings.dbPollInterval))
+    )
+
+    let detector = ChangeDetector(repository: repository, configuration: configuration)
+    let events = self.events
+    let serializer = messageSource.serializer
+    let logger = self.logger
+    // Captured like the rest, so the pump holds no reference to this service. It is the
+    // SOURCE, not the hook, so each batch still reads whatever is published at that moment.
+    let reindexerSource = self.reindexerSource
+
+    // Once, here, rather than once per change: without a serializer every change below
+    // is dropped, and a line per drop would say the same thing a thousand times.
+    if serializer == nil {
+      logger.warning("No message serializer; detected changes will not be announced")
+    }
+
+    // Started before `start()` returns, so a change written while the rest of the
+    // services are still coming up is not missed.
+    // Everything the loop reads is captured above as a local, so the pump holds no reference
+    // to this service.
+    pump.run {
+      // Outlives the batches, unlike the hydrator: what it caches is a finished
+      // transfer's file, which cannot go stale.
+      let files = AttachmentMetadataReader()
+      for await batch in await detector.changes(watching: ChatDatabase.defaultPath) {
+        let changes = batch.messages
+        // One hydrator per batch: long enough to collapse a burst in a single chat into
+        // one participants query, short enough that a roster change cannot go stale. See
+        // `EventHydrator`.
+        var hydrator = EventHydrator(repository: repository, files: files, logger: logger)
+
+        // The search index, before the events. What a message SAYS has changed, and the
+        // index built by walking ROWIDs upward never looks back — so this is the only thing
+        // that tells it. Done per batch rather than per change so a conversation where
+        // several messages were edited at once is one write.
+        //
+        // `.edited` and `.retracted` only: everything else the watcher reports is a receipt
+        // or a status, and none of them changes a word. A DELETED message needs nothing —
+        // its row is gone, so the index's row id resolves to nothing and the join drops it.
+        let rewritten = Self.rowIDsNeedingReindex(changes)
+        if !rewritten.isEmpty, let reindexer = await reindexerSource.messageReindexer() {
+          await reindexer.reindex(rowIDs: rewritten)
+        }
+
+        for change in changes {
+          for announcement in await Self.announcements(
+            for: change, serializer: serializer, hydrator: &hydrator
+          ) {
+            let event = announcement.event
+            // The one line per message a reader at debug follows. The message GUID is
+            // opaque; the chat GUID carries an address on a one-to-one chat, so it goes
+            // through `Redaction`, as it does on the chat-read line. The text and subject
+            // are content and are never here.
+            logger.debug(
+              "Announcing message change",
+              metadata: [
+                "event": .string(event.name.rawValue),
+                "guid": .string(change.message.guid),
+                "new": .stringConvertible(change.isNew),
+                "fields": .string(
+                  change.changedFields.map(\.rawValue).sorted().joined(separator: ",")),
+                "fromMe": .stringConvertible(change.message.isFromMe),
+                "attachments": .stringConvertible(change.message.cacheHasAttachments),
+                "chat": .string(Redaction.chatGUID(announcement.chatGUID)),
+              ])
+            // Rate-limited per chat where the policy asks for it, so a busy conversation
+            // cannot starve a quiet one. Keyed by the chat the payload names, which every
+            // message announced here has: one with none is held or dropped before this.
+            await events.emit(event, rateLimitKey: announcement.chatGUID)
+          }
+        }
+
+        // After the messages, so a client is told about a message before it is told the
+        // chat holding it was read.
+        await Self.announce(chatReads: batch.chatReads, to: events, logger: logger)
+      }
+    } ifItEndsOnItsOwn: { [logger] in
+      // A WARNING, so it is in a default log bundle: the symptom is "messages stopped
+      // arriving", and without this line there is nothing to find. `isAlive` turns false at
+      // the same moment, so the registry revives the service.
+      logger.warning(
+        "Change detection stopped on its own; no further messages will be detected")
+    }
+
+    logger.info(
+      "Watching chat.db for changes",
+      metadata: [
+        "debounceMs": .stringConvertible(Int(configuration.pollInterval.seconds * 1000)),
+        "backupS": .stringConvertible(configuration.backupInterval.seconds),
+      ])
+  }
+
+  /// Rebuilt rather than reconfigured: the backup interval is baked into the detector when
+  /// it is constructed and cannot be changed on a running one.
+  func apply(_ change: SettingsChange) async throws -> ReloadAction { .restart }
+
+  func stop() async {
+    await pump.stop()
+  }
+
+  /// Maps a detected change onto the client-facing event vocabulary.
+  ///
+  /// Returns nil for changes with no client event: not every column that moves is
+  /// something a client is told about, and emitting one anyway would be a new event name
+  /// no client knows. Also nil for a message with no chat to name: see `EventHydrator.context`.
+  static func event(
+    for change: MessageChange,
+    serializer: MessageSerializer?,
+    hydrator: inout EventHydrator
+  ) async -> ServerEvent? {
+    await announcement(for: change, serializer: serializer, hydrator: &hydrator)?.event
+  }
+
+  /// A message event, with the chat it was hydrated with.
+  struct Announcement {
+    let event: ServerEvent
+    /// The GUID of the chat the payload names first, as chat.db stores it: the chat a
+    /// client files the message under.
+    ///
+    /// Not `cache_roomnames`, which is a GROUP's room name and NULL for every one-to-one
+    /// chat. Keyed on that, every one-to-one conversation logged as no chat at all and
+    /// shared one rate-limit key, so a policy on message events would have let a busy
+    /// conversation starve every other one-to-one chat.
+    let chatGUID: String
+  }
+
+  /// `event(for:serializer:hydrator:)`, plus the chat the pump logs and rate-limits by.
+  static func announcement(
+    for change: MessageChange,
+    serializer: MessageSerializer?,
+    hydrator: inout EventHydrator
+  ) async -> Announcement? {
+    guard let serializer else { return nil }
+
+    // NAMED FIRST, because the name decides the notification shape and therefore whether
+    // the participants are worth loading at all.
+    //
+    // `isNew` distinguishes an insert from an update; the changed-field set says what
+    // moved. An error is reported as its own event because clients surface it
+    // differently from an ordinary update.
+    let name: EventName
+    if change.changedFields.contains(.error), change.message.error != 0 {
+      name = .messageSendError
+    } else {
+      name = change.isNew ? .newMessage : .updatedMessage
+    }
+
+    // The reference uses THREE shapes here, not two, and the differences are its own:
+    //
+    //   new-message      socket `.full`  ·  FCM `DEFAULT` (participants on, chats on)
+    //   updated-message  socket `.full`  ·  FCM participants OFF, chats OFF
+    //   send-error       one payload for both: participants OFF, chats on
+    //
+    // We sent `.notification` to all three, so every edit, unsend, reaction and read
+    // receipt pushed a chat object and its whole roster — the thing `FCMSender` then has to
+    // shed against Google's 4 KB cap.
+    let notificationConfig: MessageSerializerConfig =
+      switch name {
+      case .updatedMessage: .notificationUpdate
+      case .messageSendError: .notificationSendError
+      default: .notification
+      }
+
+    // ONE context for both payloads. `.full` sets `loadChatParticipants: false` and ignores
+    // whatever the context holds, so the participants are loaded for the NOTIFICATION alone
+    // — and only `.notification` wants them. On an update, which is the majority of traffic
+    // on a busy chat, that query is now not run.
+    guard
+      let relations = await hydrator.context(
+        for: change.message, withParticipants: notificationConfig.loadChatParticipants),
+      let chat = relations.chats.first
+    else { return nil }
+
+    // The socket's payload gains `appPayload` on an iMessage-app balloon, decoded once here
+    // rather than by every client walking `payloadData` by UID. The notification shape does
+    // not: see `MessageInterface.withAppPayload`.
+    let payload = MessageInterface.withAppPayload(
+      serializer.serialize(change.message, context: relations, config: .full),
+      row: change.message)
+    let notification = serializer.serialize(
+      change.message, context: relations,
+      config: notificationConfig, isForNotification: true
+    )
+
+    // FCM priority, and it is not cosmetic: a `normal`-priority data message is DEFERRED by
+    // Android under Doze and App Standby, so an incoming iMessage can arrive minutes late on a
+    // phone that has been idle. Every event here defaulted to `.normal`, which made that the
+    // behaviour for every notification this server sends.
+    //
+    // The reference emits NEW_MESSAGE at `newMessage.isFromMe ? "normal" : "high"`, and
+    // every other emit beside it — MESSAGE_UPDATED and the six group events — passes the
+    // literal `"normal"`. So high is exactly one case: a new message somebody else sent. A
+    // message the user sent themselves has already been seen on the device that sent it,
+    // which is why the reference splits on `isFromMe` rather than sending every new message
+    // at high priority.
+    //
+    // `.messageSendError` stays normal with the rest: the reference has no high-priority emit
+    // for it, and it is a report about the user's own outgoing message.
+    let priority: EventPriority =
+      name == .newMessage && !change.message.isFromMe ? .high : .normal
+
+    let event = ServerEvent(
+      name: name, fullPayload: payload, notificationPayload: notification,
+      priority: priority
+    )
+    return Announcement(event: event, chatGUID: chat.guid)
+  }
+
+  /// Everything one detected change announces, in the order it goes out.
+  ///
+  /// Usually one message event. A group change also gets its own event — `participant-added`,
+  /// `group-name-change`, `group-icon-changed` and the rest — and it goes FIRST, ahead of the
+  /// `new-message` for the same row, which is the order the reference emits them in. Both
+  /// are sent: the group event is what makes a client refile the chat (its roster, its name,
+  /// its photo), and the `new-message` is the line in the transcript.
+  static func announcements(
+    for change: MessageChange,
+    serializer: MessageSerializer?,
+    hydrator: inout EventHydrator
+  ) async -> [Announcement] {
+    var out: [Announcement] = []
+    if let group = await groupAnnouncement(
+      for: change, serializer: serializer, hydrator: &hydrator)
+    {
+      out.append(group)
+    }
+    if let message = await announcement(for: change, serializer: serializer, hydrator: &hydrator) {
+      out.append(message)
+    }
+    return out
+  }
+
+  /// The group event a row announces, by its `item_type` and `group_action_type`, or nil.
+  ///
+  /// The six pairs the reference maps, and only those. Every other pair is nil, and that
+  /// includes `3/3`: a group-photo row with no sender that Messages writes again, under the
+  /// GUID it already has, when it resends a group's photo. The reference announces it as a
+  /// `new-message` and nothing else, and so does this server.
+  ///
+  /// A row with text is never a group change: the reference takes only rows whose text is
+  /// empty, and every group row Messages writes has none.
+  static func groupEventName(for message: IMessageRow) -> EventName? {
+    guard (message.text ?? "").isEmpty else { return nil }
+    switch (message.itemType, message.groupActionType) {
+    case (1, 0): return .participantAdded
+    case (1, 1): return .participantRemoved
+    case (2, _): return .groupNameChange
+    case (3, 0): return .participantLeft
+    case (3, 1): return .groupIconChanged
+    case (3, 2): return .groupIconRemoved
+    default: return nil
+    }
+  }
+
+  /// The group event for a newly inserted group-change row, or nil.
+  ///
+  /// New rows only: a group change happens once, and the read receipt or delivery flag
+  /// that later moves on the same row is not a second rename. The reference keys its own
+  /// once-only on the ROWID, which is what `isNew` already is here.
+  ///
+  /// Two projections, both the reference's: the socket gets the chats WITH their
+  /// participants (`.groupEvent`); push and webhooks get the notification shape, without
+  /// participants for a rename (`.notificationGroupRename`) and with them otherwise. Always
+  /// normal priority: the reference passes the literal `"normal"` for all six.
+  static func groupAnnouncement(
+    for change: MessageChange,
+    serializer: MessageSerializer?,
+    hydrator: inout EventHydrator
+  ) async -> Announcement? {
+    guard change.isNew, let serializer, let name = groupEventName(for: change.message) else {
+      return nil
+    }
+    guard
+      let relations = await hydrator.context(for: change.message, withParticipants: true),
+      let chat = relations.chats.first
+    else { return nil }
+    let payload = serializer.serialize(change.message, context: relations, config: .groupEvent)
+    let notification = serializer.serialize(
+      change.message, context: relations,
+      config: name == .groupNameChange ? .notificationGroupRename : .notification,
+      isForNotification: true)
+    let event = ServerEvent(
+      name: name, fullPayload: payload, notificationPayload: notification, priority: .normal)
+    return Announcement(event: event, chatGUID: chat.guid)
+  }
+
+  /// Emits `chat-read-status-changed` for each chat whose last-read time moved forward.
+  ///
+  /// Static, and the whole of the step, so a test can hand it a detector's batch and see what
+  /// reaches the bus without standing up a watcher on the real `chat.db`.
+  static func announce(chatReads: [ChatReadMark], to events: EventBus, logger: Logger) async {
+    for mark in chatReads {
+      logger.debug(
+        "Announcing chat read",
+        metadata: [
+          "event": .string(EventName.chatReadStatusChanged.rawValue),
+          "chat": .string(Redaction.chatGUID(mark.guid)),
+        ])
+      // Keyed by the chat like typing is. The event has no rate limit today, so the key
+      // only matters if it is given one.
+      await events.emit(event(forChatRead: mark), rateLimitKey: mark.guid)
+    }
+  }
+
+  /// `read` is the literal `true` because only an INCREASE is detected; `false` comes from
+  /// `ChatInterface.markUnread`, which is the only thing that knows a chat went unread.
+  ///
+  /// The GUID is the row's own, as chat.db stores it, never rebuilt: a client matches it
+  /// against the chats this server has already sent it.
+  static func event(forChatRead mark: ChatReadMark) -> ServerEvent {
+    .chatReadStatusChanged(chatGUID: mark.guid, read: true)
+  }
+
+  /// `.failed` once the pump has ended: the process is up and no message will be noticed,
+  /// which `.running` hid until the liveness poll's next tick.
+  var health: ServiceHealth {
+    get async {
+      guard messageSource.messages != nil else { return .degraded(reason: "no chat.db access") }
+      return pump.isRunning ? .running : .failed(reason: "not watching for new messages")
+    }
+  }
+
+  /// The pump is the service. Without it nothing reads `chat.db` and no event is emitted,
+  /// which is the silent failure this reports.
+  var isAlive: Bool { get async { pump.isRunning } }
+}

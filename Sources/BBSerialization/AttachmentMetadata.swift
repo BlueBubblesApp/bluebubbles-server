@@ -1,0 +1,400 @@
+//  AttachmentMetadata
+//  What the wire says about an attachment's FILE: its dimensions and duration, and whether a
+//  Live Photo video sits beside it. Read here, by the layer that builds the serializer's
+//  input, so the serializer itself never touches the disk.
+//
+//  What a client loses without these is layout: a gallery sizes its cells from
+//  `height`/`width` before the bytes arrive, and zero means it cannot. The parity replay
+//  compares shape, so `height: 0, width: 0` passes it; only a real file read back catches a
+//  wrong value.
+//
+//  ## Where the numbers come from, and how that differs from the reference
+//
+//  The reference shells out to `mdls` and maps forty-odd `kMDItem…` keys into friendly names.
+//  This reads the file directly (ImageIO for images, AVFoundation for audio and video) and
+//  emits the SAME key names for the fields that carry meaning. Two deliberate consequences:
+//
+//  - **It is a subset.** The reference's EXIF tail (`aperture`, `focalLength`, `deviceMake`,
+//    `colorSpace`, …) comes from Spotlight and is not reproduced. Those keys are absent here
+//    rather than null, which is what the reference does for a file Spotlight has not indexed.
+//    Both recorded fixtures carry exactly the three keys below.
+//  - **It does not depend on Spotlight.** `mdls` answers nothing for a file in a container
+//    Spotlight has not reached, and returns stale values for one that changed. Reading the
+//    header is both faster and correct.
+//
+//  The key NAMES differ by media type in the reference and are reproduced exactly: an image's
+//  file size is `size`, an audio or video file's is `bytes`.
+
+import AVFoundation
+import BBCore
+import BBIMessage
+import Foundation
+import ImageIO
+import UniformTypeIdentifiers
+
+public struct AttachmentMetadata: Sendable, Equatable {
+  public var height: Int?
+  public var width: Int?
+  /// File size. Serialised as `size` for an image and `bytes` for audio or video, matching
+  /// the reference's per-type key maps.
+  public var byteSize: Int?
+  public var duration: Double?
+
+  public enum Kind: Sendable, Equatable {
+    case image
+    case audio
+    case video
+
+    /// From a mime type's first segment. Nil for anything else, including no mime type: a
+    /// CAF row has none and is recognised by UTI in `AttachmentMetadataReader.kind(of:)`.
+    public init?(mimeType: String?) {
+      guard let mimeType else { return nil }
+      if mimeType.hasPrefix("image") {
+        self = .image
+      } else if mimeType.hasPrefix("audio") {
+        self = .audio
+      } else if mimeType.hasPrefix("video") {
+        self = .video
+      } else {
+        return nil
+      }
+    }
+  }
+  public var kind: Kind
+
+  /// What the header says about an image, for `AttachmentDelivery`. **Never on the wire**:
+  /// `json()` does not emit it. Read in the same pass as the dimensions, so deciding what a
+  /// HEIC becomes costs no second open.
+  public var imageTraits: ImageTraits?
+
+  public init(
+    kind: Kind, height: Int? = nil, width: Int? = nil, byteSize: Int? = nil,
+    duration: Double? = nil
+  ) {
+    self.kind = kind
+    self.height = height
+    self.width = width
+    self.byteSize = byteSize
+    self.duration = duration
+  }
+
+  /// Nothing was readable. Distinct from "not a medium we read", which produces no metadata
+  /// object at all; see `AttachmentSerializer`.
+  public var isEmpty: Bool {
+    height == nil && width == nil && byteSize == nil && duration == nil
+  }
+
+  /// The wire object. Absent keys rather than nulls: the reference builds this from whatever
+  /// Spotlight returned and omits the rest.
+  public func json() -> JSONValue {
+    var object = JSONObjectBuilder()
+    switch kind {
+    case .image:
+      if let byteSize { object.set("size", .int(byteSize)) }
+    case .audio, .video:
+      if let byteSize { object.set("bytes", .int(byteSize)) }
+    }
+    if let height { object.set("height", .int(height)) }
+    if let width { object.set("width", .int(width)) }
+    if let duration { object.set("duration", .double(duration)) }
+    return object.build()
+  }
+}
+
+/// What `AttachmentDelivery` needs to know about an image before choosing its output.
+///
+/// Read from the header, never from the extension or the recorded mime type: a sticker is
+/// `image/heic` with an alpha channel and a photo is `image/heic` without one, and the only
+/// thing that tells them apart is the file.
+public struct ImageTraits: Sendable, Equatable {
+  public let frameCount: Int
+  public let hasAlpha: Bool
+  /// The container's uniform type identifier, as ImageIO identifies it from the bytes.
+  public let container: String
+
+  public init(frameCount: Int, hasAlpha: Bool, container: String) {
+    self.frameCount = frameCount
+    self.hasAlpha = hasAlpha
+    self.container = container
+  }
+
+  /// More than one frame in a container that PLAYS them. A multi-page TIFF has more than one
+  /// image too and is pages, not an animation, which is why this consults
+  /// `AttachmentDelivery.animatedContainers` rather than counting.
+  public var isAnimated: Bool {
+    frameCount > 1 && AttachmentDelivery.animatedContainers.contains(container)
+  }
+}
+
+/// Reads attachment metadata off disk, once per attachment.
+///
+/// An actor with a cache, because `loadMetadata` is ON by default in the reference's
+/// attachment config and a message page can carry hundreds of attachments: an uncached
+/// implementation opens a file per row, per request, for an answer that cannot change once
+/// the transfer has finished. `Query.withAttachmentMetadata` gates the cost at the route
+/// level; this gates it again across requests.
+///
+/// A file that has NOT finished transferring is not cached: `transferState` moves and the
+/// dimensions arrive with it, so caching an early read would pin the zeroes forever.
+public actor AttachmentMetadataReader {
+
+  /// Attachment GUID to what was read, least-recently-used first out.
+  private var cache: [String: AttachmentMetadata] = [:]
+  /// GUIDs oldest-first, so eviction is O(1) at the front.
+  private var order: [String] = []
+  /// How many reads to remember.
+  ///
+  /// **Bounded because the key is attacker-paced.** This was an unbounded dictionary on an
+  /// actor that lives for the whole process, so paging back through a photo-heavy history
+  /// pinned one entry per attachment permanently: a client scrolling a long conversation
+  /// grows it without limit, against the idle memory budget `.claude/docs/performance.md`
+  /// states. Each entry is a handful of numbers, so a few thousand is far below anything
+  /// worth worrying about and far above what a live conversation touches.
+  private let capacity: Int
+
+  public init(capacity: Int = 4096) {
+    self.capacity = max(1, capacity)
+    self.livePhotos = BoundedCache(capacity: capacity)
+    self.traitsCache = BoundedCache(capacity: capacity)
+    self.deliveries = BoundedCache(capacity: capacity)
+  }
+
+  /// Records a read and evicts the oldest if the cache is now over capacity.
+  private func remember(_ guid: String, _ value: AttachmentMetadata) {
+    if cache.updateValue(value, forKey: guid) == nil {
+      order.append(guid)
+    }
+    while order.count > capacity {
+      cache.removeValue(forKey: order.removeFirst())
+    }
+  }
+
+  /// How many entries are held. For the tests that pin the bound.
+  var count: Int { cache.count }
+
+  /// Attachment GUID to whether its still has a Live Photo video. Separate from `cache`
+  /// because it is asked for every attachment, metadata or not; bounded by the same number.
+  private var livePhotos: BoundedCache<String, Bool>
+
+  /// How many times the disk was asked about a Live Photo. For the test that pins the cache.
+  private(set) var livePhotoProbes = 0
+
+  /// Attachment GUID to what the header said, for an attachment whose `metadata` was never
+  /// asked for. Bounded by the same number; the value is nil for a file ImageIO cannot open.
+  private var traitsCache: BoundedCache<String, ImageTraits?>
+  /// Attachment GUID to what the download will serve, nil included: "the stored file" is a
+  /// decision too, and the one most attachments get.
+  private var deliveries: BoundedCache<String, AttachmentDelivery?>
+
+  /// Whether a Live Photo video sits beside this attachment's still. See `LivePhotoSidecar`.
+  ///
+  /// Cached on the same terms as `metadata(for:)`: once the transfer has finished, the
+  /// sidecar Messages writes beside the still is there or it is not. Before then nothing is
+  /// remembered, so a still that is still arriving is asked about again.
+  public func hasLivePhoto(for attachment: AttachmentRow) -> Bool {
+    if let cached = livePhotos[attachment.guid] { return cached }
+    livePhotoProbes += 1
+    let found = LivePhotoSidecar.path(for: attachment) != nil
+    if attachment.transferState == Self.transferComplete {
+      livePhotos[attachment.guid] = found
+    }
+    return found
+  }
+
+  /// Nil when the attachment is not a medium this reads, or the file is not on disk.
+  ///
+  /// Both cases are meaningful and different, and the serializer tells them apart: a missing
+  /// file answers `metadata: null`, a PDF answers no `metadata` key at all, which is what
+  /// the reference does, because its `getAttachmentMetadata` returns `undefined` for a mime
+  /// type it does not handle and `JSON.stringify` drops the key.
+  public func metadata(for attachment: AttachmentRow) async -> AttachmentMetadata? {
+    if let cached = cache[attachment.guid] { return cached }
+    guard let kind = Self.kind(of: attachment) else { return nil }
+    guard let path = attachment.resolvedPath,
+      FileManager.default.fileExists(atPath: path)
+    else { return nil }
+
+    var metadata = AttachmentMetadata(kind: kind)
+    metadata.byteSize =
+      (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? nil
+
+    let url = URL(fileURLWithPath: path)
+    switch kind {
+    case .image:
+      Self.readImage(at: url, into: &metadata)
+    case .audio, .video:
+      await Self.readAsset(at: url, into: &metadata)
+    }
+
+    // Only once it has settled. `transferState` 5 is a finished transfer; anything else is
+    // still moving, and the dimensions move with it.
+    if attachment.transferState == Self.transferComplete {
+      remember(attachment.guid, metadata)
+    }
+    return metadata
+  }
+
+  /// What the header says about this attachment's image, cached on the same terms as
+  /// `metadata(for:)` and shared with it: a metadata read already holds the traits, and a
+  /// traits read alone opens the header without the asset pass.
+  public func imageTraits(for attachment: AttachmentRow) async -> ImageTraits? {
+    if let cached = cache[attachment.guid]?.imageTraits { return cached }
+    if let cached = traitsCache[attachment.guid] { return cached }
+    guard let path = attachment.resolvedPath,
+      FileManager.default.fileExists(atPath: path)
+    else { return nil }
+    let read = Self.imageTraits(at: URL(fileURLWithPath: path))
+    if attachment.transferState == Self.transferComplete {
+      traitsCache[attachment.guid] = .some(read)
+    }
+    return read
+  }
+
+  /// What `GET /attachment/:guid/download` will hand back for this attachment, or nil for the
+  /// stored file. The one place the decision is made for a row; the serializer reports it and
+  /// the download performs it. See `AttachmentDelivery`.
+  ///
+  /// Nil for a file that is not on disk, as the reference converts only a file it finds: a
+  /// client told `image/jpeg` for bytes that are not there yet would ask for a JPEG the
+  /// download cannot produce.
+  ///
+  /// The header is read only when the decision turns on it: a JPEG, a PNG or a video needs
+  /// no open to be left alone, and a message page is mostly those.
+  public func delivery(for attachment: AttachmentRow) async -> AttachmentDelivery? {
+    if let cached = deliveries[attachment.guid] { return cached }
+    guard let kind = Self.kind(of: attachment),
+      let path = attachment.resolvedPath,
+      FileManager.default.fileExists(atPath: path)
+    else { return nil }
+    let mimeType = Self.effectiveMimeType(for: attachment)
+    let needsTraits =
+      kind == .image && !AttachmentDelivery.widelySupportedImageTypes.contains(mimeType)
+    let traits = needsTraits ? await imageTraits(for: attachment) : nil
+    let decided = AttachmentDelivery.plan(kind: kind, mimeType: mimeType, traits: traits)
+    if attachment.transferState == Self.transferComplete {
+      deliveries[attachment.guid] = .some(decided)
+    }
+    return decided
+  }
+
+  /// The row's mime type, or one derived from the file's extension when the row has none.
+  ///
+  /// A CAF voice note is the common case of a row with no mime type. The reference falls back
+  /// the same way, to `application/octet-stream` when the extension says nothing either.
+  public static func effectiveMimeType(for attachment: AttachmentRow) -> String {
+    if let mimeType = attachment.mimeType, !mimeType.isEmpty { return mimeType }
+    let ext = ((attachment.resolvedPath ?? "") as NSString).pathExtension
+    guard !ext.isEmpty, let type = UTType(filenameExtension: ext),
+      let mimeType = type.preferredMIMEType
+    else { return "application/octet-stream" }
+    return mimeType
+  }
+
+  /// The header facts alone, for a caller with a path and no row. The same read `metadata(for:)`
+  /// makes, so there is one derivation of what a file is.
+  public static func imageTraits(at url: URL) -> ImageTraits? {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+      let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+    else { return nil }
+    return traits(of: source, properties: properties)
+  }
+
+  private static func traits(of source: CGImageSource, properties: [CFString: Any]) -> ImageTraits {
+    ImageTraits(
+      frameCount: CGImageSourceGetCount(source),
+      hasAlpha: properties[kCGImagePropertyHasAlpha] as? Bool ?? false,
+      container: (CGImageSourceGetType(source) as String?) ?? "")
+  }
+
+  /// Finished. The same value the reference reports and clients branch on.
+  static let transferComplete = 5
+
+  /// Which reader applies, from the mime type, falling back to the UTI for Apple's audio
+  /// format, which is what a voice note is stored as and which carries no mime type.
+  public static func kind(of attachment: AttachmentRow) -> AttachmentMetadata.Kind? {
+    if attachment.uti == "com.apple.coreaudio-format" { return .audio }
+    return AttachmentMetadata.Kind(mimeType: attachment.mimeType)
+  }
+
+  /// The image header only. `CGImageSourceCopyPropertiesAtIndex` does not decode pixels, so
+  /// this costs a read of the first few hundred bytes rather than of the whole file.
+  private static func readImage(at url: URL, into metadata: inout AttachmentMetadata) {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+      let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil)
+        as? [CFString: Any]
+    else { return }
+    metadata.height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue
+    metadata.width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue
+    metadata.imageTraits = traits(of: source, properties: properties)
+  }
+
+  private static func readAsset(at url: URL, into metadata: inout AttachmentMetadata) async {
+    let asset = AVURLAsset(url: url)
+    if let seconds = try? await asset.load(.duration).seconds, seconds.isFinite {
+      metadata.duration = seconds
+    }
+    guard
+      let track = try? await asset.loadTracks(withMediaType: .video).first,
+      let size = try? await track.load(.naturalSize)
+    else { return }
+    // The presented size, not the stored one: a video recorded in portrait is stored
+    // landscape with a rotation transform, and a client laying out the un-transformed
+    // dimensions renders it sideways.
+    let transformed = size.applying((try? await track.load(.preferredTransform)) ?? .identity)
+    metadata.height = Int(abs(transformed.height).rounded())
+    metadata.width = Int(abs(transformed.width).rounded())
+  }
+}
+
+/// Where a still's Live Photo video is, if it has one.
+///
+/// Apple stores the video half beside the still, with the same base name and a `.mov`
+/// extension; chat.db has no row for it. So `hasLivePhoto` is a question about the disk, and
+/// a wrong `false` is the one answer a client cannot recover from: the flag is what it gates
+/// its request for the video on.
+///
+/// Derived the way the reference derives it (`AttachmentInterface.getLivePhotoPath`): only
+/// for the image extensions in its `livePhotoExts`, replacing the extension with `.mov`.
+/// Three departures, each of which can only turn a wrong `false` into a right `true`:
+///
+///   - a `.heic.jpeg` still, the reference's own spelling for a converted HEIC, is matched;
+///     the reference recognises the double extension and then rejects it, because
+///     `heic.jpeg` is not in its list;
+///   - a path with no extension at all is probed with `.mov` appended;
+///   - `.MOV` is probed as well as `.mov`.
+///
+/// **The one derivation.** `hasLivePhoto` and `GET /attachment/:guid/live`
+/// (`AttachmentInterface.livePhotoPath`) both ask this, as the reference's serializer and
+/// route both ask `getLivePhotoPath`. A second copy is how a flag said `true` for a video
+/// the route then answered 404 for.
+public enum LivePhotoSidecar {
+
+  /// Image extensions that can carry a Live Photo.
+  static let stillExtensions: Set<String> = ["png", "jpeg", "jpg", "heic", "tiff"]
+
+  /// The paths a sidecar could be at, in the order they are probed. Empty when this
+  /// attachment cannot have one. Touches no file.
+  public static func candidates(for attachment: AttachmentRow) -> [String] {
+    guard let stored = attachment.filename, !stored.isEmpty else { return [] }
+    let path = (stored as NSString).expandingTildeInPath
+
+    let base: String
+    if path.lowercased().hasSuffix(".heic.jpeg") {
+      base = String(path.dropLast(".heic.jpeg".count))
+    } else {
+      let ext = (path as NSString).pathExtension
+      guard !ext.isEmpty else { return [path + ".mov"] }
+      guard stillExtensions.contains(ext.lowercased()) else { return [] }
+      base = (path as NSString).deletingPathExtension
+    }
+    return [base + ".mov", base + ".MOV"]
+  }
+
+  /// The first candidate that exists, or nil.
+  public static func path(
+    for attachment: AttachmentRow,
+    fileExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+  ) -> String? {
+    candidates(for: attachment).first(where: fileExists)
+  }
+}

@@ -1,0 +1,31 @@
+name = "bluebubbles-license"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+# Which Creem API to talk to. TEST while setting up; flip to https://api.creem.io only when
+# real money is meant to move. `worker.js` defaults to test when this is unset, because a
+# deployment that quietly talks to production is the worse accident.
+[vars]
+CREEM_API_BASE = "https://test-api.creem.io"
+
+# machine -> activation instance id. NOT a cache, despite the binding name, which is inherited
+# from the Lemon Squeezy issuer where it was one: Creem's `validate` requires an `instance_id`
+# and there is no call that asks "which instance belongs to this machine", so this is the only
+# record of it. Losing an entry costs an activation slot, not a round trip. Create it with:
+#   npx wrangler kv namespace create ACTIVATIONS
+# then paste the id below.
+[[kv_namespaces]]
+binding = "ACTIVATIONS"
+id = "53e4c5bd28304125a7c47454faa30e3e"
+
+# TWO SECRETS, neither of them a var:
+#   npx wrangler secret put SIGNING_KEY      # raw 32-byte Ed25519 seed, base64, from keygen.mjs
+#   npx wrangler secret put CREEM_API_KEY    # from the Creem dashboard
+#
+# SIGNING_KEY leaking makes every token ever issued forgeable, and the only fix is a new
+# keypair plus a server release, which strands every license until people update. It must also
+# NEVER be regenerated on a vendor change: the public half is compiled into every shipped
+# server, so a new keypair has exactly the same effect as a leak.
+#
+# CREEM_API_KEY is an ACCOUNT credential, not a license-scoped one, which is why the Mac cannot
+# call Creem directly and this Worker is structurally required rather than merely advisable.

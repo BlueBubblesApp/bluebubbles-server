@@ -1,0 +1,6 @@
+# The Electron server. Nothing here is built by CI except `main.yml`, but a contributor
+# running `npm install` down here should not see the tree fill with noise.
+node_modules/
+dist/
+release/
+.npmrc

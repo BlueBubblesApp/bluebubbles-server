@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    The launch agent that starts the server at login and brings it back when it stops without
+    meaning to. Copied into Contents/Library/LaunchAgents/ by Packaging/build-app.sh and
+    Tools/dev-bundle.sh, and registered by `LaunchAtLogin` through SMAppService.agent(plistName:).
+    LaunchAgentContractTests holds every value here to the constants in `LaunchAgentContract`.
+
+    KeepAlive with SuccessfulExit false is the whole supervision policy: a quit is exit 0 and
+    stays down, a crash or `LaunchAgentContract.restartExitCode` comes back. A quit that is
+    killed before it finishes is kept down by the app, not here: see `LaunchAgentContract`.
+    ThrottleInterval spaces starts at least that far apart, so a server that has run for a
+    while restarts at once and only a crash loop is slowed. The second argument is what tells
+    the app nobody opened it by hand.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.BlueBubbles.BlueBubbles-Server.agent</string>
+    <key>BundleProgram</key>
+    <string>Contents/MacOS/BlueBubbles</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>Contents/MacOS/BlueBubbles</string>
+        <string>--auto-launched</string>
+    </array>
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>com.BlueBubbles.BlueBubbles-Server</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>

@@ -1,0 +1,32 @@
+{
+    "name": "bluebubbles-server",
+    "version": "1.9.9",
+    "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
+    "private": true,
+    "workspaces": [
+        "packages/*"
+    ],
+    "scripts": {
+        "start": "concurrently \"cd ./packages/ui && npm run start\" \"cd ./packages/server && npm run start\"",
+        "build-ui": "cd ./packages/ui && npm run build && mkdir -p ../server/dist/static && rm -rf ../server/dist/static && cp -R ./build/** ../server/dist/ && cd ../../",
+        "build-server": "cd ./packages/server && npm run dist && cd ../../",
+        "release-server": "cd ./packages/server && npm run release && cd ../../",
+        "build": "npm run build-ui && npm run build-server && rm -rf ./dist && mkdir -p ./dist && cp -R ./packages/server/releases/* ./dist/ && rm -rf ./packages/server/releases/ && rm -rf ./packages/ui/build/",
+        "release": "npm run build-ui && npm run release-server"
+    },
+    "repository": "https://www.github.com/BlueBubblesApp/BlueBubbles-Server",
+    "author": "BlueBubbles Development Team <bluebubblesapp@gmail.com>",
+    "license": "Apache-2.0",
+    "bugs": {
+        "url": "https://www.github.com/BlueBubblesApp/BlueBubbles-Server/issues"
+    },
+    "homepage": "https://www.bluebubbles.app",
+    "devEngines": {
+        "node": "20.11.x",
+        "npm": ">=10.x",
+        "python": ">=3.10.x"
+    },
+    "devDependencies": {
+        "concurrently": "^7.0.0"
+    }
+}

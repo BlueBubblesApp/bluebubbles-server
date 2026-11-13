@@ -1,0 +1,55 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/contact/import/vcf?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "multipart/form-data; boundary=------------------------XOPbns4oBddBrfr8okDFZO"
+    },
+    "body": {
+      "kind": "text",
+      "value": "--------------------------XOPbns4oBddBrfr8okDFZO\r\nContent-Disposition: form-data; name=\"vcf\"; filename=\"fixture.vcf\"\r\nContent-Type: text/vcard\r\n\r\nBEGIN:VCARD\nVERSION:3.0\nN:Import;Fixture;;;\nFN:Fixture Import\nEMAIL;TYPE=INTERNET:person@example.com\nTEL;TYPE=CELL:+15555550100\nEND:VCARD\n\r\n--------------------------XOPbns4oBddBrfr8okDFZO--\r\n"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "1 contacts imported successfully",
+        "data": [
+          {
+            "phoneNumbers": [
+              {
+                "address": "REDACTED",
+                "id": 699
+              }
+            ],
+            "emails": [
+              {
+                "address": "REDACTED",
+                "id": 700
+              }
+            ],
+            "firstName": "REDACTED",
+            "lastName": "REDACTED",
+            "displayName": "REDACTED",
+            "avatar": "REDACTED",
+            "sourceType": "db",
+            "id": 555,
+            "externalId": null
+          }
+        ]
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:37:02.366Z"
+}

@@ -1,0 +1,31 @@
+{
+  "request": {
+    "method": "DELETE",
+    "path": "/api/v1/chat/any;+;bcb9a1843dfc4b65bb47ce50afec8d32/icon?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "message": "Success",
+        "status": 200
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T19:35:23.736Z"
+}

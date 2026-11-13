@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/attachment/at_0_0A23AC44-5B9E-46F8-B494-B4630F309644/download?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "image/png",
+      "content-disposition": "attachment; filename=\"PNG image.png\""
+    },
+    "body": {
+      "kind": "binary",
+      "byteLength": 433659,
+      "sha256": "469e08d4d9f6dd54b5eaca5ddb744caa476b2c8f0419ac186b9b307072396e7e"
+    }
+  },
+  "recordedAt": "2026-08-30T15:59:10.259Z"
+}

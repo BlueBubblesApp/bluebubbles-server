@@ -1,0 +1,56 @@
+# Collected by Tools/private-api/collect.sh
+
+macos_version   14.6.1
+macos_build     23G93
+architecture    arm64
+hardware        Apple M3 Max (Virtual)
+xcode           command line tools only
+clang           Apple clang version 16.0.0 (clang-1600.0.26.6)
+sdk             /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+
+# Host apps. 'platform' is what decides which copy of a shared framework the
+# dumper sees, so it is the single most useful line in this file.
+# bundle-id            installed  platform   version
+app com.apple.MobileSMS    yes        catalyst   14.0
+app com.apple.FaceTime     yes        macos      5.0
+app com.apple.findmy       yes        catalyst   4.0
+app com.apple.Notes        yes        macos      4.11
+app com.apple.GenerativePlaygroundApp no         -          -
+
+# Classes reported NOT PRESENT on this release. This list is the point of the
+# whole exercise: it is what this macOS does not have that ours does.
+missing CKEmojiImageMediaObject
+missing CKSendLaterPluginInfo
+missing CKStickerDetailsItem
+missing CKStickerStore
+missing FMDSharedConfiguration
+missing FindMyLocate.FenceServiceDaemonXPC
+missing IMChatInfo
+missing IMEmojiTapback
+missing IMMutedChatList
+missing IMPollHelper
+missing IMPollOption
+missing IMScheduledSectionDateChatItem
+missing IMStickerTapback
+missing ImagePlayground.DeviceSupport
+missing ImagePlayground.GPHostProtocol
+missing ImagePlayground.GPHostSideConnectionManager
+missing ImagePlayground.GPNonUIExtension
+missing ImagePlayground.GPServiceProtocol
+missing ImagePlayground.ImageCreator
+missing ImagePlayground.ImagePlaygroundViewController
+missing ImagePlaygroundInternal.DeviceCapabilities
+missing ImagePlaygroundInternal.EmojiImageRenderer
+missing ImagePlaygroundInternal.GPServiceSideExportedObject
+missing ImagePlaygroundInternal.GenerationBlockedAvailabilityService
+missing ImagePlaygroundInternal.NonUIGenerator
+missing ImagePlaygroundInternal.ServiceSideConnectionManager
+missing ImagePlaygroundInternal.StickerSaver
+missing NSAdaptiveImageGlyph
+missing VisualGeneration.GenerativePlayground
+missing VisualGeneration.GenmojiCacheManager
+missing VisualGeneration.ImageGenerator
+missing VisualGeneration.KeyboardEmojiGenerator
+missing _MSMessageCustomAcknowledgement
+missing _STKImageGlyphRecencyObjCFacade
+missing _STKStickerObjCFacade
