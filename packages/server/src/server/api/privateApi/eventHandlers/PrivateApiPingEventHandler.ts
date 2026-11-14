@@ -10,10 +10,10 @@ export class PrivateApiPingEventHandler extends Loggable implements PrivateApiEv
     types: string[] = ["ping"];
 
     async handle(event: EventData, socket: Socket) {
-        const proc = event?.process;
-        this.log.info(`Received Ping from Private API Helper via ${proc ?? "Anonymous"}!`);
-        if (isNotEmpty(proc)) {
-            Server().privateApi.registerClient(proc, socket);
+        const processIdentifier = event?.process;
+        this.log.info(`Received Ping from Private API Helper via ${processIdentifier ?? "Anonymous"}!`);
+        if (isNotEmpty(processIdentifier)) {
+            Server().privateApi.registerClient(processIdentifier, socket);
         }
     }
 }

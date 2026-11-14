@@ -28,6 +28,8 @@ type RequirementsItem = {
     name: string;
     pass: boolean;
     solution: string;
+    diagnostic?: boolean;
+    detail?: string;
 };
 
 const spin = keyframes`
@@ -56,7 +58,7 @@ export const PrivateApiRequirements = (): JSX.Element => {
     return (
         <Box border='1px solid' borderColor={useColorModeValue('gray.200', 'gray.700')} borderRadius='xl' p={3} width='325px'>
             <Stack direction='row' align='center'>
-                <Text fontSize='lg' fontWeight='bold'>Private API Requirements</Text>
+                <Text fontSize='lg' fontWeight='bold'>System diagnostics</Text>
                 <Box
                     _hover={{ cursor: 'pointer' }}
                     animation={showProgress ? `${spin} infinite 1s linear` : undefined}
@@ -70,9 +72,11 @@ export const PrivateApiRequirements = (): JSX.Element => {
                     <ListItem key={e.name}>
                         <Stack direction='row' align='center'>
                             <Text fontSize='md'><strong>{e.name}</strong>:&nbsp;
-                                <Box as='span' color={e.pass ? 'green' : 'red'}>{e.pass ? 'Pass' : 'Fail'}</Box>
+                                <Box as='span' color={e.diagnostic ? undefined : e.pass ? 'green' : 'red'}>
+                                    {e.diagnostic ? e.detail : e.pass ? 'Pass' : 'Fail'}
+                                </Box>
                             </Text>
-                            {(!e.pass) ? (
+                            {(!e.pass || e.diagnostic) ? (
                                 <Popover trigger='hover'>
                                     <PopoverTrigger>
                                         <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
@@ -82,7 +86,7 @@ export const PrivateApiRequirements = (): JSX.Element => {
                                     <PopoverContent>
                                         <PopoverArrow />
                                         <PopoverCloseButton />
-                                        <PopoverHeader>How to Fix</PopoverHeader>
+                                        <PopoverHeader>{e.diagnostic ? 'System information' : 'How to Fix'}</PopoverHeader>
                                         <PopoverBody>
                                             <Text>
                                                 {e.solution}

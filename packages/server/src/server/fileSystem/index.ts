@@ -17,7 +17,7 @@ import {
 import { isMinMonterey } from "@server/env";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
-import { startMessages } from "../api/apple/scripts";
+import { requestFindMyAutomation, requestSystemEventsAutomation, startMessages } from "../api/apple/scripts";
 import {
     AudioMetadata,
     AudioMetadataKeys,
@@ -496,6 +496,45 @@ export class FileSystem {
         return FileSystem.execShellCommand(`osascript -e ${parts.join(" -e ")}`);
     }
 
+    // Permission preparation must be cancellable without leaving a shell wrapper
+    // between the Server and osascript. Other AppleScript callers are unchanged.
+    private static executeFindMyPermissionRequest(script: string, signal?: AbortSignal): Promise<string> {
+        return new Promise((resolve, reject) => {
+            child_process.execFile(
+                "/usr/bin/osascript",
+                ["-e", script],
+                { signal, encoding: "utf8" },
+                (error, stdout, stderr) => {
+                    if (error) {
+                        reject(error);
+                        return;
+                    }
+                    resolve(stdout || stderr);
+                }
+            );
+        });
+    }
+
+    static async requestFindMyAutomationPermissions(signal?: AbortSignal) {
+        const requests = [
+            { name: "System Events", script: requestSystemEventsAutomation() },
+            { name: "Find My", script: requestFindMyAutomation() }
+        ];
+
+        for (const request of requests) {
+            if (signal?.aborted) throw new Error("Find My initialization was cancelled");
+            try {
+                await FileSystem.executeFindMyPermissionRequest(request.script, signal);
+                Server().logger.debug(`Requested ${request.name} Automation permission`);
+            } catch (ex: any) {
+                if (signal?.aborted) throw ex;
+                Server().logger.warn(
+                    `Unable to request ${request.name} Automation permission! CLI Error: ${ex?.message ?? String(ex)}`
+                );
+            }
+        }
+    }
+
     /**
      * Makes sure that Messages is running
      */
@@ -693,7 +732,7 @@ export class FileSystem {
             }
         } catch (ex) {
             Server().log("Failed to sync time with time servers!", "debug");
-            Server().log(ex, 'debug');
+            Server().log(ex, "debug");
         }
 
         return null;

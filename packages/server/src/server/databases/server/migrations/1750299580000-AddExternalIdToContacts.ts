@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from "typeorm";
 
 export class AddExternalIdToContacts1750299580000 implements MigrationInterface {
+    name = "AddExternalIdToContacts1750299580000";
+
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.addColumn(
             "contact",

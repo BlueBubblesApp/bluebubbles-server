@@ -62,6 +62,7 @@ import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
 import { getStartDelay } from "./utils/ConfigUtils";
 import { FindMyFriendsCache } from "./api/lib/findmy/FindMyFriendsCache";
+import { FindMyDevicesCache } from "./api/lib/findmy/FindMyDevicesCache";
 import { ScheduledService } from "./lib/ScheduledService";
 import { getLogger } from "./lib/logging/Loggable";
 import { IMessageListener } from "./databases/imessage/listeners/IMessageListener";
@@ -152,7 +153,9 @@ class BlueBubblesServer extends EventEmitter {
 
     eventCache: EventCache;
 
-    findMyCache: FindMyFriendsCache;
+    findMyFriendsCache: FindMyFriendsCache;
+
+    findMyDevicesCache: FindMyDevicesCache;
 
     iMessageListener: IMessageListener;
 
@@ -245,7 +248,8 @@ class BlueBubblesServer extends EventEmitter {
 
         this.region = null;
         this.typingCache = [];
-        this.findMyCache = null;
+        this.findMyFriendsCache = null;
+        this.findMyDevicesCache = null;
     }
 
     emitToUI(event: string, data: any) {
@@ -708,8 +712,9 @@ class BlueBubblesServer extends EventEmitter {
         this.logger.info("Initializing event cache...");
         this.eventCache = new EventCache();
 
-        this.logger.info("Initializing FindMy Location cache...");
-        this.findMyCache = new FindMyFriendsCache();
+        this.logger.info("Initializing Find My caches...");
+        this.findMyFriendsCache = new FindMyFriendsCache();
+        this.findMyDevicesCache = new FindMyDevicesCache();
 
         try {
             this.logger.info("Initializing caffeinate service...");
@@ -1082,6 +1087,8 @@ class BlueBubblesServer extends EventEmitter {
         } else if (prevConfig.private_api_mode !== nextConfig.private_api_mode) {
             this.logger.debug("Detected Private API Mode change");
             await Server().privateApi.restart();
+        } else if (prevConfig.open_findmy_on_startup !== nextConfig.open_findmy_on_startup) {
+            await this.privateApi.updateFindMyPreference();
         }
 
         // If the dock style changes
@@ -1248,16 +1255,23 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     async checkPrivateApiRequirements(): Promise<Array<NodeJS.Dict<any>>> {
-        const output = [];
-        output.push({
-            name: "SIP Disabled",
-            pass: await FileSystem.isSipDisabled(),
-            solution:
-                `Follow our documentation on how to disable SIP: ` +
-                `https://docs.bluebubbles.app/private-api/installation`
-        });
-
-        return output;
+        let detail = "Unknown";
+        try {
+            detail = (await FileSystem.isSipDisabled()) ? "Disabled or custom" : "Enabled";
+        } catch (_) {
+            // Security observations are diagnostic; target helper readiness is authoritative.
+        }
+        return [
+            {
+                name: "SIP configuration",
+                pass: false,
+                diagnostic: true,
+                detail,
+                solution:
+                    "SIP status alone does not establish helper availability. " +
+                    "Each helper connection is checked separately."
+            }
+        ];
     }
 
     async checkPermissions(): Promise<Array<NodeJS.Dict<any>>> {
