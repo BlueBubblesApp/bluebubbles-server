@@ -27,29 +27,30 @@ export class AttachmentRouter {
         return new Success(ctx, { data: await AttachmentSerializer.serialize({ attachment }) }).send();
     }
 
-    static async download(ctx: RouterContext, _: Next) {
+    static async download(ctx: RouterContext, _: Next, allowForceDownload = true) {
         const { guid } = ctx.params;
         const { height, width, quality, original, force } = ctx.request.query;
         const useOriginal = isTruthyBool(original as string);
-        const forceDownload = isTruthyBool((force as string) ?? "true");
+        const forceDownload = allowForceDownload && isTruthyBool((force as string) ?? "true");
 
         // Fetch the info for the attachment by GUID
-        const attachment = await Server().iMessageRepo.getAttachment(guid);
-        if (!attachment) {
-            const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
-            if (!forceDownload || !papiEnabled) {
-                throw new NotFound({ error: "Attachment does not exist!" });
-            }
+        let attachment = await Server().iMessageRepo.getAttachment(guid);
+        if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
 
-            // Try to force download the attachment
-            try {
-                await AttachmentInterface.forceDownload(attachment);
-            } catch (ex) {
-                Server().log(`Failed for force download attachment (GUID: ${attachment.guid}): ${String(ex)}`);
+        let aPath = FileSystem.getRealPath(attachment.filePath);
+        if (!fs.existsSync(aPath) && forceDownload) {
+            const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
+            if (papiEnabled) {
+                // Try to restore an attachment that exists in the database but has been purged from disk
+                try {
+                    attachment = await AttachmentInterface.forceDownload(attachment);
+                    aPath = FileSystem.getRealPath(attachment.filePath);
+                } catch {
+                    Server().log(`Failed to force download attachment (GUID: ${attachment.guid}).`);
+                }
             }
         }
 
-        let aPath = FileSystem.getRealPath(attachment.filePath);
         let mimeType = attachment.getMimeType();
         if (!fs.existsSync(aPath)) throw new ServerError({ error: "Attachment does not exist in disk!" });
 
@@ -201,10 +202,9 @@ export class AttachmentRouter {
             throw new BadRequest({ message: `An attachment with the GUID, "${guid}" does not exist!` });
         }
 
-        await Server().privateApi.attachment.downloadPurged(guid);
-
         // Wait a max of 10 minutes
         await AttachmentInterface.forceDownload(attachment);
-        return await AttachmentRouter.download(ctx, _);
+        // Restoration already ran; stream without starting another recovery attempt.
+        return await AttachmentRouter.download(ctx, _, false);
     }
 }
