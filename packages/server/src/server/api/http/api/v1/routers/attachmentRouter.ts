@@ -27,11 +27,11 @@ export class AttachmentRouter {
         return new Success(ctx, { data: await AttachmentSerializer.serialize({ attachment }) }).send();
     }
 
-    static async download(ctx: RouterContext, _: Next) {
+    static async download(ctx: RouterContext, _: Next, allowForceDownload = true) {
         const { guid } = ctx.params;
         const { height, width, quality, original, force } = ctx.request.query;
         const useOriginal = isTruthyBool(original as string);
-        const forceDownload = isTruthyBool((force as string) ?? "true");
+        const forceDownload = allowForceDownload && isTruthyBool((force as string) ?? "true");
 
         // Fetch the info for the attachment by GUID
         let attachment = await Server().iMessageRepo.getAttachment(guid);
@@ -202,10 +202,9 @@ export class AttachmentRouter {
             throw new BadRequest({ message: `An attachment with the GUID, "${guid}" does not exist!` });
         }
 
-        await Server().privateApi.attachment.downloadPurged(guid);
-
         // Wait a max of 10 minutes
         await AttachmentInterface.forceDownload(attachment);
-        return await AttachmentRouter.download(ctx, _);
+        // Restoration already ran; stream without starting another recovery attempt.
+        return await AttachmentRouter.download(ctx, _, false);
     }
 }

@@ -51,17 +51,29 @@ const loadAttachmentRouter = ({
     privateApiEnabled = true,
     existingPaths = [],
     forceResult,
-    forceError
+    forceError,
+    useRealForceDownload = false
 }) => {
     const calls = {
         forceDownload: [],
         config: [],
         fileStreams: [],
-        logs: []
+        logs: [],
+        privateApiDownloads: []
     };
+    let currentAttachment = attachment;
     const server = {
         iMessageRepo: {
-            getAttachment: async () => attachment
+            getAttachment: async () => currentAttachment
+        },
+        privateApi: {
+            attachment: {
+                downloadPurged: async guid => {
+                    calls.privateApiDownloads.push(guid);
+                    assert.equal(guid, attachment.guid, "the Private API requires the resolved attachment GUID");
+                    currentAttachment = forceResult;
+                }
+            }
         },
         repo: {
             getConfig: key => {
@@ -71,6 +83,18 @@ const loadAttachmentRouter = ({
         },
         log: (...args) => calls.logs.push(args)
     };
+
+    const sourceAttachmentInterface = useRealForceDownload
+        ? loadTypeScriptModule(path.join(__dirname, "../src/server/api/interfaces/attachmentInterface.ts"), {
+              electron: { nativeImage: {} },
+              fs: {},
+              "@server": { Server: () => server },
+              "@server/fileSystem": { FileSystem: {} },
+              "@server/helpers/utils": {
+                  resultAwaiter: async ({ getData }) => getData()
+              }
+          }).AttachmentInterface
+        : null;
 
     class FileStream {
         constructor(ctx, filePath, mimeType) {
@@ -103,6 +127,7 @@ const loadAttachmentRouter = ({
             AttachmentInterface: {
                 forceDownload: async value => {
                     calls.forceDownload.push(value);
+                    if (sourceAttachmentInterface) return sourceAttachmentInterface.forceDownload(value);
                     if (forceError) throw forceError;
                     return forceResult;
                 }
@@ -128,6 +153,47 @@ const loadAttachmentRouter = ({
 const makeContext = (query = {}) => ({
     params: { guid: "attachment-guid" },
     request: { query }
+});
+
+for (const guidPrefix of ["", "p:/"]) {
+    test(`explicit force download restores once using the resolved GUID (${guidPrefix || "unprefixed"})`, async () => {
+        const original = makeAttachment({ filePath: "/attachments/missing.jpg", mimeType: "image/jpeg" });
+        const refreshed = makeAttachment({ filePath: "/attachments/restored.png", mimeType: "image/png" });
+        refreshed.transferState = 5;
+        const { AttachmentRouter, calls } = loadAttachmentRouter({
+            attachment: original,
+            existingPaths: [refreshed.filePath],
+            forceResult: refreshed,
+            useRealForceDownload: true
+        });
+        const ctx = makeContext({ original: "true" });
+        ctx.params.guid = guidPrefix + original.guid;
+
+        assert.equal(await AttachmentRouter.forceDownload(ctx), "sent");
+        assert.deepEqual(calls.privateApiDownloads, [original.guid]);
+        assert.deepEqual(calls.forceDownload, [original]);
+        assert.deepEqual(calls.fileStreams, [{ ctx, filePath: refreshed.filePath, mimeType: "image/png" }]);
+    });
+}
+
+test("explicit restoration does not retry when the completed transfer still has no file", async () => {
+    const original = makeAttachment({ filePath: "/attachments/missing.jpg", mimeType: "image/jpeg" });
+    const refreshed = makeAttachment({ filePath: "/attachments/still-missing.jpg", mimeType: "image/jpeg" });
+    refreshed.transferState = 5;
+    const { AttachmentRouter, calls } = loadAttachmentRouter({
+        attachment: original,
+        forceResult: refreshed,
+        useRealForceDownload: true
+    });
+
+    await assert.rejects(AttachmentRouter.forceDownload(makeContext()), error => {
+        assert.equal(error.status, 500);
+        assert.equal(error.response.error, "Attachment does not exist in disk!");
+        return true;
+    });
+    assert.deepEqual(calls.privateApiDownloads, [original.guid]);
+    assert.deepEqual(calls.forceDownload, [original]);
+    assert.equal(calls.fileStreams.length, 0);
 });
 
 test("restores a missing local file and streams the refreshed attachment", async () => {
