@@ -172,6 +172,37 @@ assert.equal(
 );
 assert.equal(Object.prototype.hasOwnProperty.call(normalizedDeviceWithLocation, "description"), false);
 
+// CLLocation preserves fractional measurements and sub-millisecond Date values;
+// the released client decoder requires integers for these legacy API fields.
+const fractionalLocation = JSON.parse(JSON.stringify(normalizeFindMyDevice({
+    identifier: "fractional-native-location",
+    location: {
+        latitude: 47.612345,
+        longitude: -122.334567,
+        horizontalAccuracy: 6.5,
+        verticalAccuracy: 9.75,
+        altitude: -32.75,
+        timeStamp: 1790000000123.456,
+        floorLevel: 4.5
+    }
+}).location));
+assert.equal(fractionalLocation.timeStamp, 1790000000123);
+assert.equal(fractionalLocation.verticalAccuracy, 10);
+assert.equal(fractionalLocation.altitude, -33);
+assert.equal(fractionalLocation.floorLevel, undefined, "a fractional floor must not become a different floor");
+assert.equal(fractionalLocation.latitude, 47.612345);
+assert.equal(fractionalLocation.longitude, -122.334567);
+assert.equal(fractionalLocation.horizontalAccuracy, 6.5);
+for (const value of [0, null, true, "", NaN, Infinity, Number.MAX_VALUE]) {
+    const location = normalizeFindMyDevice({
+        identifier: "integer-boundary",
+        location: { latitude: 1, longitude: 2, verticalAccuracy: value, altitude: value, timeStamp: value, floorLevel: value }
+    }).location;
+    for (const field of ["verticalAccuracy", "altitude", "timeStamp", "floorLevel"]) {
+        assert.equal(location[field], value === 0 ? 0 : undefined, `${field} must preserve zero and omit invalid integers`);
+    }
+}
+
 const normalizedOfflineDevice = normalizeFindMyDevice({
     identifier: "offline-device",
     batteryLevel: 0,

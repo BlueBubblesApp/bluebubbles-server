@@ -20,6 +20,15 @@ const normalizeOptionalNumber = (value: unknown): number | null => {
     return Number.isFinite(numericValue) ? numericValue : null;
 };
 
+// Released clients require whole metres and integer Unix milliseconds for these
+// legacy location fields. Preserve precision in coordinates and horizontal accuracy.
+const normalizeOptionalInteger = (value: unknown): number | undefined => {
+    const numericValue = normalizeOptionalNumber(value);
+    if (numericValue == null) return undefined;
+    const integerValue = Math.round(numericValue);
+    return Number.isSafeInteger(integerValue) ? integerValue : undefined;
+};
+
 const normalizeOptionalBoolean = (value: unknown): boolean | undefined => {
     return typeof value === "boolean" ? value : undefined;
 };
@@ -128,15 +137,17 @@ const normalizeFindMyDeviceLocation = (value: unknown): FindMyDevice["location"]
     if (latitude == null || longitude == null) return undefined;
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return undefined;
 
+    const floorLevel = normalizeOptionalNumber(location.floorLevel);
+
     return {
         latitude,
         longitude,
         positionType: normalizeOptionalString(location.positionType) ?? undefined,
         horizontalAccuracy: normalizeOptionalNumber(location.horizontalAccuracy) ?? undefined,
-        verticalAccuracy: normalizeOptionalNumber(location.verticalAccuracy) ?? undefined,
-        altitude: normalizeOptionalNumber(location.altitude) ?? undefined,
-        timeStamp: normalizeOptionalNumber(location.timeStamp) ?? undefined,
-        floorLevel: normalizeOptionalNumber(location.floorLevel) ?? undefined,
+        verticalAccuracy: normalizeOptionalInteger(location.verticalAccuracy),
+        altitude: normalizeOptionalInteger(location.altitude),
+        timeStamp: normalizeOptionalInteger(location.timeStamp),
+        floorLevel: floorLevel != null && Number.isSafeInteger(floorLevel) ? floorLevel : undefined,
         isInaccurate: normalizeOptionalBoolean(location.isInaccurate),
         isOld: normalizeOptionalBoolean(location.isOld),
         locationFinished: normalizeOptionalBoolean(location.locationFinished)

@@ -67,6 +67,13 @@ the whole snapshot. After accepted helper registration, empty Friends and
 Devices caches initialize independently so a failure in one does not prevent
 the other from refreshing.
 
+The Devices public location shape retains the released clients' integer fields:
+timestamps use whole Unix milliseconds, and altitude/vertical accuracy use whole
+metres. The Server rounds native fractional values at this boundary, preserving
+coordinate and horizontal-accuracy precision. A non-integer floor is omitted
+rather than converted into a different floor. The native helper artifact retains
+its original numeric payload.
+
 The dedicated Friends helper returns `locations`, boolean `partial` and
 `friendListTimedOut` fields, a `timedOutHandles` string array, and a nonnegative
 integer `skippedFriends` count. A complete snapshot (`partial: false`) must
