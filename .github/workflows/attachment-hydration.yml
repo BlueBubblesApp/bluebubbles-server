@@ -1,0 +1,38 @@
+name: Attachment hydration regressions
+
+on:
+  push:
+    paths:
+      - '.github/workflows/attachment-hydration.yml'
+      - 'packages/server/scripts/test-attachment-hydration.js'
+      - 'packages/server/src/server/databases/imessage/**'
+  pull_request:
+    paths:
+      - '.github/workflows/attachment-hydration.yml'
+      - 'packages/server/scripts/test-attachment-hydration.js'
+      - 'packages/server/src/server/databases/imessage/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hydration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '20.11.1'
+          package-manager-cache: false
+      - name: Install only the native-free TypeScript transpiler
+        run: >-
+          npm install --prefix "$RUNNER_TEMP/bluebubbles-regressions"
+          --ignore-scripts --no-save --no-audit --no-fund typescript@5.5.2
+      - name: Test the repository fallback without a live database
+        env:
+          NODE_PATH: ${{ runner.temp }}/bluebubbles-regressions/node_modules
+        run: node packages/server/scripts/test-attachment-hydration.js
