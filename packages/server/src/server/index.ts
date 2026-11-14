@@ -1082,6 +1082,8 @@ class BlueBubblesServer extends EventEmitter {
         } else if (prevConfig.private_api_mode !== nextConfig.private_api_mode) {
             this.logger.debug("Detected Private API Mode change");
             await Server().privateApi.restart();
+        } else if (prevConfig.open_findmy_on_startup !== nextConfig.open_findmy_on_startup) {
+            await this.privateApi.updateFindMyPreference();
         }
 
         // If the dock style changes
@@ -1248,16 +1250,23 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     async checkPrivateApiRequirements(): Promise<Array<NodeJS.Dict<any>>> {
-        const output = [];
-        output.push({
-            name: "SIP Disabled",
-            pass: await FileSystem.isSipDisabled(),
-            solution:
-                `Follow our documentation on how to disable SIP: ` +
-                `https://docs.bluebubbles.app/private-api/installation`
-        });
-
-        return output;
+        let detail = "Unknown";
+        try {
+            detail = (await FileSystem.isSipDisabled()) ? "Disabled or custom" : "Enabled";
+        } catch (_) {
+            // Security observations are diagnostic; target helper readiness is authoritative.
+        }
+        return [
+            {
+                name: "SIP configuration",
+                pass: false,
+                diagnostic: true,
+                detail,
+                solution:
+                    "SIP status alone does not establish helper availability. " +
+                    "Each helper connection is checked separately."
+            }
+        ];
     }
 
     async checkPermissions(): Promise<Array<NodeJS.Dict<any>>> {

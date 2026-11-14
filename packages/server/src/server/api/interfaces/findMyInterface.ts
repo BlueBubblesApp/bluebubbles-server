@@ -3,19 +3,26 @@ import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { isMinBigSur, isMinSequoia, isMinSonoma } from "@server/env";
-import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
+import { waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
-import { FindMyDevice, FindMyItem, FindMyLocationItem } from "@server/api/lib/findmy/types";
-import { transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
+import {
+    FindMyDevice,
+    FindMyFriendLocation,
+    FindMyFriendsRefreshResponse,
+    FindMyItem
+} from "@server/api/lib/findmy/types";
+import { normalizeFindMyFriendLocations, transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
+import { resolveFindMyFriendsPrivateApiTarget } from "@server/api/lib/findmy/privateApiSupport";
+import { FindMyUnavailableError } from "@server/api/privateApi/FindMyHelperReadiness";
 
 export class FindMyInterface {
-    static async getFriends() {
-        return Server().findMyCache.getAll();
+    static async getFriends(): Promise<FindMyFriendLocation[]> {
+        return normalizeFindMyFriendLocations(Server().findMyCache.getAll());
     }
 
     static async getDevices(): Promise<Array<FindMyDevice> | null> {
         if (isMinSequoia) {
-            Server().logger.debug('Cannot fetch FindMy devices on macOS Sequoia or later.');
+            Server().logger.debug("Cannot fetch FindMy devices on macOS Sequoia or later.");
             return null;
         }
 
@@ -48,7 +55,7 @@ export class FindMyInterface {
                         }
                     }
                 } catch (ex: any) {
-                    Server().logger.debug('An error occurred while reading FindMy ItemGroups cache file.');
+                    Server().logger.debug("An error occurred while reading FindMy ItemGroups cache file.");
                     Server().logger.debug(String(ex));
                 }
             }
@@ -58,55 +65,135 @@ export class FindMyInterface {
 
             return [...(devices ?? []), ...transformedItems];
         } catch (ex: any) {
-            Server().logger.debug('An error occurred while reading FindMy Device cache files.');
+            Server().logger.debug("An error occurred while reading FindMy Device cache files.");
             Server().logger.debug(String(ex));
             return null;
         }
     }
 
     static async refreshDevices(): Promise<Array<FindMyDevice> | null> {
-        // Can't use the Private API to refresh devices yet
-        await this.refreshLocationsAccessibility();
+        await this.refreshUsingFindMyApp();
         return await this.getDevices();
     }
 
-    static async refreshFriends(openFindMyApp = true): Promise<FindMyLocationItem[]> {
-        const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
-        if (papiEnabled && isMinBigSur && !isMinSonoma) {
-            checkPrivateApiStatus();
-            const result = await Server().privateApi.findmy.refreshFriends();
-            const refreshLocations = result?.data?.locations ?? [];
-
-            // Save the data to the cache
-            // The cache will handle properly updating the data.
-            Server().findMyCache.addAll(refreshLocations);
+    private static requireFindMyHelperReady(processIdentifier: string): void {
+        const api = Server().privateApi;
+        const readiness = api.findMyReadiness;
+        if (readiness.status !== "ready" || !api.hasClient(processIdentifier)) {
+            throw new FindMyUnavailableError(
+                readiness.status === "ready"
+                    ? {
+                          ...readiness,
+                          status: "unavailable",
+                          reason: "connection_lost",
+                          message: "Find My helper is not connected. Retry to check its availability again."
+                      }
+                    : readiness
+            );
         }
-
-        // No matter what, open the Find My app.
-        // Don't await because it should update in the background.
-        // Location updates get emitted as an event as they come in.
-        if (openFindMyApp) {
-            this.refreshLocationsAccessibility();
-        }
-
-        return Server().findMyCache.getAll();
     }
 
-    static async refreshLocationsAccessibility() {
+    static async refreshFriends(
+        allowFindMyAppFallback = true,
+        requireFreshResult = false
+    ): Promise<FindMyFriendLocation[]> {
+        const privateApiEnabled = Boolean(Server().repo.getConfig("enable_private_api"));
+        const privateApiTarget = resolveFindMyFriendsPrivateApiTarget({ isMinBigSur, isMinSonoma, isMinSequoia });
+        const privateApiHelperAvailable = privateApiTarget != null && Server().privateApi.hasClient(privateApiTarget);
+        if (isMinSequoia && (Server().privateApi.findMyReadiness.status !== "ready" || !privateApiHelperAvailable)) {
+            if (requireFreshResult && privateApiTarget) this.requireFindMyHelperReady(privateApiTarget);
+            return this.getFriends();
+        }
+        let receivedUsableHelperResponse = false;
+        if (privateApiEnabled && privateApiTarget != null && privateApiHelperAvailable) {
+            try {
+                const result = await Server().privateApi.findmy.refreshFriends();
+                const refreshResponse = result?.data as FindMyFriendsRefreshResponse | undefined;
+                if (Array.isArray(refreshResponse?.locations)) {
+                    const refreshedLocations = normalizeFindMyFriendLocations(refreshResponse.locations);
+                    if (refreshedLocations.length !== refreshResponse.locations.length) {
+                        throw new Error("The Find My Friends helper returned invalid location records");
+                    }
+                    const handles = refreshedLocations.map(location => location.handle);
+                    if (new Set(handles).size !== handles.length) {
+                        throw new Error("The Find My Friends helper returned duplicate friend handles");
+                    }
+
+                    // The dedicated helper reports whether its snapshot is complete.
+                    // Earlier Messages helpers do not supply this metadata.
+                    if (isMinSequoia) {
+                        if (
+                            typeof refreshResponse.partial !== "boolean" ||
+                            typeof refreshResponse.friendListTimedOut !== "boolean" ||
+                            !Array.isArray(refreshResponse.timedOutHandles) ||
+                            !refreshResponse.timedOutHandles.every(
+                                handle => typeof handle === "string" && handle.trim().length > 0
+                            ) ||
+                            !Number.isInteger(refreshResponse.skippedFriends) ||
+                            refreshResponse.skippedFriends < 0
+                        ) {
+                            throw new Error("The Find My Friends helper returned invalid completion metadata");
+                        }
+                        if (
+                            !refreshResponse.partial &&
+                            (refreshResponse.friendListTimedOut ||
+                                refreshResponse.timedOutHandles.length > 0 ||
+                                refreshResponse.skippedFriends > 0)
+                        ) {
+                            throw new Error("The Find My Friends helper returned an inconsistent completion state");
+                        }
+                    }
+                    const responseIsPartial = refreshResponse.partial === true;
+                    if (responseIsPartial) {
+                        Server().findMyCache.updateAll(refreshedLocations);
+                    } else {
+                        Server().findMyCache.replaceAll(refreshedLocations);
+                    }
+                    receivedUsableHelperResponse = !responseIsPartial || refreshedLocations.length > 0;
+
+                    if (responseIsPartial) {
+                        const timedOutFriendCount = Array.isArray(refreshResponse.timedOutHandles)
+                            ? refreshResponse.timedOutHandles.length
+                            : 0;
+                        const skippedFriendCount = Number(refreshResponse.skippedFriends ?? 0);
+                        Server().logger.warn(
+                            `Find My Friends returned a partial response (${timedOutFriendCount} timed-out ` +
+                                `handle(s), ${skippedFriendCount} skipped friend(s)).`
+                        );
+                    }
+                }
+            } catch (error: any) {
+                Server().logger.warn(
+                    `Unable to refresh Find My Friends through the helper: ${error?.message ?? String(error)}`
+                );
+            }
+        }
+
+        if (requireFreshResult && isMinSequoia && !receivedUsableHelperResponse) {
+            throw new Error("Find My Friends helper did not return a usable fresh response; cached data was retained");
+        }
+
+        const shouldRefreshUsingFindMyApp = allowFindMyAppFallback && (!receivedUsableHelperResponse || !isMinSequoia);
+        if (shouldRefreshUsingFindMyApp) {
+            void this.refreshUsingFindMyApp().catch((error: any) => {
+                Server().logger.warn(`Unable to refresh Find My through the app: ${error?.message ?? String(error)}`);
+            });
+        }
+
+        return normalizeFindMyFriendLocations(Server().findMyCache.getAll());
+    }
+
+    static async refreshUsingFindMyApp() {
+        await FileSystem.requestFindMyAutomationPermissions();
         await FileSystem.executeAppleScript(quitFindMyFriends());
         await waitMs(3000);
 
-        // Make sure the Find My app is open.
-        // Give it 5 seconds to open
         await FileSystem.executeAppleScript(startFindMyFriends());
         await waitMs(5000);
 
-        // Bring the Find My app to the foreground so it refreshes the devices
-        // Give it 15 seconods to refresh
         await FileSystem.executeAppleScript(showFindMyFriends());
         await waitMs(15000);
 
-        // Re-hide the Find My App
         await FileSystem.executeAppleScript(hideFindMyFriends());
     }
 

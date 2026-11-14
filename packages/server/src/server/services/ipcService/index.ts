@@ -129,11 +129,20 @@ export class IPCService extends Loggable {
         });
 
         ipcMain.handle("get-private-api-status", async (_, __) => {
+            const privateApi = Server().privateApi;
             return {
                 enabled: Server().repo.getConfig("enable_private_api") as boolean,
-                connected: !!Server().privateApi?.helper,
+                connected: !!privateApi?.helper,
+                messagesConnected: privateApi?.hasClient("com.apple.MobileSMS") ?? false,
+                findMy: privateApi?.findMyReadiness,
                 port: PrivateApiService.port
             };
+        });
+
+        ipcMain.handle("retry-findmy-helper", async () => {
+            const privateApi = Server().privateApi;
+            if (!privateApi) throw new Error("The Private API listener has not initialized yet. Retry after startup.");
+            return privateApi.retryFindMy();
         });
 
         ipcMain.handle("reinstall-helper-bundle", async (_, __) => {

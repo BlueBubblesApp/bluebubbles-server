@@ -100,6 +100,17 @@ export class GatewayTimeout extends HTTPError {
     }
 }
 
+export class ServiceUnavailable extends HTTPError {
+    constructor(response?: ResponseParams) {
+        super({
+            status: 503,
+            message: response?.message ?? "The requested feature is unavailable",
+            error: { type: ErrorTypes.FEATURE_UNAVAILABLE, message: response?.error ?? "Service Unavailable" },
+            data: response?.data
+        });
+    }
+}
+
 export class IMessageError extends HTTPError {
     constructor(response?: ResponseParams) {
         super({
