@@ -479,6 +479,7 @@ export class MessageRepository extends Loggable {
                 // Reject malformed references before the suffix/LIKE lookup can match unrelated attachments.
                 if (
                     typeof guid === "string" &&
+                    !guid.includes("\0") &&
                     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
                         this.normalizeAttachmentGuid(guid)
                     )
