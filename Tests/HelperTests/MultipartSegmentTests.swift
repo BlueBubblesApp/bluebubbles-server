@@ -5,6 +5,9 @@
 //  text, so a client's `["hey ", mention, " whatsup?"]` appended part by part arrived as
 //  three lines. `CKCompositions.segments(of:)` is what joins them; these tests hold the
 //  joined string, where the mention attribute lands, and that an attachment still splits.
+//
+//  They also hold the message-part tag on a joined run: every character or none, never a
+//  formatted word tagged beside an untagged space, and numbered by the segment's position.
 
 import BBPrivateAPIContract
 import Foundation
@@ -64,6 +67,100 @@ struct MultipartSegmentTests {
     var range = NSRange()
     #expect(run.attribute(bold, at: 3, effectiveRange: &range) as? Int == 1)
     #expect(range == NSRange(location: 3, length: 4))
+  }
+
+  private static let partKey = NSAttributedString.Key("__kIMMessagePartAttributeName")
+
+  private func boldWhole(_ text: String) -> [FormattedRange] {
+    [FormattedRange(start: 0, length: text.utf16.count, styles: [.bold])]
+  }
+
+  /// Each stretch of `run` with its part tag, as (text, tag or nil), so a gap shows up as a
+  /// stretch whose tag is nil.
+  private func partStretches(_ run: NSAttributedString) -> [(String, Int?)] {
+    var stretches: [(String, Int?)] = []
+    run.enumerateAttribute(
+      Self.partKey, in: NSRange(location: 0, length: run.length)
+    ) { value, range, _ in
+      stretches.append(((run.string as NSString).substring(with: range), value as? Int))
+    }
+    return stretches
+  }
+
+  private func textRuns(_ segments: [CKCompositions.Segment]) -> [NSAttributedString] {
+    segments.compactMap {
+      if case .text(let run) = $0 { return run }
+      return nil
+    }
+  }
+
+  @Test("A plain part beside a formatted one is tagged too, so the run is one part")
+  func plainTextBesideFormattingIsTagged() throws {
+    let runs = textRuns(
+      CKCompositions.segments(of: [
+        MessagePart(text: "hi "),
+        MessagePart(text: "there", formatting: boldWhole("there")),
+      ]))
+    let run = try #require(runs.first)
+    #expect(run.string == "hi there")
+    #expect(partStretches(run).map(\.0) == ["hi there"])
+    #expect(partStretches(run).map(\.1) == [0])
+  }
+
+  @Test("Per-word formatting with plain spaces between the words is one tagged part")
+  func perWordFormattingKeepsTheSpacesInThePart() throws {
+    let runs = textRuns(
+      CKCompositions.segments(of: [
+        MessagePart(text: "Hello", formatting: boldWhole("Hello")),
+        MessagePart(text: " "),
+        MessagePart(text: "world", formatting: boldWhole("world")),
+      ]))
+    let run = try #require(runs.first)
+    #expect(run.string == "Hello world")
+    #expect(partStretches(run).map(\.1) == [0])
+  }
+
+  @Test("An unformatted mention in a run with formatting carries the part tag")
+  func unformattedMentionIsTagged() throws {
+    let runs = textRuns(
+      CKCompositions.segments(of: [
+        MessagePart(text: "Name", mention: "someone@example.com"),
+        MessagePart(
+          text: " ok", formatting: [FormattedRange(start: 1, length: 2, styles: [.bold])]),
+      ]))
+    let run = try #require(runs.first)
+    #expect(run.string == "Name ok")
+    #expect(partStretches(run).map(\.1) == [0])
+    #expect(
+      run.attribute(Self.mentionKey, at: 0, effectiveRange: nil) as? String == "someone@example.com"
+    )
+  }
+
+  @Test("Plain parts with no formatting get no part tag at all")
+  func plainPartsStayUntagged() throws {
+    let runs = textRuns(
+      CKCompositions.segments(of: [
+        MessagePart(text: "hey "),
+        MessagePart(text: "Name", mention: "someone@example.com"),
+        MessagePart(text: " whatsup?"),
+      ]))
+    let run = try #require(runs.first)
+    #expect(partStretches(run).map(\.1) == [nil])
+  }
+
+  @Test("A tagged run after an attachment is numbered by its position, not 0")
+  func runAfterAttachmentTakesItsPosition() {
+    let runs = textRuns(
+      CKCompositions.segments(of: [
+        MessagePart(text: "a", formatting: boldWhole("a")),
+        MessagePart(attachmentPath: "/tmp/file.png"),
+        MessagePart(text: "b "),
+        MessagePart(text: "c", formatting: boldWhole("c")),
+        MessagePart(attachmentPath: "/tmp/other.png"),
+        MessagePart(text: "plain"),
+      ]))
+    #expect(runs.map(\.string) == ["a", "b c", "plain"])
+    #expect(runs.map { partStretches($0).map(\.1) } == [[0], [2], [nil]])
   }
 
   @Test("An attachment splits the text around it, and empty parts are dropped")

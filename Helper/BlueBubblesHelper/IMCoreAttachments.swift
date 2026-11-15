@@ -341,13 +341,20 @@ enum CKCompositions {
   /// three-part shape, so appending part by part put every mention on a line of its own.
   /// Media still goes in through its own append: a text part after an attachment is a new
   /// line in Messages' own composer too.
+  ///
+  /// Each joined run goes through `tagWholeRun(_:partIndex:)` before it is returned.
   static func segments(of parts: [MessagePart]) -> [Segment] {
     var segments: [Segment] = []
     var pending: NSMutableAttributedString?
+    func flushText() {
+      guard let text = pending else { return }
+      tagWholeRun(text, partIndex: segments.count)
+      segments.append(.text(text))
+      pending = nil
+    }
     for part in parts {
       if let path = part.attachmentPath, !path.isEmpty {
-        if let text = pending { segments.append(.text(text)) }
-        pending = nil
+        flushText()
         segments.append(.media(path: path))
       } else if let text = part.text, !text.isEmpty {
         let run = textRun(text, mention: part.mention, formatting: part.formatting)
@@ -358,8 +365,37 @@ enum CKCompositions {
         }
       }
     }
-    if let text = pending { segments.append(.text(text)) }
+    flushText()
     return segments
+  }
+
+  /// Gives a joined text run ONE message part: every character, or none.
+  ///
+  /// `TextFormattingAttributes.apply` tags a part only when that part has formatting, so a
+  /// run joined from a formatted word, a plain `" "` and another formatted word would carry
+  /// the tag on the words and not on the space. Every attributed body Messages writes itself
+  /// tags each character of a text part, spaces included, and a run that is half tagged is a
+  /// shape Messages never produces, so it is not sent either: if any character carries the
+  /// tag, the whole run does. A run with no tag anywhere is left exactly as it was, and
+  /// ChatKit numbers it itself.
+  ///
+  /// The index is the segment's position, counting text runs and attachments alike, which is
+  /// how Messages numbers the parts of the rows it writes (an attachment then text is 0 then
+  /// 1, text then an attachment is 0 then 1). For the first segment that is the 0 `apply`
+  /// writes; after an attachment `apply`'s 0 would name the attachment's part, so it is
+  /// replaced.
+  static func tagWholeRun(_ run: NSMutableAttributedString, partIndex: Int) {
+    let key = NSAttributedString.Key(TextFormattingAttributes.partAttributeName)
+    let whole = NSRange(location: 0, length: run.length)
+    var tagged = false
+    run.enumerateAttribute(key, in: whole) { value, _, stop in
+      if value != nil {
+        tagged = true
+        stop.pointee = true
+      }
+    }
+    guard tagged else { return }
+    run.addAttribute(key, value: partIndex, range: whole)
   }
 
   /// Appends a text run built by `textRun(_:mention:formatting:)` or `segments(of:)`.

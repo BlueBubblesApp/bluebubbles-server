@@ -367,3 +367,19 @@ sending bold, italic+underline, strikethrough and explode on `/message/text`, an
 bold+shake on a multipart part, and reading the same runs back from chat.db after delivery.
 `TextFormattingAttributes` in `Helper/HelperShared` writes them; `TextStyle`/`TextEffect` in
 the contract name them.
+
+**A multipart text run carries the message-part tag on every character or on none.** Every
+attributed body Messages writes tags each character of a text part, spaces included, and
+numbers the parts in order across text and attachments (an attachment then text is part 0 then
+part 1). A client sends per-word formatting as one part per run (`"Hello"` bold, `" "`,
+`"world"` bold), and `TextFormattingAttributes.apply` tags only parts that have formatting, so
+`CKCompositions.segments(of:)` hands each joined run to `CKCompositions.tagWholeRun(_:partIndex:)`,
+which tags the whole run when any of it is tagged, with the run's position as the index. A run
+with no tag anywhere is left for ChatKit to number. Measured 14 November 2026 on macOS 27.0.1
+against a real recipient, with bold `BB`, `" "`, bold `test` and a plain tail: before, the two
+words carried part 0 and the space and the tail carried nothing; after, with an attachment
+first, the whole run carried part 1. In both, the sending Mac's `text` column kept the spaces,
+so on 27 the untagged space is not what loses them from `text`. In that message the attachment
+character came out with no part tag, where rows whose text went in untagged have ChatKit tag the
+attachment too; the message was delivered with its attachment, and whether a tagged run leaves
+the attachment untagged without this change is not measured.
