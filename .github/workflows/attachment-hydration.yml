@@ -28,11 +28,11 @@ jobs:
         with:
           node-version: '20.11.1'
           package-manager-cache: false
-      - name: Install only the native-free TypeScript transpiler
+      - name: Install the transpiler and in-memory SQLite test dependencies
         run: >-
           npm install --prefix "$RUNNER_TEMP/bluebubbles-regressions"
-          --ignore-scripts --no-save --no-audit --no-fund typescript@5.5.2
-      - name: Test the repository fallback without a live database
+          --ignore-scripts --no-save --no-audit --no-fund typescript@5.5.2 typeorm@0.3.20 sql.js@1.13.0
+      - name: Test the repository fallback against synthetic SQLite data
         env:
           NODE_PATH: ${{ runner.temp }}/bluebubbles-regressions/node_modules
         run: node packages/server/scripts/test-attachment-hydration.js

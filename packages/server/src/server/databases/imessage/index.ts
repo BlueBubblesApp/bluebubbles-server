@@ -153,7 +153,7 @@ export class MessageRepository extends Loggable {
      * @param attachmentGuid A specific attachment identifier to get
      * @param withMessages Whether to include the participants or not
      */
-    async getAttachment(attachmentGuid: string, withMessages = false): Promise<Attachment | null> {
+    async getAttachment(attachmentGuid: string, withMessages = false) {
         const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
 
         if (withMessages) query.leftJoinAndSelect("attachment.messages", "message");
@@ -469,7 +469,50 @@ export class MessageRepository extends Loggable {
     }
 
     private normalizeAttachmentGuid(guid: string): string {
-        return guid.slice(-36).toLowerCase();
+        // Match SQLite's ASCII case folding without conflating distinct prefixes.
+        return guid.replace(/[A-Z]/g, letter => letter.toLowerCase());
+    }
+
+    private async getAttachmentsForHydration(guids: ReadonlySet<string>): Promise<Map<string, Attachment | null>> {
+        const columns = ["attachment.guid"];
+        if (isMinHighSierra) columns.push("attachment.original_guid");
+
+        const suffixMatch = columns.map(column => `LOWER(SUBSTR(${column}, -36)) IN (:...suffixes)`).join(" OR ");
+        const suffixes = Array.from(new Set(Array.from(guids, guid => guid.slice(-36))));
+        const byExact = new Map<string, Attachment | null>();
+        const bySuffix = new Map<string, Attachment | null>();
+        const recordMatch = (matches: Map<string, Attachment | null>, key: string, attachment: Attachment) => {
+            if (!matches.has(key)) matches.set(key, attachment);
+            // One row can match through both columns or appear in multiple batches.
+            else if (matches.get(key)?.ROWID !== attachment.ROWID) matches.set(key, null);
+        };
+
+        // SQLite binds each suffix once per column. Keep batches below its legacy 999-variable limit.
+        const batchSize = 400;
+        for (let start = 0; start < suffixes.length; start += batchSize) {
+            const batch = suffixes.slice(start, start + batchSize);
+            const requestedSuffixes = new Set(batch);
+            const candidates = await this.db.getRepository(Attachment)
+                .createQueryBuilder("attachment")
+                .where(suffixMatch, { suffixes: batch })
+                .getMany();
+
+            for (const attachment of candidates) {
+                for (const identifier of [attachment.guid, attachment.originalGuid]) {
+                    if (typeof identifier !== "string" || identifier.includes("\0")) continue;
+                    const exact = this.normalizeAttachmentGuid(identifier);
+                    const suffix = exact.slice(-36);
+                    if (!requestedSuffixes.has(suffix)) continue;
+                    if (guids.has(exact)) recordMatch(byExact, exact, attachment);
+                    recordMatch(bySuffix, suffix, attachment);
+                }
+            }
+        }
+
+        return new Map(Array.from(guids, guid => [
+            guid,
+            byExact.has(guid) ? byExact.get(guid) : bySuffix.get(guid.slice(-36)) ?? null
+        ]));
     }
 
     private getAttributedBodyAttachmentGuids(message: Message): string[] {
@@ -477,15 +520,13 @@ export class MessageRepository extends Loggable {
         for (const item of message.attributedBody ?? []) {
             for (const run of item?.runs ?? []) {
                 const guid = run?.attributes?.__kIMFileTransferGUIDAttributeName;
-                // Reject malformed references before the suffix/LIKE lookup can match unrelated attachments.
+                // Only structured file-transfer UUID references are eligible for hydration.
                 if (
                     typeof guid === "string" &&
                     !guid.includes("\0") &&
-                    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
-                        this.normalizeAttachmentGuid(guid)
-                    )
+                    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(guid.slice(-36))
                 ) {
-                    guids.add(guid);
+                    guids.add(this.normalizeAttachmentGuid(guid));
                 }
             }
         }
@@ -494,7 +535,8 @@ export class MessageRepository extends Loggable {
     }
 
     private async addMissingAttachmentsFromAttributedBody(messages: Message[]): Promise<void> {
-        const attachmentCache = new Map<string, Attachment | null>();
+        const pending: { message: Message; guids: string[] }[] = [];
+        const requested = new Set<string>();
 
         for (const message of messages) {
             const guids = this.getAttributedBodyAttachmentGuids(message);
@@ -502,23 +544,26 @@ export class MessageRepository extends Loggable {
 
             if (!message.attachments) message.attachments = [];
 
-            for (const guid of guids) {
-                const normalizedGuid = this.normalizeAttachmentGuid(guid);
-                const existing = message.attachments.some(attachment => {
+            const missing = guids.filter(guid => {
+                return !message.attachments.some(attachment => {
                     return [attachment.guid, attachment.originalGuid].some(attachmentGuid => {
                         return (
                             typeof attachmentGuid === "string" &&
-                            this.normalizeAttachmentGuid(attachmentGuid) === normalizedGuid
+                            this.normalizeAttachmentGuid(attachmentGuid) === guid
                         );
                     });
                 });
-                if (existing) continue;
+            });
+            if (missing.length === 0) continue;
+            pending.push({ message, guids: missing });
+            missing.forEach(guid => requested.add(guid));
+        }
 
-                if (!attachmentCache.has(normalizedGuid)) {
-                    attachmentCache.set(normalizedGuid, await this.getAttachment(guid));
-                }
-
-                const attachment = attachmentCache.get(normalizedGuid);
+        if (requested.size === 0) return;
+        const attachments = await this.getAttachmentsForHydration(requested);
+        for (const { message, guids } of pending) {
+            for (const guid of guids) {
+                const attachment = attachments.get(guid);
                 if (!attachment) continue;
 
                 const alreadyAdded = message.attachments.some(item => item.ROWID === attachment.ROWID);
