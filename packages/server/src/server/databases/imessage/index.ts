@@ -203,6 +203,7 @@ export class MessageRepository extends Loggable {
         query.andWhere("message.guid = :guid", { guid });
 
         const message = await query.getOne();
+        if (withAttachments && message) await this.addMissingAttachmentsFromAttributedBody([message]);
         return message;
     }
 
@@ -303,7 +304,9 @@ export class MessageRepository extends Loggable {
         query.skip(offset);
         query.take(limit);
 
-        return await query.getManyAndCount();
+        const [messages, totalCount] = await query.getManyAndCount();
+        if (withAttachments) await this.addMissingAttachmentsFromAttributedBody(messages);
+        return [messages, totalCount];
     }
 
     /**
@@ -460,7 +463,113 @@ export class MessageRepository extends Loggable {
         query.skip(offset);
         query.take(limit);
 
-        return await query.getMany();
+        const messages = await query.getMany();
+        if (withAttachments) await this.addMissingAttachmentsFromAttributedBody(messages);
+        return messages;
+    }
+
+    private normalizeAttachmentGuid(guid: string): string {
+        // Match SQLite's ASCII case folding without conflating distinct prefixes.
+        return guid.replace(/[A-Z]/g, letter => letter.toLowerCase());
+    }
+
+    private async getAttachmentsForHydration(guids: ReadonlySet<string>): Promise<Map<string, Attachment | null>> {
+        const columns = ["attachment.guid"];
+        if (isMinHighSierra) columns.push("attachment.original_guid");
+
+        const suffixMatch = columns.map(column => `LOWER(SUBSTR(${column}, -36)) IN (:...suffixes)`).join(" OR ");
+        const suffixes = Array.from(new Set(Array.from(guids, guid => guid.slice(-36))));
+        const byExact = new Map<string, Attachment | null>();
+        const bySuffix = new Map<string, Attachment | null>();
+        const recordMatch = (matches: Map<string, Attachment | null>, key: string, attachment: Attachment) => {
+            if (!matches.has(key)) matches.set(key, attachment);
+            // One row can match through both columns or appear in multiple batches.
+            else if (matches.get(key)?.ROWID !== attachment.ROWID) matches.set(key, null);
+        };
+
+        // SQLite binds each suffix once per column. Keep batches below its legacy 999-variable limit.
+        const batchSize = 400;
+        for (let start = 0; start < suffixes.length; start += batchSize) {
+            const batch = suffixes.slice(start, start + batchSize);
+            const requestedSuffixes = new Set(batch);
+            const candidates = await this.db.getRepository(Attachment)
+                .createQueryBuilder("attachment")
+                .where(suffixMatch, { suffixes: batch })
+                .getMany();
+
+            for (const attachment of candidates) {
+                for (const identifier of [attachment.guid, attachment.originalGuid]) {
+                    if (typeof identifier !== "string" || identifier.includes("\0")) continue;
+                    const exact = this.normalizeAttachmentGuid(identifier);
+                    const suffix = exact.slice(-36);
+                    if (!requestedSuffixes.has(suffix)) continue;
+                    if (guids.has(exact)) recordMatch(byExact, exact, attachment);
+                    recordMatch(bySuffix, suffix, attachment);
+                }
+            }
+        }
+
+        return new Map(Array.from(guids, guid => [
+            guid,
+            byExact.has(guid) ? byExact.get(guid) : bySuffix.get(guid.slice(-36)) ?? null
+        ]));
+    }
+
+    private getAttributedBodyAttachmentGuids(message: Message): string[] {
+        const guids = new Set<string>();
+        for (const item of message.attributedBody ?? []) {
+            for (const run of item?.runs ?? []) {
+                const guid = run?.attributes?.__kIMFileTransferGUIDAttributeName;
+                // Only structured file-transfer UUID references are eligible for hydration.
+                if (
+                    typeof guid === "string" &&
+                    !guid.includes("\0") &&
+                    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(guid.slice(-36))
+                ) {
+                    guids.add(this.normalizeAttachmentGuid(guid));
+                }
+            }
+        }
+
+        return Array.from(guids);
+    }
+
+    private async addMissingAttachmentsFromAttributedBody(messages: Message[]): Promise<void> {
+        const pending: { message: Message; guids: string[] }[] = [];
+        const requested = new Set<string>();
+
+        for (const message of messages) {
+            const guids = this.getAttributedBodyAttachmentGuids(message);
+            if (guids.length === 0) continue;
+
+            if (!message.attachments) message.attachments = [];
+
+            const missing = guids.filter(guid => {
+                return !message.attachments.some(attachment => {
+                    return [attachment.guid, attachment.originalGuid].some(attachmentGuid => {
+                        return (
+                            typeof attachmentGuid === "string" &&
+                            this.normalizeAttachmentGuid(attachmentGuid) === guid
+                        );
+                    });
+                });
+            });
+            if (missing.length === 0) continue;
+            pending.push({ message, guids: missing });
+            missing.forEach(guid => requested.add(guid));
+        }
+
+        if (requested.size === 0) return;
+        const attachments = await this.getAttachmentsForHydration(requested);
+        for (const { message, guids } of pending) {
+            for (const guid of guids) {
+                const attachment = attachments.get(guid);
+                if (!attachment) continue;
+
+                const alreadyAdded = message.attachments.some(item => item.ROWID === attachment.ROWID);
+                if (!alreadyAdded) message.attachments.push(attachment);
+            }
+        }
     }
 
     /**
