@@ -60,7 +60,7 @@ export class CertificateService extends Loggable {
             try {
                 const pem = fs.readFileSync(CertificateService.certPath, { encoding: "utf-8" });
                 const now = new Date().getTime();
-                
+
                 // Try multiple methods to read the certificate based on its type
                 try {
                     if (pem.includes("BEGIN EC PRIVATE KEY") || pem.includes("BEGIN CERTIFICATE")) {
@@ -79,14 +79,15 @@ export class CertificateService extends Loggable {
                 } catch (certError: any) {
                     // If the first method fails, try the alternative
                     try {
-                        const cert = pem.includes("BEGIN CERTIFICATE") ? 
-                            new x509.X509Certificate(pem) : 
-                            pki.certificateFromPem(pem);
-                            
-                        const expirationTime = cert instanceof x509.X509Certificate ? 
-                            cert.notAfter.getTime() : 
-                            cert.validity.notAfter.getTime();
-                            
+                        const cert = pem.includes("BEGIN CERTIFICATE")
+                            ? new x509.X509Certificate(pem)
+                            : pki.certificateFromPem(pem);
+
+                        const expirationTime =
+                            cert instanceof x509.X509Certificate
+                                ? cert.notAfter.getTime()
+                                : cert.validity.notAfter.getTime();
+
                         if (now > expirationTime) {
                             shouldRefresh = true;
                         }
@@ -133,7 +134,8 @@ export class CertificateService extends Loggable {
 
         if (
             prevConfig.password === nextConfig.password &&
-            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() !== onlyAlphaNumeric(ProxyServices.DynamicDNS) &&
+            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() !==
+                onlyAlphaNumeric(ProxyServices.DynamicDNS) &&
             onlyAlphaNumeric(prevConfig.proxy_service as string).toLowerCase() !==
                 onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase()
         )
@@ -146,7 +148,8 @@ export class CertificateService extends Loggable {
         } else if (
             onlyAlphaNumeric(prevConfig.proxy_service as string).toLowerCase() !==
                 onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() &&
-            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() === onlyAlphaNumeric(ProxyServices.DynamicDNS)
+            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() ===
+                onlyAlphaNumeric(ProxyServices.DynamicDNS)
         ) {
             log.info("Proxy service changed to Dynamic DNS. Refreshing certificate");
             CertificateService.refreshCertificate();

@@ -49,4 +49,12 @@ export class OutgoingMessageManager {
 
         return false;
     }
+
+    /**
+     * Drops settled promises so the list doesn't grow unbounded. Unresolved promises are
+     * matched against on every poll, so this keeps that scan bounded to in-flight sends.
+     */
+    prune() {
+        this.promises = this.promises.filter(p => !p.isResolved);
+    }
 }

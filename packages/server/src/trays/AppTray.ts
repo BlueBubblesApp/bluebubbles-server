@@ -43,7 +43,7 @@ export class AppTray extends Tray {
             iconPath = path.join(FileSystem.resources, "macos", "icons", "tray", "icon-lightTemplate.png");
         }
 
-        let trayIcon = nativeImage.createFromPath(iconPath);
+        const trayIcon = nativeImage.createFromPath(iconPath);
         trayIcon.setTemplateImage(true);
 
         // If the this.instance is already created, just change the icon color

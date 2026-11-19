@@ -4,11 +4,12 @@ import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { checkPrivateApiStatus, isEmpty, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
-import { isMinMonterey, isMinVentura } from "@server/env";
+import { isMinMonterey, isMinSequoia, isMinVentura } from "@server/env";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/apple/mappings";
 import { invisibleMediaChar } from "@server/api/http/constants";
 import { ActionHandler } from "@server/api/apple/actions";
 import { rimrafSync } from "rimraf";
+import { hasTextFormatting, validateTextFormatting } from "@server/utils/TextFormattingUtils";
 import type {
     SendMessageParams,
     SendAttachmentParams,
@@ -54,6 +55,7 @@ export class MessageInterface {
         message,
         method = "apple-script",
         attributedBody = null,
+        textFormatting = null,
         subject = null,
         effectId = null,
         selectedMessageGuid = null,
@@ -64,6 +66,22 @@ export class MessageInterface {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
         Server().log(`Sending message "${message}" to ${chatGuid}`, "debug");
+
+        if (hasTextFormatting(textFormatting)) {
+            if (attributedBody) {
+                throw new Error("Use either textFormatting or attributedBody, not both");
+            }
+
+            if (method !== "private-api") {
+                throw new Error("Text formatting requires the Private API send method");
+            }
+
+            if (!isMinSequoia) {
+                throw new Error("Text formatting is only supported on macOS Sequoia (15) and newer");
+            }
+
+            validateTextFormatting(textFormatting, message ?? "");
+        }
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
@@ -103,12 +121,20 @@ export class MessageInterface {
                 chatGuid,
                 message,
                 attributedBody,
+                textFormatting,
                 subject,
                 effectId,
                 selectedMessageGuid,
                 partIndex,
                 ddScan
             });
+
+            // We already have the exact message via its GUID, so resolve the awaiter directly
+            // instead of leaving it to be matched (by text) on a future poll. This attaches
+            // the tempGuid immediately and stops the poller from matching against it further.
+            if (sentMessage && !awaiter.isResolved) {
+                await awaiter.resolve(sentMessage);
+            }
         } else {
             throw new Error(`Invalid send method: ${method}`);
         }
@@ -197,6 +223,12 @@ export class MessageInterface {
                 // Only wait for the promise if it's not sent yet.
                 if (sentMessage && !sentMessage.isSent) {
                     sentMessage = await awaiter.promise;
+                } else if (sentMessage && !awaiter.isResolved) {
+                    // We already have the exact message via its GUID, so resolve the awaiter
+                    // directly instead of leaving it to be matched (by filename) on a future
+                    // poll. This attaches the tempGuid immediately and stops the poller from
+                    // matching against it further.
+                    await awaiter.resolve(sentMessage);
                 }
             } catch (e) {
                 if (sentMessage) {
@@ -225,6 +257,7 @@ export class MessageInterface {
         chatGuid,
         message,
         attributedBody = null,
+        textFormatting = null,
         subject = null,
         effectId = null,
         selectedMessageGuid = null,
@@ -236,6 +269,7 @@ export class MessageInterface {
             chatGuid,
             message,
             attributedBody ?? null,
+            textFormatting ?? null,
             subject ?? null,
             effectId ?? null,
             selectedMessageGuid ?? null,
@@ -303,7 +337,10 @@ export class MessageInterface {
         const retMessage = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
-                return await Server().iMessageRepo.getMessage(result.identifier, true, false);
+                // withAttachments: true -- this is returned as the API response and also used
+                // to resolve the send awaiter directly (see sendAttachmentSync), which broadcasts
+                // it to other clients. Both need the attachment data included.
+                return await Server().iMessageRepo.getMessage(result.identifier, true, true);
             }
         });
 
@@ -472,6 +509,11 @@ export class MessageInterface {
         // If we can't get the message via the transaction, try via the promise
         if (!retMessage) {
             retMessage = await awaiter.promise;
+        } else if (!awaiter.isResolved) {
+            // We already have the exact message via its GUID, so resolve the awaiter directly
+            // instead of leaving it to be matched (by text) on a future poll. This attaches
+            // the tempGuid immediately and stops the poller from matching against it further.
+            await awaiter.resolve(retMessage);
         }
 
         // Check if the name changed

@@ -7,6 +7,7 @@ export type SendMessageParams = {
     message: string;
     method: "apple-script" | "private-api";
     attributedBody?: Record<string, any> | null;
+    textFormatting?: TextFormatting | null;
     subject?: string;
     effectId?: string;
     selectedMessageGuid?: string;
@@ -19,6 +20,7 @@ export type SendMessagePrivateApiParams = {
     chatGuid: string;
     message: string;
     attributedBody?: Record<string, any> | null;
+    textFormatting?: TextFormatting | null;
     subject?: string;
     effectId?: string;
     selectedMessageGuid?: string;
@@ -84,6 +86,16 @@ export type SendMultipartTextParams = {
     parts: Record<string, any>[];
     ddScan?: boolean;
 };
+
+export type TextFormattingStyle = "bold" | "italic" | "underline" | "strikethrough";
+
+export type TextFormattingRange = {
+    start: number;
+    length: number;
+    styles: TextFormattingStyle[];
+};
+
+export type TextFormatting = TextFormattingRange[];
 
 export class Socket extends net.Socket {
     id: string;

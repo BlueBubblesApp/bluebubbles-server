@@ -38,6 +38,7 @@ export class MessageRepository extends Loggable {
             name: "iMessage",
             type: "better-sqlite3",
             database: this.dbPath,
+            readonly: true,
             entities: [Chat, Handle, Message, Attachment]
         });
 

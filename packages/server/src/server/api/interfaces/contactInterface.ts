@@ -285,7 +285,14 @@ export class ContactInterface {
         let contact = null;
 
         // Throw an error if we don't have enough information to update an entry
-        if (updateEntry && isEmpty(id) && isEmpty(externalId) && isEmpty(firstName) && isEmpty(lastName) && isEmpty(displayName)) {
+        if (
+            updateEntry &&
+            isEmpty(id) &&
+            isEmpty(externalId) &&
+            isEmpty(firstName) &&
+            isEmpty(lastName) &&
+            isEmpty(displayName)
+        ) {
             throw new Error(
                 "To update an existing contact, you must provide one of the following: " +
                     "id, externalId, firstName, lastName, displayName"
@@ -407,7 +414,7 @@ export class ContactInterface {
                     .findOne({ where: { externalId }, relations: { addresses: true } });
             }
         }
-        
+
         if (!foundContact && throwError) {
             if (contactId) {
                 throw new Error(`No contact found with the ID: ${contactId}`);
@@ -498,6 +505,7 @@ export class ContactInterface {
 
         // If the file doesn't use \r\n, we need to convert it to use \r\n
         // so that the vcf package can parse it correctly.
+        // eslint-disable-next-line max-len
         // See: https://codeberg.org/jhermsmeier/node-vcf/src/commit/b1024165d874b199b61ec07bbd79291cf922d959/lib/vcard.js#L263
         if (!content.includes("\r\n")) {
             const lines = content.split("\n");
@@ -559,10 +567,10 @@ export class ContactInterface {
         const repo = Server().repo.contacts();
         await repo.clear();
     }
-    
+
     /**
      * Checks if an object has the required fields to be considered a contact
-     * 
+     *
      * @param data The object to check
      * @returns True if the object is a valid contact object
      */
@@ -574,17 +582,17 @@ export class ContactInterface {
             (Object.keys(data).includes("firstName") || Object.keys(data).includes("displayName"))
         );
     }
-    
+
     /**
      * Creates multiple contacts from an array of contact data
-     * 
+     *
      * @param contactData Array of contact data to create
      * @returns Object containing created contacts and any errors
      */
-    static async batchCreateContacts(contactData: any[]): Promise<{ contacts: Contact[], errors: any[] }> {
+    static async batchCreateContacts(contactData: any[]): Promise<{ contacts: Contact[]; errors: any[] }> {
         const contacts: Contact[] = [];
         const errors: any[] = [];
-        
+
         for (const item of contactData) {
             if (!ContactInterface.isAddressObject(item)) {
                 errors.push({
@@ -597,9 +605,9 @@ export class ContactInterface {
             try {
                 contacts.push(
                     await ContactInterface.createOrUpdateContact({
-                        firstName: item.firstName ?? '',
-                        lastName: item?.lastName ?? '',
-                        displayName: item?.displayName ?? '',
+                        firstName: item.firstName ?? "",
+                        lastName: item?.lastName ?? "",
+                        displayName: item?.displayName ?? "",
                         phoneNumbers: item?.phoneNumbers ?? [],
                         emails: item?.emails ?? [],
                         avatar: item?.avatar ?? null,
@@ -614,41 +622,41 @@ export class ContactInterface {
                 });
             }
         }
-        
+
         return { contacts, errors };
     }
-    
+
     /**
      * Updates multiple contacts from an array of contact data
-     * 
+     *
      * @param contactData Array of contact data to update
      * @returns Object containing updated contacts and any errors
      */
-    static async batchUpdateContacts(contactData: any[]): Promise<{ contacts: Contact[], errors: any[] }> {
+    static async batchUpdateContacts(contactData: any[]): Promise<{ contacts: Contact[]; errors: any[] }> {
         const updatedContacts: Contact[] = [];
         const errors: any[] = [];
-        
+
         for (const item of contactData) {
             try {
                 // Find the contact by ID or externalId
                 let contact: Contact | null = null;
-                
+
                 if (item.id) {
                     contact = await ContactInterface.findDbContact({ contactId: item.id, throwError: false });
                 } else if (item.externalId) {
                     contact = await ContactInterface.findDbContact({ externalId: item.externalId, throwError: false });
                 }
-                
+
                 if (!contact) {
                     errors.push({
                         entry: item,
-                        error: item.id 
-                            ? `Contact not found with ID: ${item.id}` 
+                        error: item.id
+                            ? `Contact not found with ID: ${item.id}`
                             : `Contact not found with externalId: ${item.externalId}`
                     });
                     continue;
                 }
-                
+
                 // Update the contact with provided fields
                 const updatedContact = await ContactInterface.createOrUpdateContact({
                     id: contact.id,
@@ -661,7 +669,7 @@ export class ContactInterface {
                     avatar: item.avatar !== undefined ? item.avatar : contact.avatar,
                     updateEntry: true
                 });
-                
+
                 updatedContacts.push(updatedContact);
             } catch (ex: any) {
                 console.log(ex);
@@ -671,20 +679,20 @@ export class ContactInterface {
                 });
             }
         }
-        
+
         return { contacts: updatedContacts, errors };
     }
-    
+
     /**
      * Deletes multiple contacts by ID or externalId
-     * 
+     *
      * @param contactData Array of contact deletion data (containing id or externalId)
      * @returns Object containing deleted IDs and any errors
      */
-    static async batchDeleteContacts(contactData: any[]): Promise<{ deletedIds: any[], errors: any[] }> {
+    static async batchDeleteContacts(contactData: any[]): Promise<{ deletedIds: any[]; errors: any[] }> {
         const deletedIds = [];
         const errors = [];
-        
+
         for (const item of contactData) {
             try {
                 if (!item.id && !item.externalId) {
@@ -694,7 +702,7 @@ export class ContactInterface {
                     });
                     continue;
                 }
-                
+
                 if (item.id) {
                     await ContactInterface.deleteContact({ contactId: item.id });
                     deletedIds.push({ id: item.id });
@@ -709,7 +717,7 @@ export class ContactInterface {
                 });
             }
         }
-        
+
         return { deletedIds, errors };
     }
 }

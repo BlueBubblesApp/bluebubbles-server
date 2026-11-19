@@ -24,7 +24,7 @@ export class OauthService extends Loggable {
 
     running = false;
 
-    status: ProgressStatus = ProgressStatus.NOT_STARTED
+    status: ProgressStatus = ProgressStatus.NOT_STARTED;
 
     koaApp: KoaApp;
 
@@ -54,9 +54,7 @@ export class OauthService extends Loggable {
         "https://www.googleapis.com/auth/iam"
     ];
 
-    private contactScopes = [
-        "https://www.googleapis.com/auth/contacts.readonly"
-    ]
+    private contactScopes = ["https://www.googleapis.com/auth/contacts.readonly"];
 
     get callbackUrl(): string {
         return `http://localhost:${this.port}/oauth/callback`;
@@ -194,7 +192,9 @@ export class OauthService extends Loggable {
         } catch (ex: any) {
             this.log.error(`Failed to create project: ${ex?.message}`);
             if (ex?.response?.data?.error) {
-                this.log.info(`Error: (${ex.response.data.error.code}) ${ex.response.data?.error?.message ?? 'Unknown error'}`);
+                this.log.info(
+                    `Error: (${ex.response.data.error.code}) ${ex.response.data?.error?.message ?? "Unknown error"}`
+                );
             }
 
             this.log.info(`Use the Google Login button and try again. If the issue persists, please contact support.`);
@@ -249,7 +249,7 @@ export class OauthService extends Loggable {
             }
 
             // Mark the service as completed
-            this.log.info('Successfully synced your Google Contacts to the BlueBubbles Server!');
+            this.log.info("Successfully synced your Google Contacts to the BlueBubbles Server!");
             this.setStatus(ProgressStatus.COMPLETED);
 
             // Shutdown the service
@@ -387,7 +387,8 @@ export class OauthService extends Loggable {
             getUrl,
             null,
             "projects",
-            12, 10000,  // Wait at least 2 minutes
+            12,
+            10000, // Wait at least 2 minutes
             `Project "${this.projectName}" was not found! Please restart the setup process.`
         );
         return (projectData.projects ?? []).find((p: any) => p.projectId === projectId);
@@ -511,9 +512,14 @@ export class OauthService extends Loggable {
         } catch (ex: any) {
             if (ex.response?.data?.error?.code === 409) {
                 this.log.info(`Firestore already exists!`);
-            } else if (ex.response?.data?.error?.code === 403 && (ex.response?.data?.error?.message ?? '').includes('requires billing')) {
+            } else if (
+                ex.response?.data?.error?.code === 403 &&
+                (ex.response?.data?.error?.message ?? "").includes("requires billing")
+            ) {
                 if (attempt == 1) {
-                    await this.enableBillingManual(`https://console.developers.google.com/billing/enable?project=${projectId}`);
+                    await this.enableBillingManual(
+                        `https://console.developers.google.com/billing/enable?project=${projectId}`
+                    );
 
                     // Try again after enabling billing
                     await this.createDatabase(projectId, 2);
@@ -692,8 +698,9 @@ export class OauthService extends Loggable {
             attempts += 1;
             if (attempts > maxAttempts) {
                 this.log.debug(`Received data from failed request: ${getObjectAsString(res.data)}`);
-                throw new Error(errorOverride ??
-                    `Failed to get data from: ${url}. Please gather server logs and contact the developers!`
+                throw new Error(
+                    errorOverride ??
+                        `Failed to get data from: ${url}. Please gather server logs and contact the developers!`
                 );
             }
 
@@ -709,7 +716,13 @@ export class OauthService extends Loggable {
      * @param data The data to send (optional)
      * @param key The key to check for in the response data (optional)
      */
-    async tryUntilNoError(method: "GET" | "POST", url: string, data: Record<string, any> = null, maxAttempts = 30, waitTime = 2000) {
+    async tryUntilNoError(
+        method: "GET" | "POST",
+        url: string,
+        data: Record<string, any> = null,
+        maxAttempts = 30,
+        waitTime = 2000
+    ) {
         let attempts = 0;
 
         // eslint-disable-next-line no-constant-condition
@@ -763,7 +776,7 @@ export class OauthService extends Loggable {
 
         // Paginate through all the data
         let pageToken = null;
-        let contacts = [];
+        const contacts = [];
         do {
             const res: AxiosResponse<any, any> = await this.sendRequest("GET", getUrl, null, { ...params, pageToken });
             contacts.push(...res.data.connections);
@@ -808,7 +821,12 @@ export class OauthService extends Loggable {
      * @param data The data to send (optional)
      * @returns The response object
      */
-    async sendRequest(method: "GET" | "POST" | "DELETE", url: string, data: Record<string, any> = null, params: Record<string, any> = null) {
+    async sendRequest(
+        method: "GET" | "POST" | "DELETE",
+        url: string,
+        data: Record<string, any> = null,
+        params: Record<string, any> = null
+    ) {
         if (!this.authToken) throw new Error("Missing auth token");
 
         const headers: Record<string, string> = {

@@ -84,7 +84,9 @@ export class AttachmentRouter {
 
                     const qualities = ["good", "better", "best"];
                     if (!qualities.includes(quality as string)) {
-                        throw new BadRequest({ error: `Invalid quality specified! Must be one of: ${qualities.join(', ')}` });
+                        throw new BadRequest({
+                            error: `Invalid quality specified! Must be one of: ${qualities.join(", ")}`
+                        });
                     }
 
                     opts.quality = quality as "good" | "better" | "best";
