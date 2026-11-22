@@ -454,10 +454,7 @@ export class ChatInterface {
 
     static async markRead(chatGuid: string): Promise<void> {
         await Server().privateApi.chat.markRead(chatGuid);
-        await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
-            chatGuid,
-            read: true
-        });
+        this.notifyReadStatus(chatGuid, true);
     }
 
     static async markUnread(chatGuid: string): Promise<void> {
@@ -465,9 +462,14 @@ export class ChatInterface {
             await Server().privateApi.chat.markUnread(chatGuid);
         }
 
-        await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
-            chatGuid,
-            read: false
+        this.notifyReadStatus(chatGuid, false);
+    }
+
+    private static notifyReadStatus(chatGuid: string, read: boolean): void {
+        const server = Server();
+        // Push delivery can outlive the request once Messages has accepted the change.
+        server.emitMessage(CHAT_READ_STATUS_CHANGED, { chatGuid, read }).catch(() => {
+            server.log("Failed to notify clients about a chat read status change", "debug");
         });
     }
 
